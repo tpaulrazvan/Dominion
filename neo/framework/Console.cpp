@@ -89,6 +89,9 @@ private:
 
 	void				DrawInput();
 	void				DrawNotify();
+#if defined( DOMINION ) // Console Tweaks
+	void				DrawOverlay();
+#endif // DOMINION -> Console Tweaks
 	void				DrawSolidConsole( float frac );
 
 	void				Scroll();
@@ -137,26 +140,50 @@ private:
 
 	idEditField			historyEditLines[COMMAND_HISTORY];
 
-	int					nextHistoryLine;// the last line in the history buffer, not masked
-	int					historyLine;	// the line being displayed from history buffer
+	int					nextHistoryLine;	// the last line in the history buffer, not masked
+	int					historyLine;		// the line being displayed from history buffer
 	// will be <= nextHistoryLine
 
 	idEditField			consoleField;
 
-	idList< overlayText_t >	overlayText;
-	idList< idDebugGraph*> debugGraphs;
+	idList<overlayText_t>	overlayText;
+	idList<idDebugGraph*>	debugGraphs;
 
 	int					lastVirtualScreenWidth;
 	int					lastVirtualScreenHeight;
 
+#if defined( DOMINION ) // Console Tweaks
+	static idCVar		con_speed;
+	static idCVar		con_alpha;
+	static idCVar		con_size;
+	static idCVar		con_notifyTime;
+	static idCVar		con_overlay;
+#else
 	static idCVar		con_speed;
 	static idCVar		con_notifyTime;
 	static idCVar		con_noPrint;
+#endif // DOMINION -> Console Tweaks
 };
 
 static idConsoleLocal localConsole;
 idConsole* console = &localConsole;
 
+#if defined( DOMINION ) // Console Tweaks
+idCVar idConsoleLocal::con_speed(	"con_speed",		"3",		CVAR_FLOAT | CVAR_SYSTEM | CVAR_ARCHIVE,		"Speed at which the console moves up and down" );
+idCVar idConsoleLocal::con_alpha(	"con_alpha",		"0.75",		CVAR_FLOAT | CVAR_SYSTEM | CVAR_ARCHIVE,		"Transparency factor of the console's background", 0.0f, 1.0f );
+idCVar idConsoleLocal::con_size(	"con_size",			"0.5",		CVAR_FLOAT | CVAR_SYSTEM | CVAR_ARCHIVE,		"Size of the console as a fraction of the screen", 0.125f, 1.0f );
+idCVar idConsoleLocal::con_notifyTime(	"con_notifyTime",	"3",	CVAR_FLOAT | CVAR_SYSTEM | CVAR_ARCHIVE,		"Duration (in seconds) that prints remain visible on game top with con_overlay 1", 0.20f, 25.0f );
+#ifdef _DEBUG
+idCVar idConsoleLocal::con_overlay(	"con_overlay",		"1",		CVAR_INTEGER | CVAR_SYSTEM | CVAR_DEBUG,		"Overlay console prints on game top\n"
+									"1 - draws the last few lines of output\n"
+									"2 - draws the entire output", 0, 2 );
+#else
+idCVar idConsoleLocal::con_overlay(	"con_overlay",		"0",		CVAR_INTEGER | CVAR_SYSTEM | CVAR_DEBUG,		"Overlay console prints on game top\n"
+									"1 - draws the last few lines of output\n"
+									"2 - draws the entire output", 0, 2 );
+#endif
+
+#else
 idCVar idConsoleLocal::con_speed( "con_speed", "3", CVAR_SYSTEM, "speed at which the console moves up and down" );
 idCVar idConsoleLocal::con_notifyTime( "con_notifyTime", "3", CVAR_SYSTEM, "time messages are displayed onscreen when console is pulled up" );
 #ifdef DEBUG
@@ -164,6 +191,8 @@ idCVar idConsoleLocal::con_notifyTime( "con_notifyTime", "3", CVAR_SYSTEM, "time
 #else
 	idCVar idConsoleLocal::con_noPrint( "con_noPrint", "1", CVAR_BOOL | CVAR_SYSTEM | CVAR_NOCHEAT, "print on the console but not onscreen when console is pulled up" );
 #endif
+#endif // DOMINION -> Console Tweaks
+
 
 /*
 =============================================================================
@@ -208,9 +237,6 @@ void idConsoleLocal::DrawTextRightAlign( float x, float& y, const char* text, ..
 	renderSystem->DrawSmallStringExt( x - i * SMALLCHAR_WIDTH, y + 2, string, colorWhite, true );
 	y += SMALLCHAR_HEIGHT + 4;
 }
-
-
-
 
 /*
 ==================
@@ -664,7 +690,7 @@ void idConsoleLocal::Shutdown()
 idConsoleLocal::Active
 ================
 */
-bool	idConsoleLocal::Active()
+bool idConsoleLocal::Active()
 {
 	return keyCatching;
 }
@@ -674,7 +700,7 @@ bool	idConsoleLocal::Active()
 idConsoleLocal::ClearNotifyLines
 ================
 */
-void	idConsoleLocal::ClearNotifyLines()
+void idConsoleLocal::ClearNotifyLines()
 {
 	int		i;
 
@@ -689,17 +715,21 @@ void	idConsoleLocal::ClearNotifyLines()
 idConsoleLocal::Open
 ================
 */
-void	idConsoleLocal::Open()
+void idConsoleLocal::Open()
 {
 	if( keyCatching )
 	{
-		return;    // already open
+		return;	// already open
 	}
 
 	consoleField.ClearAutoComplete();
 	consoleField.Clear();
 	keyCatching = true;
+#if defined( DOMINION ) // Console Tweaks
+	SetDisplayFraction( con_size.GetFloat() );
+#else
 	SetDisplayFraction( 0.5f );
+#endif // DOMINION -> Console Tweaks
 }
 
 /*
@@ -707,7 +737,7 @@ void	idConsoleLocal::Open()
 idConsoleLocal::Close
 ================
 */
-void	idConsoleLocal::Close()
+void idConsoleLocal::Close()
 {
 	keyCatching = false;
 	SetDisplayFraction( 0 );
@@ -882,7 +912,6 @@ void idConsoleLocal::Bottom()
 	display = current;
 }
 
-
 /*
 =============================================================================
 
@@ -1027,7 +1056,8 @@ void idConsoleLocal::KeyDownEvent( int key )
 /*
 ==============
 Scroll
-deals with scrolling text because we don't have key repeat
+
+Deals with scrolling text because we don't have key repeat
 ==============
 */
 void idConsoleLocal::Scroll()
@@ -1069,12 +1099,16 @@ void idConsoleLocal::SetDisplayFraction( float frac )
 ==============
 UpdateDisplayFraction
 
-Scrolls the console up or down based on conspeed
+Scrolls the console up or down based on con_speed
 ==============
 */
 void idConsoleLocal::UpdateDisplayFraction()
 {
+#if defined( DOMINION ) // Console Tweaks
+	if( con_speed.GetFloat() <= 0.1f || con_overlay.GetInteger() == 2 )
+#else
 	if( con_speed.GetFloat() <= 0.1f )
+#endif // DOMINION -> Console Tweaks
 	{
 		fracTime = Sys_Milliseconds();
 		displayFrac = finalFrac;
@@ -1084,7 +1118,12 @@ void idConsoleLocal::UpdateDisplayFraction()
 	// scroll towards the destination height
 	if( finalFrac < displayFrac )
 	{
+#if defined( DOMINION ) // Console Tweaks
+		// make sure the time to draw is always the same no matter the fraction
+		displayFrac -= con_speed.GetFloat() * ( con_size.GetFloat() / 0.5f ) * ( Sys_Milliseconds() - fracTime ) * 0.001f;
+#else
 		displayFrac -= con_speed.GetFloat() * ( Sys_Milliseconds() - fracTime ) * 0.001f;
+#endif // DOMINION -> Console Tweaks
 		if( finalFrac > displayFrac )
 		{
 			displayFrac = finalFrac;
@@ -1093,7 +1132,12 @@ void idConsoleLocal::UpdateDisplayFraction()
 	}
 	else if( finalFrac > displayFrac )
 	{
+#if defined( DOMINION ) // Console Tweaks
+		// make sure the time to draw is always the same no matter the fraction
+		displayFrac += con_speed.GetFloat() * ( con_size.GetFloat() / 0.5f ) * ( Sys_Milliseconds() - fracTime ) * 0.001f;
+#else
 		displayFrac += con_speed.GetFloat() * ( Sys_Milliseconds() - fracTime ) * 0.001f;
+#endif // DOMINION -> Console Tweaks
 		if( finalFrac < displayFrac )
 		{
 			displayFrac = finalFrac;
@@ -1107,9 +1151,12 @@ void idConsoleLocal::UpdateDisplayFraction()
 ProcessEvent
 ==============
 */
-bool	idConsoleLocal::ProcessEvent( const sysEvent_t* event, bool forceAccept )
+bool idConsoleLocal::ProcessEvent( const sysEvent_t* event, bool forceAccept )
 {
 	const bool consoleKey = event->evType == SE_KEY && event->evValue == K_GRAVE && com_allowConsole.GetBool();
+#if defined( DOMINION ) // Console Tweaks
+	const bool overlayDrawn = con_overlay.GetInteger() == 2;
+#endif // DOMINION -> Console Tweaks
 
 	// we always catch the console key event
 	if( !forceAccept && consoleKey )
@@ -1132,6 +1179,17 @@ bool	idConsoleLocal::ProcessEvent( const sysEvent_t* event, bool forceAccept )
 		{
 			consoleField.Clear();
 			keyCatching = true;
+#if defined( DOMINION ) // Console Tweaks
+			if( !overlayDrawn && ( idKeyInput::IsDown( K_LSHIFT ) || idKeyInput::IsDown( K_RSHIFT ) ) )
+			{
+				// if the shift key is down, don't open the console as much
+				SetDisplayFraction( 0.25f );
+			}
+			else
+			{
+				SetDisplayFraction( con_size.GetFloat() );
+			}
+#else
 			if( idKeyInput::IsDown( K_LSHIFT ) || idKeyInput::IsDown( K_RSHIFT ) )
 			{
 				// if the shift key is down, don't open the console as much
@@ -1141,9 +1199,18 @@ bool	idConsoleLocal::ProcessEvent( const sysEvent_t* event, bool forceAccept )
 			{
 				SetDisplayFraction( 0.5f );
 			}
+#endif // DOMINION -> Console Tweaks
 		}
 		return true;
 	}
+
+#if defined( DOMINION ) // Console Tweaks
+	// don't allow other key events while the console is fully overlayed on screen
+	if( overlayDrawn && !keyCatching )
+	{
+		return false;
+	}
+#endif // DOMINION -> Console Tweaks
 
 	// if we aren't key catching, dump all the other events
 	if( !forceAccept && !keyCatching )
@@ -1214,7 +1281,6 @@ void idConsoleLocal::Linefeed()
 	}
 }
 
-
 /*
 ================
 Print
@@ -1254,8 +1320,8 @@ void idConsoleLocal::Print( const char* txt )
 
 		y = current % TOTAL_LINES;
 
-		// if we are about to print a new word, check to see
-		// if we should wrap to the new line
+		// if we are about to print a new word, check to see if we should wrap to the new line
+#if 1
 		if( c > ' ' && ( x == 0 || text[y * LINE_WIDTH + x - 1] <= ' ' ) )
 		{
 			// count word length
@@ -1273,6 +1339,24 @@ void idConsoleLocal::Print( const char* txt )
 				Linefeed();
 			}
 		}
+#else
+#if defined( DOMINION ) // Console Tweaks
+		// this wraps better but on some cases it prints one character per row
+		l = 0;
+		// count world length
+		while( l < LINE_WIDTH && txt[l] > ' ' )
+		{
+			l++;
+		}
+		// word wrap
+		if( l > 0 && ( x + l >= LINE_WIDTH ) )
+		{
+			Linefeed();
+			y = current % TOTAL_LINES;
+			x = 0;
+		}
+#endif
+#endif // DOMINION -> Console Tweaks
 
 		txt++;
 
@@ -1309,7 +1393,6 @@ void idConsoleLocal::Print( const char* txt )
 		}
 	}
 
-
 	// mark time for transparent overlay
 	if( current >= 0 )
 	{
@@ -1325,7 +1408,6 @@ DRAWING
 
 ==============================================================================
 */
-
 
 /*
 ================
@@ -1359,7 +1441,6 @@ void idConsoleLocal::DrawInput()
 	consoleField.Draw( LOCALSAFE_LEFT + 2 * SMALLCHAR_WIDTH, y, renderSystem->GetVirtualWidth() - 3 * SMALLCHAR_WIDTH, true );
 }
 
-
 /*
 ================
 DrawNotify
@@ -1375,7 +1456,11 @@ void idConsoleLocal::DrawNotify()
 	int		time;
 	int		currentColor;
 
+#if defined( DOMINION ) // Console Tweaks
+	if( con_overlay.GetInteger() != 1 )
+#else
 	if( con_noPrint.GetBool() )
+#endif // DOMINION -> Console Tweaks
 	{
 		return;
 	}
@@ -1422,6 +1507,115 @@ void idConsoleLocal::DrawNotify()
 	renderSystem->SetColor( colorWhite );
 }
 
+#if defined( DOMINION ) // Console Tweaks
+/*
+================
+DrawOverlay
+
+Draws the console output overlayed on game top
+================
+*/
+void idConsoleLocal::DrawOverlay()
+{
+	int		i, x;
+	float	y;
+	int		row, rows, lines;
+	int		currentColor;
+	short*	text_p;
+
+	// this should really be an exact copy of DrawSolidConsole with a fully transparent background
+	// and minus the input row and the information drawn on the right side (version, date, etc.)
+
+	float frac = con_size.GetFloat();
+
+	lines = idMath::Ftoi( renderSystem->GetVirtualHeight() * frac );
+	if( lines <= 0 )
+	{
+		return;
+	}
+
+	if( lines > renderSystem->GetVirtualHeight() )
+	{
+		lines = renderSystem->GetVirtualHeight();
+	}
+
+	// draw the background
+	y = frac * renderSystem->GetVirtualHeight() - 2;
+	if( y < 1.0f )
+	{
+		y = 0.0f;
+	}
+	else
+	{
+		// make sure the background is always transparent
+		renderSystem->DrawFilled( idVec4( 0.0f, 0.0f, 0.0f, 0.0f ), 0, 0, renderSystem->GetVirtualWidth(), y );
+	}
+
+	// draw the text
+	vislines = lines;
+	// ensure rows are stacked properly no matter the console's size
+	rows = ( lines - SMALLCHAR_HEIGHT * 2 ) / SMALLCHAR_HEIGHT;		// rows of text to draw
+
+	x = 1;
+	y = lines - ( SMALLCHAR_HEIGHT * 3 );
+
+	// draw from the bottom up
+	if( display != current )
+	{
+		// draw arrows to show the buffer is backscrolled
+		renderSystem->SetColor( idStr::ColorForIndex( C_COLOR_WHITE ) );
+		for( x = 0; x < LINE_WIDTH; x += 4 )
+		{
+			renderSystem->DrawSmallChar( LOCALSAFE_LEFT + ( x + 1 )*SMALLCHAR_WIDTH, idMath::Ftoi( y ), '^' );
+		}
+		y -= SMALLCHAR_HEIGHT;
+		rows--;
+	}
+
+	row = display;
+
+	if( x == 0 )
+	{
+		row--;
+	}
+
+	currentColor = idStr::ColorIndex( C_COLOR_WHITE );
+	renderSystem->SetColor( idStr::ColorForIndex( currentColor ) );
+
+	for( i = 0; i < rows; i++, y -= SMALLCHAR_HEIGHT, row-- )
+	{
+		if( row < 0 )
+		{
+			break;
+		}
+		if( current - row >= TOTAL_LINES )
+		{
+			// past scrollback wrap point
+			continue;
+		}
+
+		text_p = text + ( row % TOTAL_LINES ) * LINE_WIDTH;
+
+		for( x = 0; x < LINE_WIDTH; x++ )
+		{
+			if( ( text_p[x] & 0xff ) == ' ' )
+			{
+				continue;
+			}
+
+			if( idStr::ColorIndex( text_p[x] >> 8 ) != currentColor )
+			{
+				currentColor = idStr::ColorIndex( text_p[x] >> 8 );
+				renderSystem->SetColor( idStr::ColorForIndex( currentColor ) );
+			}
+			renderSystem->DrawSmallChar( LOCALSAFE_LEFT + ( x + 1 )*SMALLCHAR_WIDTH, idMath::Ftoi( y ), text_p[x] & 0xff );
+		}
+	}
+
+	renderSystem->SetColor( colorWhite );
+}
+#endif // DOMINION -> Console Tweaks
+
 /*
 ================
 DrawSolidConsole
@@ -1458,7 +1652,12 @@ void idConsoleLocal::DrawSolidConsole( float frac )
 	}
 	else
 	{
+#if defined( DOMINION ) // Console Tweaks
+		// allow us to change the background's transparency
+		renderSystem->DrawFilled( idVec4( 0.0f, 0.0f, 0.0f, con_alpha.GetFloat() ), 0, 0, renderSystem->GetVirtualWidth(), y );
+#else
 		renderSystem->DrawFilled( idVec4( 0.0f, 0.0f, 0.0f, 0.75f ), 0, 0, renderSystem->GetVirtualWidth(), y );
+#endif // DOMINION -> Console Tweaks
 	}
 
 	renderSystem->DrawFilled( colorGold, 0, y, renderSystem->GetVirtualWidth(), 2 );
@@ -1507,7 +1706,12 @@ void idConsoleLocal::DrawSolidConsole( float frac )
 
 	// draw the text
 	vislines = lines;
+#if defined( DOMINION ) // Console Tweaks
+	// ensure rows are stacked properly no matter the console's size
+	rows = ( lines - SMALLCHAR_HEIGHT * 2 ) / SMALLCHAR_HEIGHT;		// rows of text to draw
+#else
 	rows = ( lines - SMALLCHAR_WIDTH ) / SMALLCHAR_WIDTH;		// rows of text to draw
+#endif
 
 	y = lines - ( SMALLCHAR_HEIGHT * 3 );
 
@@ -1570,7 +1774,6 @@ void idConsoleLocal::DrawSolidConsole( float frac )
 	renderSystem->SetColor( colorWhite );
 }
 
-
 /*
 ==============
 Draw
@@ -1605,12 +1808,22 @@ void idConsoleLocal::Draw( bool forceFullScreen )
 	}
 	else
 	{
-		// only draw the notify lines if the developer cvar is set,
-		// or we are a debug build
+		// only draw the notify lines if the developer cvar is set, or if we are a debug build
+#if defined( DOMINION ) // Console Tweaks
+		if( con_overlay.GetInteger() == 1 )
+		{
+			DrawNotify();
+		}
+		if( con_overlay.GetInteger() == 2 )
+		{
+			DrawOverlay();
+		}
+#else
 		if( !con_noPrint.GetBool() )
 		{
 			DrawNotify();
 		}
+#endif
 	}
 
 	float lefty = LOCALSAFE_TOP;
