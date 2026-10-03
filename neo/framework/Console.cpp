@@ -1331,6 +1331,29 @@ void idConsoleLocal::Print( const char* txt )
 
 	while( ( c = *( const unsigned char* )txt ) != 0 )
 	{
+#if defined( DOMINION ) // Two-digit color code
+		if( idStr::IsColor( txt ) )
+		{
+			// no color code, default color
+			if( *( txt + 1 ) == C_COLOR_DEFAULT )
+			{
+				color = idStr::ColorIndex( C_COLOR_WHITE );
+			}
+			// two digit color code
+			else if( idStr::CharIsNumeric( *( txt + 1 ) ) && idStr::CharIsNumeric( *( txt + 2 ) ) )
+			{
+				color = idStr::ColorIndex( ( *( txt + 1 ) - '0' ) * 10 + ( *( txt + 2 ) - '0' ) );
+				txt += 1;
+			}
+			// one digit color code
+			else
+			{
+				color = idStr::ColorIndex( *( txt + 1 ) );
+			}
+			txt += 2;
+			continue;
+		}
+#else
 		if( idStr::IsColor( txt ) )
 		{
 			if( *( txt + 1 ) == C_COLOR_DEFAULT )
@@ -1344,6 +1367,7 @@ void idConsoleLocal::Print( const char* txt )
 			txt += 2;
 			continue;
 		}
+#endif
 
 		y = current % TOTAL_LINES;
 

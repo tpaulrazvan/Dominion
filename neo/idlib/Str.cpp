@@ -37,16 +37,20 @@ If you have questions concerning this license or the applicable additional terms
 idVec4	g_color_table[16] =
 {
 	idVec4( 0.0f, 0.0f, 0.0f, 1.0f ),
-	idVec4( 1.0f, 0.0f, 0.0f, 1.0f ), // S_COLOR_RED
-	idVec4( 0.0f, 1.0f, 0.0f, 1.0f ), // S_COLOR_GREEN
-	idVec4( 1.0f, 1.0f, 0.0f, 1.0f ), // S_COLOR_YELLOW
-	idVec4( 0.0f, 0.0f, 1.0f, 1.0f ), // S_COLOR_BLUE
-	idVec4( 0.0f, 1.0f, 1.0f, 1.0f ), // S_COLOR_CYAN
-	idVec4( 1.0f, 0.5f, 0.0f, 1.0f ), // S_COLOR_ORANGE
-	idVec4( 1.0f, 1.0f, 1.0f, 1.0f ), // S_COLOR_WHITE
-	idVec4( 0.5f, 0.5f, 0.5f, 1.0f ), // S_COLOR_GRAY
-	idVec4( 0.0f, 0.0f, 0.0f, 1.0f ), // S_COLOR_BLACK
+	idVec4( 1.0f, 0.0f, 0.0f, 1.0f ),		// S_COLOR_RED
+	idVec4( 0.0f, 1.0f, 0.0f, 1.0f ),		// S_COLOR_GREEN
+	idVec4( 1.0f, 1.0f, 0.0f, 1.0f ),		// S_COLOR_YELLOW
+	idVec4( 0.0f, 0.0f, 1.0f, 1.0f ),		// S_COLOR_BLUE
+	idVec4( 0.0f, 1.0f, 1.0f, 1.0f ),		// S_COLOR_CYAN
+	idVec4( 1.0f, 0.5f, 0.0f, 1.0f ),		// S_COLOR_ORANGE
+	idVec4( 1.0f, 1.0f, 1.0f, 1.0f ),		// S_COLOR_WHITE
+	idVec4( 0.5f, 0.5f, 0.5f, 1.0f ),		// S_COLOR_GRAY
+	idVec4( 0.0f, 0.0f, 0.0f, 1.0f ),		// S_COLOR_BLACK
+#if defined( DOMINION ) // Two-digit color code
+	idVec4( 0.68f, 0.63f, 0.36f, 1.00f ),	// S_COLOR_GOLD
+#else
 	idVec4( 0.0f, 0.0f, 0.0f, 1.0f ),
+#endif
 	idVec4( 0.0f, 0.0f, 0.0f, 1.0f ),
 	idVec4( 0.0f, 0.0f, 0.0f, 1.0f ),
 	idVec4( 0.0f, 0.0f, 0.0f, 1.0f ),

@@ -1468,8 +1468,7 @@ void idCVarSystemLocal::ListAllContaining( const char* string, int& hits )
 		for( i = matchingCvars.Num() - 1; i >= 0; i-- )
 		{
 			cvar = matchingCvars[i];
-			// would look much better in gold
-			idLib::Printf( S_COLOR_ORANGE "%s", cvar->GetName() );
+			idLib::Printf( S_COLOR_GOLD "%s", cvar->GetName() );
 			idLib::Printf( " is '%s'\n", cvar->GetString() );
 			if( idStr( cvar->GetDescription() ).Length() > 0 )
 			{

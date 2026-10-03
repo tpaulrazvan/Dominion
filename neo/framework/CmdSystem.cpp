@@ -312,8 +312,7 @@ void idCmdSystemLocal::ListAllContaining( const char* string, int& hits )
 		for( i = matchingCmds.Num() - 1; i >= 0; i-- )
 		{
 			cmd = matchingCmds[i];
-			// would look much better in gold
-			idLib::Printf( S_COLOR_ORANGE "%s\n", cmd->name );
+			idLib::Printf( S_COLOR_GOLD "%s\n", cmd->name );
 			if( idStr( cmd->description ).Length() > 0 )
 			{
 				idLib::Printf( "%s\n", cmd->description );

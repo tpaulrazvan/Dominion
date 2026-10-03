@@ -89,6 +89,11 @@ class idVec4;
 	#define FILE_HASH_SIZE		1024
 #endif
 
+#if defined( DOMINION ) // Two-digit color code
+// color escape bits
+const int COLOR_BITS				= 15;
+#endif
+
 // color escape character
 const int C_COLOR_ESCAPE			= '^';
 const int C_COLOR_DEFAULT			= '0';
@@ -101,6 +106,9 @@ const int C_COLOR_ORANGE			= '6';
 const int C_COLOR_WHITE				= '7';
 const int C_COLOR_GRAY				= '8';
 const int C_COLOR_BLACK				= '9';
+#if defined( DOMINION ) // Two-digit color code
+const int C_COLOR_GOLD				= '10';
+#endif
 
 // color escape string
 #define S_COLOR_DEFAULT				"^0"
@@ -113,6 +121,9 @@ const int C_COLOR_BLACK				= '9';
 #define S_COLOR_WHITE				"^7"
 #define S_COLOR_GRAY				"^8"
 #define S_COLOR_BLACK				"^9"
+#if defined( DOMINION ) // Two-digit color code
+#define S_COLOR_GOLD				"^10"
+#endif
 
 // make idStr a multiple of 16 bytes long
 // don't make too large to keep memory requirements to a minimum
@@ -1368,7 +1379,11 @@ ID_INLINE int idStr::IHash( const char* string, int length )
 
 ID_INLINE bool idStr::IsColor( const char* s )
 {
+#if defined( DOMINION ) // Two-digit color code
+	return ( s && s[0] == C_COLOR_ESCAPE && s[1] != '\0' && s[1] != ' ' );
+#else
 	return ( s[0] == C_COLOR_ESCAPE && s[1] != '\0' && s[1] != ' ' );
+#endif
 }
 
 ID_INLINE char idStr::ToLower( char c )
@@ -1431,7 +1446,11 @@ ID_INLINE bool idStr::CharIsTab( char c )
 
 ID_INLINE int idStr::ColorIndex( int c )
 {
+#if defined( DOMINION ) // Two-digit color code
+	return ( ( c - '0' ) & COLOR_BITS );
+#else
 	return ( c & 15 );
+#endif
 }
 
 ID_INLINE int idStr::DynamicMemoryUsed() const
