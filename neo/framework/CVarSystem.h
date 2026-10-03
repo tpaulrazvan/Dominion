@@ -337,6 +337,11 @@ public:
 	// Moves CVars to and from dictionaries.
 	virtual void			MoveCVarsToDict( int flags, idDict& dict, bool onlyModified = false ) const = 0;
 	virtual void			SetCVarsFromDict( const idDict& dict ) = 0;
+
+#if defined( DOMINION ) // Apropos
+	// Lists all CVars that contain the given string
+	virtual void			ListAllContaining( const char* string, int& hits ) = 0;
+#endif
 };
 
 extern idCVarSystem* 		cvarSystem;

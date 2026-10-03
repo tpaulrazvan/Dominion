@@ -527,6 +527,10 @@ public:
 	virtual void			MoveCVarsToDict( int flags, idDict& dict, bool onlyModified ) const;
 	virtual void			SetCVarsFromDict( const idDict& dict );
 
+#if defined( DOMINION ) // Apropos
+	virtual void			ListAllContaining( const char* string, int& hits ) final;
+#endif
+
 	void					RegisterInternal( idCVar* cvar );
 	idInternalCVar* 		FindInternal( const char* name ) const;
 	void					SetInternal( const char* name, const char* value, int flags );
@@ -1401,6 +1405,80 @@ void idCVarSystemLocal::ListByFlags( const idCmdArgs& args, cvarFlags_t flags )
 					"listCvar -flags [search string]   = list cvar flags\n"
 					"listCvar -new [search string]     = list new RBDoom vars\n"	);
 }
+
+#if defined( DOMINION ) // Apropos
+/*
+============
+idCVarSystemLocal::ListAllContaining
+============
+*/
+void idCVarSystemLocal::ListAllContaining( const char* string, int& hits )
+{
+	int i;
+	idStr str;
+	const idInternalCVar* cvar;
+	idList<const idInternalCVar*> matchingCvars;
+
+	if( string == nullptr )
+	{
+		return;
+	}
+
+	str = string;
+	str.ToLower();
+
+	for( i = 0; i < cvars.Num(); i++ )
+	{
+		cvar = cvars[i];
+		// check the names
+		idStr cvarName = cvar->nameString;
+		cvarName.ToLower();
+		if( cvarName.Find( str ) != -1 )
+		{
+			matchingCvars.Append( cvar );
+			hits++;
+			continue;
+		}
+		// check the values, but only if they are not a number
+		idStr cvarValue = cvar->valueString;
+		cvarValue.ToLower();
+		if( ( cvar->GetFlags() & ( CVAR_BOOL | CVAR_FLOAT | CVAR_INTEGER ) ) == 0 || !cvarValue.IsNumeric() )
+		{
+			if( cvarValue.Find( str ) != -1 )
+			{
+				matchingCvars.Append( cvar );
+				hits++;
+				continue;
+			}
+		}
+		// check the descriptions
+		idStr cvarDescription = cvar->GetDescription();
+		cvarDescription.ToLower();
+		if( cvarDescription.Find( str ) != -1 )
+		{
+			matchingCvars.Append( cvar );
+			hits++;
+			continue;
+		}
+	}
+
+	if( matchingCvars.Num() > 0 )
+	{
+		// list in reverse because we tend to add new cvars at the end of the cvar storage files
+		for( i = matchingCvars.Num() - 1; i >= 0; i-- )
+		{
+			cvar = matchingCvars[i];
+			// would look much better in gold
+			idLib::Printf( S_COLOR_ORANGE "%s", cvar->GetName() );
+			idLib::Printf( " is '%s'\n", cvar->GetString() );
+			if( idStr( cvar->GetDescription() ).Length() > 0 )
+			{
+				idLib::Printf( "%s\n", cvar->GetDescription() );
+			}
+		}
+	}
+}
+#endif
 
 /*
 ============

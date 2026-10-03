@@ -115,6 +115,11 @@ private:
 	void					ExecuteTokenizedString( const idCmdArgs& args );
 	void					InsertCommandText( const char* text );
 
+#if defined( DOMINION ) // Apropos
+	// Lists all CMDs that contain the given string
+	static void				ListAllContaining( const char* string, int& hits );
+#endif
+
 	static void				ListByFlags( const idCmdArgs& args, cmdFlags_t flags );
 	static void				List_f( const idCmdArgs& args );
 	static void				SystemList_f( const idCmdArgs& args );
@@ -122,6 +127,9 @@ private:
 	static void				SoundList_f( const idCmdArgs& args );
 	static void				GameList_f( const idCmdArgs& args );
 	static void				ToolList_f( const idCmdArgs& args );
+#if defined( DOMINION ) // Apropos
+	static void				Apropos_f( const idCmdArgs& args );
+#endif
 	static void				Exec_f( const idCmdArgs& args );
 	static void				Vstr_f( const idCmdArgs& args );
 	static void				Echo_f( const idCmdArgs& args );
@@ -255,6 +263,122 @@ void idCmdSystemLocal::ToolList_f( const idCmdArgs& args )
 	idCmdSystemLocal::ListByFlags( args, CMD_FL_TOOL );
 }
 
+#if defined( DOMINION ) // Apropos
+/*
+============
+idCmdSystemLocal::ListAllContaining
+============
+*/
+void idCmdSystemLocal::ListAllContaining( const char* string, int& hits )
+{
+	int i;
+	idStr str;
+	const commandDef_t* cmd;
+	idList<const commandDef_t*> matchingCmds;
+
+	if( string == nullptr )
+	{
+		return;
+	}
+
+	str = string;
+	str.ToLower();
+
+	for( cmd = cmdSystemLocal.GetCommands(); cmd; cmd = cmd->next )
+	{
+		// check the names
+		idStr cmdName = cmd->name;
+		cmdName.ToLower();
+		if( cmdName.Find( str ) != -1 )
+		{
+			matchingCmds.Append( cmd );
+			hits++;
+			continue;
+		}
+		// check the descriptions
+		idStr cmdDescription = cmd->description;
+		cmdDescription.ToLower();
+		if( cmdDescription.Find( str ) != -1 )
+		{
+			matchingCmds.Append( cmd );
+			hits++;
+			continue;
+		}
+	}
+
+	if( matchingCmds.Num() > 0 )
+	{
+		// list in reverse because we tend to add new CMDs at the end of the AddCommand lists
+		for( i = matchingCmds.Num() - 1; i >= 0; i-- )
+		{
+			cmd = matchingCmds[i];
+			// would look much better in gold
+			idLib::Printf( S_COLOR_ORANGE "%s\n", cmd->name );
+			if( idStr( cmd->description ).Length() > 0 )
+			{
+				idLib::Printf( "%s\n", cmd->description );
+			}
+		}
+	}
+}
+
+/*
+============
+idCmdSystemLocal::Apropos_f
+============
+*/
+void idCmdSystemLocal::Apropos_f( const idCmdArgs& args )
+{
+	idStr string;
+
+	if( args.Argc() < 2 )
+	{
+		idLib::Printf( "Usage: apropos <string>\n" );
+		return;
+	}
+
+	string = args.Argv( 1 );
+	string.ToLower();
+
+	// string should have at least three characters
+	if( string.Length() < 3 )
+	{
+		idLib::Printf( "String must contain at least three characters\n" );
+		return;
+	}
+	// and not be numeric
+	/*
+	if ( keyword.IsNumeric() ) {
+		idLib::Printf( "String must not be numeric\n" );
+		return;
+	}
+	*/
+
+	bool hits = false;
+	int cmdCount = 0, cvarCount = 0;
+
+	ListAllContaining( string.c_str(), cmdCount );
+	if( cmdCount > 0 )
+	{
+		hits = true;
+	}
+	cvarSystem->ListAllContaining( string.c_str(), cvarCount );
+	if( cvarCount > 0 )
+	{
+		hits = true;
+	}
+
+	if( hits )
+	{
+		idLib::Printf( "%d CVars / %d CMDs found that contain '%s'\n", cvarCount, cmdCount, string.c_str() );
+	}
+	else
+	{
+		idLib::Printf( "No CVars / CMDs found that contain '%s'\n", string.c_str() );
+	}
+}
+#endif // DOMINION -> Apropos
+
 /*
 ===============
 idCmdSystemLocal::Exec_f
@@ -377,6 +501,9 @@ void idCmdSystemLocal::Init()
 	AddCommand( "listSoundCmds", SoundList_f, CMD_FL_SYSTEM, "lists sound commands" );
 	AddCommand( "listGameCmds", GameList_f, CMD_FL_SYSTEM, "lists game commands" );
 	AddCommand( "listToolCmds", ToolList_f, CMD_FL_SYSTEM, "lists tool commands" );
+#if defined( DOMINION ) // Apropos
+	AddCommand( "apropos", Apropos_f, CMD_FL_SYSTEM, "lists all console variables/commands containing the specified string in the name, description or value" );
+#endif
 	AddCommand( "exec", Exec_f, CMD_FL_SYSTEM, "executes a config file", ArgCompletion_ConfigName );
 	AddCommand( "vstr", Vstr_f, CMD_FL_SYSTEM, "inserts the current value of a cvar as command text" );
 	AddCommand( "echo", Echo_f, CMD_FL_SYSTEM, "prints text" );
