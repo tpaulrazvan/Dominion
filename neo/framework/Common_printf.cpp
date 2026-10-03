@@ -176,7 +176,9 @@ void idCommonLocal::VPrintf( const char* fmt, va_list args )
 	}
 #endif
 
-
+#if defined( DOMINION ) // Console Tweaks
+	// disabling this since we can now print from all threads
+#else
 	if( !idLib::IsMainThread() )
 	{
 		// RB: printf should be thread-safe on Linux
@@ -188,6 +190,7 @@ void idCommonLocal::VPrintf( const char* fmt, va_list args )
 		// RB end
 		return;
 	}
+#endif // DOMINION -> Console Tweaks
 
 	// echo to console buffer
 	console->Print( msg );
@@ -370,10 +373,14 @@ void idCommonLocal::Warning( const char* fmt, ... )
 	va_list		argptr;
 	char		msg[MAX_PRINT_MSG_SIZE];
 
+#if defined( DOMINION ) // Console Tweaks
+	// disabling this since we can now print from all threads
+#else
 	if( !idLib::IsMainThread() )
 	{
 		return;	// not thread safe!
 	}
+#endif // DOMINION -> Console Tweaks
 
 	va_start( argptr, fmt );
 	idStr::vsnPrintf( msg, sizeof( msg ), fmt, argptr );

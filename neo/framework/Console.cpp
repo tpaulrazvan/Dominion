@@ -107,6 +107,10 @@ private:
 	void				DrawOverlayText( float& leftY, float& rightY, float& centerY );
 	void				DrawDebugGraphs();
 
+#if defined( DOMINION ) // Console Tweaks
+	void				PumpThreadLines();
+#endif
+
 	//============================
 
 	// allow these constants to be adjusted for HMD
@@ -151,6 +155,11 @@ private:
 
 	int					lastVirtualScreenWidth;
 	int					lastVirtualScreenHeight;
+
+#if defined( DOMINION ) // Console Tweaks
+	idList<idStr>		strings;			// list to store messages from non main threads
+	idSysMutex			mutex;				// mutex for thread safety
+#endif
 
 #if defined( DOMINION ) // Console Tweaks
 	static idCVar		con_speed;
@@ -679,6 +688,9 @@ idConsoleLocal::Shutdown
 */
 void idConsoleLocal::Shutdown()
 {
+#if defined( DOMINION ) // Console Tweaks
+	strings.Clear();
+#endif // DOMINION -> Console Tweaks
 	cmdSystem->RemoveCommand( "clear" );
 	cmdSystem->RemoveCommand( "conDump" );
 
@@ -782,6 +794,10 @@ void idConsoleLocal::Dump( const char* fileName )
 		common->Warning( "couldn't open %s", fileName );
 		return;
 	}
+
+#if defined( DOMINION ) // Console Tweaks
+	PumpThreadLines();
+#endif // DOMINION -> Console Tweaks
 
 	// skip empty lines
 	l = current - TOTAL_LINES + 1;
@@ -1300,6 +1316,17 @@ void idConsoleLocal::Print( const char* txt )
 		return;
 	}
 
+#if defined( DOMINION ) // Console Tweaks
+	if( !idLib::IsMainThread() )
+	{
+		mutex.Lock();
+		strings.Append( idStr( txt ) );
+		mutex.Unlock();
+	}
+
+	PumpThreadLines();
+#endif // DOMINION -> Console Tweaks
+
 	color = idStr::ColorIndex( C_COLOR_WHITE );
 
 	while( ( c = *( const unsigned char* )txt ) != 0 )
@@ -1399,6 +1426,41 @@ void idConsoleLocal::Print( const char* txt )
 		times[current % NUM_CON_TIMES] = Sys_Milliseconds();
 	}
 }
+
+#if defined( DOMINION ) // Console Tweaks
+/*
+================
+PumpThreadLines
+
+Pump the non-main thread prints to the main thread and print them
+================
+*/
+void idConsoleLocal::PumpThreadLines()
+{
+	static bool isPumping = false;
+
+	if( idLib::IsMainThread() && strings.Num() > 0 )
+	{
+
+		if( isPumping )
+		{
+			return;
+		}
+
+		isPumping = true;
+		mutex.Lock();
+		for( int i = 0; i < strings.Num(); ++i )
+		{
+			const char* msg = strings[i].c_str();
+			// common->Printf( msg );
+			Print( msg );
+		}
+		strings.Clear();
+		mutex.Unlock();
+		isPumping = false;
+	}
+}
+#endif // DOMINION -> Console Tweaks
 
 
 /*
@@ -1797,6 +1859,10 @@ void idConsoleLocal::Draw( bool forceFullScreen )
 	Scroll();
 
 	UpdateDisplayFraction();
+
+#if defined( DOMINION ) // Console Tweaks
+	PumpThreadLines();
+#endif // DOMINION -> Console Tweaks
 
 	if( forceFullScreen )
 	{
