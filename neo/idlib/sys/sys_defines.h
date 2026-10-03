@@ -313,3 +313,5 @@ extern volatile int ignoredReturnValue;
 	#define PRIxSIZE "zx"
 
 #endif // ifdef _MSV_VER
+
+#define DOMINION		1
