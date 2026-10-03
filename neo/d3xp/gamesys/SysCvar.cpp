@@ -327,3 +327,11 @@ idCVar g_xp_bind_run_once(          "g_xp_bind_run_once",		"0",			CVAR_GAME | CV
 // RB: new game mode vars
 idCVar ng_classicFlashlight(		"ng_classicFlashlight",		"0",			CVAR_GAME | CVAR_BOOL | CVAR_ARCHIVE | CVAR_NEW, "Classic flash light weapon" );
 // RB end
+
+#if defined( DOMINION ) // Debug CVars
+idCVar g_testBool(					"g_testBool",						"0",	CVAR_BOOL | CVAR_DEBUG,					"Utility bool variable for internal development and testing game side code" );
+idCVar g_testInt(					"g_testInt",						"0",	CVAR_INTEGER | CVAR_DEBUG,				"Utility integer variable for internal development and testing game side code" );
+idCVar g_testFloat(					"g_testFloat",						"0",	CVAR_FLOAT | CVAR_DEBUG,				"Utility float variable for internal development and testing game side code" );
+idCVar g_testString(				"g_testString",						"",		CVAR_DEBUG,								"Utility string variable for internal development and testing game side code" );
+
+#endif // DOMINION -> Debug CVars

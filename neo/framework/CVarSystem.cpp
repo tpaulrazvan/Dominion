@@ -1370,6 +1370,12 @@ void idCVarSystemLocal::ListByFlags( const idCmdArgs& args, cvarFlags_t flags )
 				{
 					string += S_COLOR_WHITE "TOOL ";
 				}
+#if defined( DOMINION ) // Debug CVars
+				else if( cvar->GetFlags() & CVAR_DEBUG )
+				{
+					string += S_COLOR_WHITE "DEBUG ";
+				}
+#endif // DOMINION -> Debug CVars
 				else
 				{
 					string += S_COLOR_WHITE "     ";
