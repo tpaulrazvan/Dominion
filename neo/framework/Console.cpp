@@ -109,7 +109,7 @@ private:
 
 #if defined( DOMINION ) // Console Tweaks
 	void				PumpThreadLines();
-#endif
+#endif // DOMINION -> Console Tweaks
 
 	//============================
 
@@ -159,7 +159,7 @@ private:
 #if defined( DOMINION ) // Console Tweaks
 	idList<idStr>		strings;			// list to store messages from non main threads
 	idSysMutex			mutex;				// mutex for thread safety
-#endif
+#endif // DOMINION -> Console Tweaks
 
 #if defined( DOMINION ) // Console Tweaks
 	static idCVar		con_speed;
@@ -1367,7 +1367,7 @@ void idConsoleLocal::Print( const char* txt )
 			txt += 2;
 			continue;
 		}
-#endif
+#endif // DOMINION -> Two-digit color code
 
 		y = current % TOTAL_LINES;
 
@@ -1797,7 +1797,7 @@ void idConsoleLocal::DrawSolidConsole( float frac )
 	rows = ( lines - SMALLCHAR_HEIGHT * 2 ) / SMALLCHAR_HEIGHT;		// rows of text to draw
 #else
 	rows = ( lines - SMALLCHAR_WIDTH ) / SMALLCHAR_WIDTH;		// rows of text to draw
-#endif
+#endif // DOMINION -> Console Tweaks
 
 	y = lines - ( SMALLCHAR_HEIGHT * 3 );
 
@@ -1913,7 +1913,7 @@ void idConsoleLocal::Draw( bool forceFullScreen )
 		{
 			DrawNotify();
 		}
-#endif
+#endif // DOMINION -> Console Tweaks
 	}
 
 	float lefty = LOCALSAFE_TOP;

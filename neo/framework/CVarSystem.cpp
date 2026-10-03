@@ -529,7 +529,7 @@ public:
 
 #if defined( DOMINION ) // Apropos
 	virtual void			ListAllContaining( const char* string, int& hits ) final;
-#endif
+#endif // DOMINION -> Apropos
 
 	void					RegisterInternal( idCVar* cvar );
 	idInternalCVar* 		FindInternal( const char* name ) const;
@@ -1477,7 +1477,7 @@ void idCVarSystemLocal::ListAllContaining( const char* string, int& hits )
 		}
 	}
 }
-#endif
+#endif // DOMINION -> Apropos
 
 /*
 ============

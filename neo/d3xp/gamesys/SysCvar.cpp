@@ -333,5 +333,4 @@ idCVar g_testBool(					"g_testBool",						"0",	CVAR_BOOL | CVAR_DEBUG,					"Util
 idCVar g_testInt(					"g_testInt",						"0",	CVAR_INTEGER | CVAR_DEBUG,				"Utility integer variable for internal development and testing game side code" );
 idCVar g_testFloat(					"g_testFloat",						"0",	CVAR_FLOAT | CVAR_DEBUG,				"Utility float variable for internal development and testing game side code" );
 idCVar g_testString(				"g_testString",						"",		CVAR_DEBUG,								"Utility string variable for internal development and testing game side code" );
-
 #endif // DOMINION -> Debug CVars

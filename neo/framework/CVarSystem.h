@@ -341,7 +341,7 @@ public:
 #if defined( DOMINION ) // Apropos
 	// Lists all CVars that contain the given string
 	virtual void			ListAllContaining( const char* string, int& hits ) = 0;
-#endif
+#endif // DOMINION -> Apropos
 };
 
 extern idCVarSystem* 		cvarSystem;

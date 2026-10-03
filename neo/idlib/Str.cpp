@@ -50,7 +50,7 @@ idVec4	g_color_table[16] =
 	idVec4( 0.68f, 0.63f, 0.36f, 1.00f ),	// S_COLOR_GOLD
 #else
 	idVec4( 0.0f, 0.0f, 0.0f, 1.0f ),
-#endif
+#endif // DOMINION -> Two-digit color code
 	idVec4( 0.0f, 0.0f, 0.0f, 1.0f ),
 	idVec4( 0.0f, 0.0f, 0.0f, 1.0f ),
 	idVec4( 0.0f, 0.0f, 0.0f, 1.0f ),

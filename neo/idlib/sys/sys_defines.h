@@ -314,4 +314,4 @@ extern volatile int ignoredReturnValue;
 
 #endif // ifdef _MSV_VER
 
-#define DOMINION		1
+#define DOMINION		1	// macro so we can do our work while trying to stay to a rather cleaner diff for unrefactored files. most likely disabling fail the compile

@@ -118,7 +118,7 @@ private:
 #if defined( DOMINION ) // Apropos
 	// Lists all CMDs that contain the given string
 	static void				ListAllContaining( const char* string, int& hits );
-#endif
+#endif // DOMINION -> Apropos
 
 	static void				ListByFlags( const idCmdArgs& args, cmdFlags_t flags );
 	static void				List_f( const idCmdArgs& args );
@@ -129,7 +129,7 @@ private:
 	static void				ToolList_f( const idCmdArgs& args );
 #if defined( DOMINION ) // Apropos
 	static void				Apropos_f( const idCmdArgs& args );
-#endif
+#endif // DOMINION -> Apropos
 	static void				Exec_f( const idCmdArgs& args );
 	static void				Vstr_f( const idCmdArgs& args );
 	static void				Echo_f( const idCmdArgs& args );
@@ -502,7 +502,7 @@ void idCmdSystemLocal::Init()
 	AddCommand( "listToolCmds", ToolList_f, CMD_FL_SYSTEM, "lists tool commands" );
 #if defined( DOMINION ) // Apropos
 	AddCommand( "apropos", Apropos_f, CMD_FL_SYSTEM, "lists all console variables/commands containing the specified string in the name, description or value" );
-#endif
+#endif // DOMINIOn -> Apropos
 	AddCommand( "exec", Exec_f, CMD_FL_SYSTEM, "executes a config file", ArgCompletion_ConfigName );
 	AddCommand( "vstr", Vstr_f, CMD_FL_SYSTEM, "inserts the current value of a cvar as command text" );
 	AddCommand( "echo", Echo_f, CMD_FL_SYSTEM, "prints text" );
