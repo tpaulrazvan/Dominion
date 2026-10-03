@@ -2182,7 +2182,11 @@ void RB_AddDebugPolygon( const idVec4& color, const idWinding& winding, const in
 	if( rb_numDebugPolygons < MAX_DEBUG_POLYGONS )
 	{
 		poly = &rb_debugPolygons[ rb_numDebugPolygons++ ];
+#if defined( DOMINION ) // Debug Polygons
+		poly->color		= color;
+#else
 		poly->rgb		= color;
+#endif // DOMINION -> Debug Polygons
 		poly->winding	= winding;
 		poly->depthTest = depthTest;
 		poly->lifeTime	= rb_debugPolygonTime + lifeTime;
@@ -2196,6 +2200,63 @@ idRenderBackend::DBG_ShowDebugPolygons
 */
 void idRenderBackend::DBG_ShowDebugPolygons()
 {
+#if defined( DOMINION ) // Debug Polygons
+	int	i, j;
+	debugPolygon_t* poly;
+
+	if( !rb_numDebugPolygons )
+	{
+		return;
+	}
+
+	// all lines are expressed in world coordinates
+	DBG_SimpleWorldSetup();
+
+	// RB --->
+	renderProgManager.BindShader_VertexColor();
+	renderProgManager.CommitUniforms( glStateBits );
+	// <---
+
+	if( r_debugPolygonFilled.GetBool() )
+	{
+		GL_State( GLS_POLYGON_OFFSET | GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA | GLS_DEPTHMASK );
+		GL_PolygonOffset( -1, -2 );
+	}
+	else
+	{
+		GL_State( GLS_POLYGON_OFFSET | GLS_POLYMODE_LINE );
+		GL_PolygonOffset( -1, -2 );
+	}
+
+	poly = rb_debugPolygons;
+	for( i = 0; i < rb_numDebugPolygons; i++, poly++ )
+	{
+		fhImmediateMode im( backEnd.GL_GetCommandList() );
+		im.Begin( GFX_LINES );
+		im.Color4fv( poly->color.ToFloatPtr() );
+		im.Begin( GFX_POLYGON );
+
+		for( j = 0; j < poly->winding.GetNumPoints(); j++ )
+		{
+			im.Vertex3fv( poly->winding[j].ToFloatPtr() );
+		}
+		im.End();
+	}
+
+	GL_State( GLS_DEFAULT );
+
+	// not sure this is alright
+	if( r_debugPolygonFilled.GetBool() )
+	{
+		GL_PolygonOffset( -1, -2 );
+	}
+	else
+	{
+		GL_PolygonOffset( -1, -2 );
+	}
+
+	GL_State( GLS_DEFAULT );
+#endif // DOMINION -> Debug Polygons
 }
 
 /*

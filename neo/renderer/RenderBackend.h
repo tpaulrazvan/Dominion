@@ -97,7 +97,11 @@ struct debugText_t
 
 struct debugPolygon_t
 {
+#if defined( DOMINION ) // Debug Polygons
+	idVec4		color;
+#else
 	idVec4		rgb;
+#endif // DOMINION -> Debug Polygons
 	idWinding	winding;
 	bool		depthTest;
 	int			lifeTime;
