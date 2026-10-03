@@ -1081,7 +1081,12 @@ bool idInventory::Give( idPlayer* owner, const idDict& spawnArgs, const char* st
 	else
 	{
 		// unknown item
+#if defined( DOMINION ) // Console Spam
+		// disable annoying warning for now
+		// gameLocal.Warning( "Unknown stat '%s' added to player's inventory", statname );
+#else
 		gameLocal.Warning( "Unknown stat '%s' added to player's inventory", statname );
+#endif
 		return false;
 	}
 
