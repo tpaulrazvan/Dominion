@@ -1614,6 +1614,9 @@ void idRestoreGame::ReadRenderLight( renderLight_t& renderLight )
 	ReadInt( renderLight.suppressLightInViewID );
 	ReadInt( renderLight.allowLightInViewID );
 	ReadBool( renderLight.noShadows );
+#if defined( SHADOW_VOLUMES )
+	renderLight.prelightModel = NULL;
+#endif
 	ReadBool( renderLight.noSpecular );
 	ReadBool( renderLight.pointLight );
 	ReadBool( renderLight.parallel );

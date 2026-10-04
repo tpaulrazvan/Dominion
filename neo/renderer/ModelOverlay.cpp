@@ -778,9 +778,15 @@ drawSurf_t* idRenderModelOverlay::CreateOverlayDrawSurf( const viewEntity_t* spa
 	drawSurf->numIndexes = newTri->numIndexes;
 	drawSurf->ambientCache = newTri->ambientCache;
 	drawSurf->indexCache = newTri->indexCache;
+#if defined( SHADOW_VOLUMES )
+	drawSurf->shadowCache = 0;
+#endif
 	drawSurf->space = space;
 	drawSurf->scissorRect = space->scissorRect;
 	drawSurf->extraGLState = 0;
+#if defined( SHADOW_VOLUMES )
+	drawSurf->renderZFail = 0;
+#endif
 
 	R_SetupDrawSurfShader( drawSurf, material, &space->entityDef->parms );
 	R_SetupDrawSurfJoints( drawSurf, newTri, NULL );

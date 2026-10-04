@@ -36,12 +36,18 @@ struct PipelineKey
 	float slopeBias;
 
 	Framebuffer* framebuffer;
+#if defined( SHADOW_VOLUMES )
+	byte stencilWriteMask = 0xFF;
+#endif
 };
 
 inline bool operator==( const PipelineKey& lhs, const PipelineKey& rhs )
 {
 	return lhs.state == rhs.state &&
 		   lhs.program == rhs.program &&
+#if defined( SHADOW_VOLUMES )
+		   lhs.stencilWriteMask == rhs.stencilWriteMask &&
+#endif
 		   lhs.framebuffer == rhs.framebuffer &&
 		   lhs.depthBias == rhs.depthBias &&
 		   lhs.slopeBias == rhs.slopeBias;
@@ -55,6 +61,9 @@ struct std::hash<PipelineKey>
 		std::size_t h = 0;
 		nvrhi::hash_combine( h, key.state );
 		nvrhi::hash_combine( h, key.program );
+#if defined( SHADOW_VOLUMES )
+		nvrhi::hash_combine( h, key.stencilWriteMask );
+#endif
 		nvrhi::hash_combine( h, key.framebuffer );
 		nvrhi::hash_combine( h, key.depthBias );
 		nvrhi::hash_combine( h, key.slopeBias );

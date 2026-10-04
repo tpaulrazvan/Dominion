@@ -371,10 +371,10 @@ bool DeviceManager_DX12::CreateDeviceAndSwapChain()
 	if(	SUCCEEDED( targetAdapter->CheckInterfaceSupport( __uuidof( IDXGIDevice ), &UMDVersion ) ) )
 	{
 		version_string.Format( "UMD driver %u.%u.%u.%u",
-								UMDVersion.QuadPart >> 48,
-							  ( UMDVersion.QuadPart >> 32 ) & 0xFFFF,
-							  ( UMDVersion.QuadPart >> 16 ) & 0xFFFF,
-								UMDVersion.QuadPart & 0xFFFF );
+							   UMDVersion.QuadPart >> 48,
+							   ( UMDVersion.QuadPart >> 32 ) & 0xFFFF,
+							   ( UMDVersion.QuadPart >> 16 ) & 0xFFFF,
+							   UMDVersion.QuadPart & 0xFFFF );
 	}
 	else
 	{

@@ -806,6 +806,14 @@ static void CreateMapLight( const idMapEntity* mapEnt )
 	light->lightShader = light->parms.shader;
 #endif
 
+#if defined( SHADOW_VOLUMES )
+	light->name = mapEnt->epairs.GetString( "name" );
+	light->shadowTris = NULL;
+	memcpy( light->def.frustum, light->frustumPlanes, sizeof( light->def.frustum ) );
+	memset( light->def.shadowFrustums, 0, sizeof( light->def.shadowFrustums ) );
+	R_MakeShadowFrustums( &light->def );
+#endif
+
 	dmapGlobals.mapLights.Append( light );
 
 }

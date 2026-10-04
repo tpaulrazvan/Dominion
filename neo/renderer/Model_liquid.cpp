@@ -96,6 +96,10 @@ modelSurface_t idRenderModelLiquid::GenerateSurface( float lerp )
 	tri->mirroredVerts = deformInfo->mirroredVerts;
 	tri->numDupVerts = deformInfo->numDupVerts;
 	tri->dupVerts = deformInfo->dupVerts;
+#if defined( SHADOW_VOLUMES )
+	tri->numSilEdges = deformInfo->numSilEdges;
+	tri->silEdges = deformInfo->silEdges;
+#endif
 
 	tri->numVerts = deformInfo->numOutputVerts;
 	R_AllocStaticTriSurfVerts( tri, tri->numVerts );

@@ -967,6 +967,58 @@ static void WriteOutputEntity( int entityNum, idFile* procFile, idFile* objFile 
 	}
 }
 
+#if defined( SHADOW_VOLUMES )
+/*
+====================
+WriteShadowTriangles
+====================
+*/
+static void WriteShadowTriangles( const srfTriangles_t* tri, idFile* procFile )
+{
+	int			col;
+	int			i;
+
+	// emit this chain
+	procFile->WriteFloatString( "/* numVerts = */ %i /* noCaps = */ %i /* noFrontCaps = */ %i /* numIndexes = */ %i /* planeBits = */ %i\n",
+								ALIGN( tri->numVerts, 2 ), tri->numShadowIndexesNoCaps, tri->numShadowIndexesNoFrontCaps, tri->numIndexes, tri->shadowCapPlaneBits );
+
+	// verts
+	col = 0;
+	for( i = 0 ; i < ALIGN( tri->numVerts, 2 ) ; i++ )
+	{
+		idVec3 position = i < tri->numVerts ? tri->preLightShadowVertexes[i].xyzw.ToVec3() : vec3_zero;
+		Write1DMatrix( procFile, 3, position.ToFloatPtr() );
+
+		if( ++col == 5 )
+		{
+			col = 0;
+			procFile->WriteFloatString( "\n" );
+		}
+	}
+	if( col != 0 )
+	{
+		procFile->WriteFloatString( "\n" );
+	}
+
+	// indexes
+	col = 0;
+	for( i = 0 ; i < tri->numIndexes ; i++ )
+	{
+		procFile->WriteFloatString( "%i ", tri->indexes[i] );
+
+		if( ++col == 18 )
+		{
+			col = 0;
+			procFile->WriteFloatString( "\n" );
+		}
+	}
+	if( col != 0 )
+	{
+		procFile->WriteFloatString( "\n" );
+	}
+}
+
+#endif
 
 /*
 ====================
@@ -1019,6 +1071,21 @@ void WriteOutputFile()
 
 		WriteOutputEntity( i, procFile, objFile );
 	}
+
+#if defined( SHADOW_VOLUMES )
+	for( i = 0; i < dmapGlobals.mapLights.Num(); i++ )
+	{
+		mapLight_t* light = dmapGlobals.mapLights[i];
+		if( light->shadowTris != NULL )
+		{
+			procFile->WriteFloatString( "shadowModel { /* name = */ \"_prelight_%s\"\n\n", light->name.c_str() );
+			WriteShadowTriangles( light->shadowTris, procFile );
+			procFile->WriteFloatString( "}\n\n" );
+			R_FreeStaticTriSurf( light->shadowTris );
+			light->shadowTris = NULL;
+		}
+	}
+#endif
 
 	if( objFile )
 	{

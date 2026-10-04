@@ -713,6 +713,14 @@ void R_CreateLightRefs( idRenderLightLocal* light )
 	// we can limit the area references to those visible through the portals from the light center.
 	// We can't do this in the normal case, because shadows are cast from back facing triangles, which
 	// may be in areas not directly visible to the light projection center.
+
+#if defined( SHADOW_VOLUMES )
+	if( R_GetShadowMode() == SHADOWMODE_VOLUMES && light->parms.prelightModel != NULL && r_useLightPortalFlow.GetBool() && light->lightShader->LightCastsShadows() )
+	{
+		light->world->FlowLightThroughPortals( light );
+	}
+	else
+#else
 	/*
 	if( light->parms.prelightModel != NULL && r_useLightPortalFlow.GetBool() && light->lightShader->LightCastsShadows() )
 	{
@@ -720,6 +728,7 @@ void R_CreateLightRefs( idRenderLightLocal* light )
 	}
 	else
 	*/
+#endif
 	{
 		// push the light frustum down the BSP tree into areas
 		light->world->PushFrustumIntoTree( NULL, light, light->inverseBaseLightProject, bounds_zeroOneCube );

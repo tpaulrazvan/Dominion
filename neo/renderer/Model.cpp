@@ -50,6 +50,10 @@ static const byte BRM_VERSION = BRM_VERSION_MOC_DATA;
 
 static const unsigned int BRM_MAGIC_BFG = ( 'B' << 24 ) | ( 'R' << 16 ) | ( 'M' << 8 ) | BRM_VERSION_BFG;
 static const unsigned int BRM_MAGIC = ( 'B' << 24 ) | ( 'R' << 16 ) | ( 'M' << 8 ) | BRM_VERSION;
+#if defined( SHADOW_VOLUMES )
+	// temp until we figure out what to do with the shadow tris in generated models
+	static const unsigned int BRM_MAGIC_SHADOW = ( 'B' << 24 ) | ( 'R' << 16 ) | ( 'M' << 8 ) | ( BRM_VERSION + 1 );
+#endif
 
 /*
 ================
@@ -392,6 +396,15 @@ bool idRenderModelStatic::LoadBinaryModel( idFile* file, const ID_TIME_T sourceT
 
 	unsigned int magic = 0;
 	file->ReadBig( magic );
+
+#if defined( SHADOW_VOLUMES )
+	const bool hasShadowData = magic == BRM_MAGIC_SHADOW;
+	if( hasShadowData )
+	{
+		magic = BRM_MAGIC;
+	}
+#endif
+
 	if( magic != BRM_MAGIC_BFG && magic != BRM_MAGIC )
 	{
 		return false;
@@ -469,6 +482,24 @@ bool idRenderModelStatic::LoadBinaryModel( idFile* file, const ID_TIME_T sourceT
 				}
 			}
 
+#if defined( SHADOW_VOLUMES )
+			if( magic == BRM_MAGIC_BFG )
+			{
+				file->ReadBig( numInFile );
+				if( numInFile == 0 )
+				{
+					tri.preLightShadowVertexes = NULL;
+				}
+				else
+				{
+					R_AllocStaticTriSurfPreLightShadowVerts( &tri, numInFile );
+					for( int j = 0; j < numInFile; j++ )
+					{
+						file->ReadVec4( tri.preLightShadowVertexes[ j ].xyzw );
+					}
+				}
+			}
+#else
 			if( magic == BRM_MAGIC_BFG )
 			{
 				// jmarshall - keep compatibility.
@@ -493,6 +524,7 @@ bool idRenderModelStatic::LoadBinaryModel( idFile* file, const ID_TIME_T sourceT
 				}
 				// jmarshall end
 			}
+#endif
 
 			file->ReadBig( tri.numIndexes );
 			tri.indexes = NULL;
@@ -525,6 +557,25 @@ bool idRenderModelStatic::LoadBinaryModel( idFile* file, const ID_TIME_T sourceT
 				file->ReadBigArray( tri.dupVerts, tri.numDupVerts * 2 );
 			}
 
+#if defined( SHADOW_VOLUMES )
+			if( magic == BRM_MAGIC_BFG )
+			{
+				file->ReadBig( tri.numSilEdges );
+				tri.silEdges = NULL;
+				if( tri.numSilEdges > 0 )
+				{
+					R_AllocStaticTriSurfSilEdges( &tri, tri.numSilEdges );
+					assert( tri.silEdges != NULL );
+					for( int j = 0; j < tri.numSilEdges; j++ )
+					{
+						file->ReadBig( tri.silEdges[j].p1 );
+						file->ReadBig( tri.silEdges[j].p2 );
+						file->ReadBig( tri.silEdges[j].v1 );
+						file->ReadBig( tri.silEdges[j].v2 );
+					}
+				}
+			}
+#else
 			if( magic == BRM_MAGIC_BFG )
 			{
 				// jmarshall - keep compatibility.
@@ -543,6 +594,7 @@ bool idRenderModelStatic::LoadBinaryModel( idFile* file, const ID_TIME_T sourceT
 				}
 				// jmarshall end
 			}
+#endif
 
 			file->ReadBig( temp );
 			tri.dominantTris = NULL;
@@ -560,6 +612,14 @@ bool idRenderModelStatic::LoadBinaryModel( idFile* file, const ID_TIME_T sourceT
 				}
 			}
 
+#if defined( SHADOW_VOLUMES )
+			if( magic == BRM_MAGIC_BFG )
+			{
+				file->ReadBig( tri.numShadowIndexesNoFrontCaps );
+				file->ReadBig( tri.numShadowIndexesNoCaps );
+				file->ReadBig( tri.shadowCapPlaneBits );
+			}
+#else
 			if( magic == BRM_MAGIC_BFG )
 			{
 				// jmarshall - keep compatibility.
@@ -569,6 +629,7 @@ bool idRenderModelStatic::LoadBinaryModel( idFile* file, const ID_TIME_T sourceT
 				file->ReadBig( stub );
 				// jmarshall end
 			}
+#endif
 
 			// RB: read MOC data
 			if( magic == BRM_MAGIC )
@@ -597,10 +658,52 @@ bool idRenderModelStatic::LoadBinaryModel( idFile* file, const ID_TIME_T sourceT
 			}
 			// RB end
 
+#if defined( SHADOW_VOLUMES )
+			if( hasShadowData )
+			{
+				int numShadowVerts = 0;
+				file->ReadBig( numShadowVerts );
+				if( numShadowVerts > 0 )
+				{
+					R_AllocStaticTriSurfPreLightShadowVerts( &tri, ALIGN( numShadowVerts, 2 ) );
+					for( int j = 0; j < numShadowVerts; j++ )
+					{
+						file->ReadVec4( tri.preLightShadowVertexes[j].xyzw );
+					}
+				}
+				file->ReadBig( tri.numSilEdges );
+				if( tri.numSilEdges > 0 )
+				{
+					R_AllocStaticTriSurfSilEdges( &tri, tri.numSilEdges );
+					for( int j = 0; j < tri.numSilEdges; j++ )
+					{
+						file->ReadBig( tri.silEdges[j].p1 );
+						file->ReadBig( tri.silEdges[j].p2 );
+						file->ReadBig( tri.silEdges[j].v1 );
+						file->ReadBig( tri.silEdges[j].v2 );
+					}
+				}
+				file->ReadBig( tri.numShadowIndexesNoFrontCaps );
+				file->ReadBig( tri.numShadowIndexesNoCaps );
+				file->ReadBig( tri.shadowCapPlaneBits );
+			}
+			if( tri.verts != NULL && tri.numIndexes > 0 && tri.silEdges == NULL )
+			{
+				if( tri.silIndexes == NULL )
+				{
+					R_CreateSilIndexes( &tri );
+				}
+				R_IdentifySilEdges( &tri, false );
+			}
+#endif
+
 			tri.ambientSurface = NULL;
 			tri.nextDeferredFree = NULL;
 			tri.indexCache = 0;
 			tri.ambientCache = 0;
+#if defined( SHADOW_VOLUMES )
+			tri.shadowCache = 0;
+#endif
 		}
 	}
 
@@ -637,7 +740,11 @@ void idRenderModelStatic::WriteBinaryModel( idFile* file, ID_TIME_T* _timeStamp 
 		return;
 	}
 
+#if defined( SHADOW_VOLUMES )
+	file->WriteBig( BRM_MAGIC_SHADOW );
+#else
 	file->WriteBig( BRM_MAGIC );
+#endif
 
 	if( _timeStamp != NULL )
 	{
@@ -768,6 +875,28 @@ void idRenderModelStatic::WriteBinaryModel( idFile* file, ID_TIME_T* _timeStamp 
 				file->WriteBig( ( int ) 0 );
 			}
 			// RB end
+
+#if defined( SHADOW_VOLUMES )
+			file->WriteBig( tri.preLightShadowVertexes != NULL ? tri.numVerts * 2 : 0 );
+			if( tri.preLightShadowVertexes != NULL )
+			{
+				for( int j = 0; j < tri.numVerts * 2; j++ )
+				{
+					file->WriteVec4( tri.preLightShadowVertexes[j].xyzw );
+				}
+			}
+			file->WriteBig( tri.numSilEdges );
+			for( int j = 0; j < tri.numSilEdges; j++ )
+			{
+				file->WriteBig( tri.silEdges[j].p1 );
+				file->WriteBig( tri.silEdges[j].p2 );
+				file->WriteBig( tri.silEdges[j].v1 );
+				file->WriteBig( tri.silEdges[j].v2 );
+			}
+			file->WriteBig( tri.numShadowIndexesNoFrontCaps );
+			file->WriteBig( tri.numShadowIndexesNoCaps );
+			file->WriteBig( tri.shadowCapPlaneBits );
+#endif
 		}
 	}
 

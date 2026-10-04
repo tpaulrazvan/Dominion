@@ -276,10 +276,10 @@ extern idCVar ng_classicFlashlight;
 // RB end
 
 #if defined( DOMINION ) // Debug CVars
-extern idCVar	g_testBool;
-extern idCVar	g_testInt;
-extern idCVar	g_testFloat;
-extern idCVar	g_testString;
+	extern idCVar	g_testBool;
+	extern idCVar	g_testInt;
+	extern idCVar	g_testFloat;
+	extern idCVar	g_testString;
 #endif // DOMINION -> Debug CVars
 
 #endif /* !__SYS_CVAR_H__ */

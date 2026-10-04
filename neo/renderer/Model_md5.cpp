@@ -522,6 +522,10 @@ void idMD5Mesh::UpdateSurface( const struct renderEntity_s* ent, const idJointMa
 	tri->mirroredVerts = deformInfo->mirroredVerts;
 	tri->numDupVerts = deformInfo->numDupVerts;
 	tri->dupVerts = deformInfo->dupVerts;
+#if defined( SHADOW_VOLUMES )
+	tri->numSilEdges = deformInfo->numSilEdges;
+	tri->silEdges = deformInfo->silEdges;
+#endif
 
 	tri->indexCache = deformInfo->staticIndexCache;
 
@@ -536,6 +540,9 @@ void idMD5Mesh::UpdateSurface( const struct renderEntity_s* ent, const idJointMa
 		}
 		tri->verts = deformInfo->verts;
 		tri->ambientCache = deformInfo->staticAmbientCache;
+#if defined( SHADOW_VOLUMES )
+		tri->shadowCache = deformInfo->staticShadowCache;
+#endif
 		tri->referencedVerts = true;
 	}
 	else
@@ -797,9 +804,13 @@ bool idRenderModelMD5::LoadBinaryModel( idFile* file, const ID_TIME_T sourceTime
 		file->ReadBig( deform.numIndexes );
 		file->ReadBig( deform.numMirroredVerts );
 		file->ReadBig( deform.numDupVerts );
+#if defined( SHADOW_VOLUMES )
+		file->ReadBig( deform.numSilEdges );
+#else
 
 		int numSilEdges;
 		file->ReadBig( numSilEdges );
+#endif
 
 		srfTriangles_t	tri;
 		memset( &tri, 0, sizeof( srfTriangles_t ) );
@@ -834,7 +845,23 @@ bool idRenderModelMD5::LoadBinaryModel( idFile* file, const ID_TIME_T sourceTime
 			deform.dupVerts = tri.dupVerts;
 			file->ReadBigArray( deform.dupVerts, deform.numDupVerts * 2 );
 		}
-// jmarshall - compatibility
+
+#if defined( SHADOW_VOLUMES )
+		if( deform.numSilEdges > 0 )
+		{
+			R_AllocStaticTriSurfSilEdges( &tri, deform.numSilEdges );
+			deform.silEdges = tri.silEdges;
+			assert( deform.silEdges != NULL );
+			for( int j = 0; j < deform.numSilEdges; j++ )
+			{
+				file->ReadBig( deform.silEdges[j].p1 );
+				file->ReadBig( deform.silEdges[j].p2 );
+				file->ReadBig( deform.silEdges[j].v1 );
+				file->ReadBig( deform.silEdges[j].v2 );
+			}
+		}
+#else
+		// jmarshall - compatibility
 		if( numSilEdges > 0 )
 		{
 			for( int j = 0; j < numSilEdges; j++ )
@@ -846,7 +873,8 @@ bool idRenderModelMD5::LoadBinaryModel( idFile* file, const ID_TIME_T sourceTime
 				file->ReadBig( stub );
 			}
 		}
-// jmarshall end
+		// jmarshall end
+#endif
 
 		file->ReadBig( meshes[i].surfaceNum );
 	}
@@ -926,8 +954,13 @@ void idRenderModelMD5::WriteBinaryModel( idFile* file, ID_TIME_T* _timeStamp ) c
 		file->WriteBig( deform.numIndexes );
 		file->WriteBig( deform.numMirroredVerts );
 		file->WriteBig( deform.numDupVerts );
+
+#if defined( SHADOW_VOLUMES )
+		file->WriteBig( deform.numSilEdges );
+#else
 		int silDummy = 0;
 		file->WriteBig( silDummy ); // deform.numSilEdges
+#endif
 
 		if( deform.numOutputVerts > 0 )
 		{
@@ -949,6 +982,19 @@ void idRenderModelMD5::WriteBinaryModel( idFile* file, ID_TIME_T* _timeStamp ) c
 		{
 			file->WriteBigArray( deform.dupVerts, deform.numDupVerts * 2 );
 		}
+
+#if defined( SHADOW_VOLUMES )
+		if( deform.numSilEdges > 0 )
+		{
+			for( int j = 0; j < deform.numSilEdges; j++ )
+			{
+				file->WriteBig( deform.silEdges[j].p1 );
+				file->WriteBig( deform.silEdges[j].p2 );
+				file->WriteBig( deform.silEdges[j].v1 );
+				file->WriteBig( deform.silEdges[j].v2 );
+			}
+		}
+#endif
 
 		file->WriteBig( meshes[i].surfaceNum );
 	}

@@ -92,6 +92,9 @@ struct drawSurf_t
 	int						numIndexes;
 	vertCacheHandle_t		indexCache;			// triIndex_t
 	vertCacheHandle_t		ambientCache;		// idDrawVert
+#if defined( SHADOW_VOLUMES )
+	vertCacheHandle_t		shadowCache;		// idShadowVert / idShadowVertSkinned
+#endif
 	vertCacheHandle_t		jointCache;			// idJointMat
 	const viewEntity_t* 	space;
 	const idMaterial* 		material;			// may be NULL for shadow volumes
@@ -102,6 +105,10 @@ struct drawSurf_t
 	drawSurf_t** 			linkChain;			// defer linking to lights to a serial section to avoid a mutex
 	idScreenRect			scissorRect;		// for scissor clipping, local inside renderView viewport
 	const struct portalArea_s*	area;			// RB: if != NULL then the area provides valid lightgrid
+#if defined( SHADOW_VOLUMES )
+	int						renderZFail;
+	volatile shadowVolumeState_t shadowVolumeState;
+#endif
 };
 
 // areas have references to hold all the lights and entities in them
@@ -163,6 +170,14 @@ public:
 	virtual void			RemoveDecals() = 0;
 };
 
+#if defined( SHADOW_VOLUMES )
+struct shadowFrustum_t
+{
+	idPlane planes[6];
+	int numPlanes;
+	bool makeClippedPlanes;
+};
+#endif
 
 class idRenderLightLocal : public idRenderLight
 {
@@ -181,6 +196,12 @@ public:
 	}
 
 	renderLight_t			parms;					// specification
+
+#if defined( SHADOW_VOLUMES )
+	idPlane					frustum[6];
+	int						numShadowFrustums;
+	shadowFrustum_t			shadowFrustums[6];
+#endif
 
 	bool					lightHasMoved;			// the light has changed its position since it was
 	// first added, so the prelight model is not valid
@@ -380,6 +401,11 @@ struct viewLight_t
 	drawSurf_t* 			globalInteractions;			// get shadows from everything
 	drawSurf_t* 			translucentInteractions;	// translucent interactions don't get shadows
 
+#if defined( SHADOW_VOLUMES )
+	// R_AddSingleLight will build a chain of parameters here to setup shadow volumes
+	preLightShadowVolumeParms_t* 	preLightShadowVolumes;
+#endif
+
 	bool					ImageAtlasPlaced() const
 	{
 		return ( imageSize.x != -1 ) && ( imageSize.y != -1 );
@@ -422,6 +448,12 @@ struct viewEntity_t
 	// parallelAddModels will build a chain of surfaces here that will need to
 	// be linked to the lights or added to the drawsurf list in a serial code section
 	drawSurf_t* 			drawSurfs;
+
+#if defined( SHADOW_VOLUMES )
+	// R_AddSingleModel will build a chain of parameters here to setup shadow volumes
+	staticShadowVolumeParms_t* 		staticShadowVolumes;
+	dynamicShadowVolumeParms_t* 	dynamicShadowVolumes;
+#endif
 };
 
 // RB: viewEnvprobes are allocated on the frame temporary stack memory
@@ -784,7 +816,13 @@ enum vertexLayoutType_t
 {
 	LAYOUT_UNKNOWN = 0,	// RB: TODO -1
 	LAYOUT_DRAW_VERT,
+#if defined( SHADOW_VOLUMES )
+	LAYOUT_DRAW_SHADOW_VERT,
+	LAYOUT_DRAW_SHADOW_VERT_SKINNED,
 	LAYOUT_DRAW_IMGUI_VERT, // unused
+#else
+	LAYOUT_DRAW_IMGUI_VERT, // unused
+#endif
 	NUM_VERTEX_LAYOUTS
 };
 
@@ -815,6 +853,11 @@ enum bindingLayoutType_t
 
 	BINDING_LAYOUT_AMBIENT_LIGHTING_IBL,
 	BINDING_LAYOUT_AMBIENT_LIGHTING_IBL_SKINNED,
+
+#if defined( SHADOW_VOLUMES )
+	// BINDING_LAYOUT_DRAW_SHADOWVOLUME, // TODO FIX or REMOVE?
+	// BINDING_LAYOUT_DRAW_SHADOWVOLUME_SKINNED,
+#endif
 
 	BINDING_LAYOUT_DRAW_INTERACTION,
 	BINDING_LAYOUT_DRAW_INTERACTION_SKINNED,
@@ -857,6 +900,11 @@ enum bindingLayoutType_t
 	BINDING_LAYOUT_TONEMAP,
 	BINDING_LAYOUT_HISTOGRAM,
 	BINDING_LAYOUT_EXPOSURE,
+
+#if defined( SHADOW_VOLUMES )
+	BINDING_LAYOUT_SHADOW_VOLUME,
+	BINDING_LAYOUT_SHADOW_VOLUME_SKINNED,
+#endif
 
 	NUM_BINDING_LAYOUTS
 };
@@ -1119,6 +1167,9 @@ extern idCVar r_useLightPortalCulling;		// 0 = none, 1 = box, 2 = exact clip of 
 extern idCVar r_useLightAreaCulling;		// 0 = off, 1 = on
 extern idCVar r_useLightScissors;			// 1 = use custom scissor rectangle for each light
 extern idCVar r_useEntityPortalCulling;		// 0 = none, 1 = box
+#if defined( SHADOW_VOLUMES )
+	extern idCVar r_skipPrelightShadows;		// 1 = skip the dmap generated static shadow volumes
+#endif
 extern idCVar r_useCachedDynamicModels;		// 1 = cache snapshots of dynamic models
 extern idCVar r_useScissor;					// 1 = scissor clip as portals and lights are processed
 extern idCVar r_usePortals;					// 1 = use portals to perform area culling, otherwise draw everything
@@ -1314,6 +1365,32 @@ extern idCVar image_pixelLook;
 extern idCVar r_psxVertexJitter;
 extern idCVar r_psxAffineTextures;
 // RB end
+
+enum shadowMode_t
+{
+	SHADOWMODE_NONE		= 0,
+	SHADOWMODE_VOLUMES	= 1,
+	SHADOWMODE_MAPS		= 2
+};
+
+extern idCVar r_shadows;
+
+ID_INLINE shadowMode_t R_GetShadowMode()
+{
+	const shadowMode_t mode = static_cast<shadowMode_t>( r_shadows.GetInteger() );
+#if !defined( SHADOW_VOLUMES )
+	if( mode == SHADOWMODE_VOLUMES )
+	{
+		return SHADOWMODE_MAPS;
+	}
+#endif
+	return mode;
+}
+#if defined( SHADOW_VOLUMES )
+
+	extern idCVar r_shadowPolygonOffset;
+	extern idCVar r_shadowPolygonFactor;
+#endif
 
 /*
 ====================================================================
@@ -1630,8 +1707,16 @@ TR_TRISURF
 srfTriangles_t* 	R_AllocStaticTriSurf();
 void				R_AllocStaticTriSurfVerts( srfTriangles_t* tri, int numVerts );
 void				R_AllocStaticTriSurfIndexes( srfTriangles_t* tri, int numIndexes );
+#if defined( SHADOW_VOLUMES )
+	void				R_AllocStaticTriSurfPreLightShadowVerts( srfTriangles_t* tri, int numVerts );
+	void				R_CreateSilIndexes( srfTriangles_t* tri );
+	void				R_IdentifySilEdges( srfTriangles_t* tri, bool omitCoplanarEdges );
+#endif
 void				R_AllocStaticTriSurfSilIndexes( srfTriangles_t* tri, int numIndexes );
 void				R_AllocStaticTriSurfDominantTris( srfTriangles_t* tri, int numVerts );
+#if defined( SHADOW_VOLUMES )
+	void				R_AllocStaticTriSurfSilEdges( srfTriangles_t* tri, int numSilEdges );
+#endif
 void				R_AllocStaticTriSurfMirroredVerts( srfTriangles_t* tri, int numMirroredVerts );
 void				R_AllocStaticTriSurfDupVerts( srfTriangles_t* tri, int numDupVerts );
 
@@ -1707,8 +1792,16 @@ struct deformInfo_t
 	int					numDupVerts;			// number of duplicate vertexes
 	int* 				dupVerts;				// pairs of the number of the first vertex and the number of the duplicate vertex
 
+#if defined( SHADOW_VOLUMES )
+	int					numSilEdges;			// number of silhouette edges
+	silEdge_t* 			silEdges;				// silhouette edges
+#endif
+
 	vertCacheHandle_t	staticIndexCache;		// GL_INDEX_TYPE
 	vertCacheHandle_t	staticAmbientCache;		// idDrawVert
+#if defined( SHADOW_VOLUMES )
+	vertCacheHandle_t	staticShadowCache;		// idShadowCacheSkinned
+#endif
 };
 
 
@@ -1790,12 +1883,18 @@ void RB_ShutdownDebugTools();
 void RB_SetVertexColorParms( stageVertexColor_t svc );
 
 
-
-
 //=============================================
 
 #include "ResolutionScale.h"
 #include "RenderLog.h"
+
+#if defined( SHADOW_VOLUMES )
+	#include "jobs/ShadowShared.h"
+	#include "jobs/prelightshadowvolume/PreLightShadowVolume.h"
+	#include "jobs/staticshadowvolume/StaticShadowVolume.h"
+	#include "jobs/dynamicshadowvolume/DynamicShadowVolume.h"
+#endif
+
 #include "GLMatrix.h"
 
 #include "BufferObject.h"

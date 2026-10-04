@@ -115,7 +115,9 @@ ID_INLINE halfFloat_t F32toF16( float a )
 class idDrawVert
 {
 	friend class idSwap;
-//	friend class idShadowVertSkinned;
+#if defined( SHADOW_VOLUMES )
+	friend class idShadowVertSkinned;
+#endif
 	friend class idRenderModelStatic;
 
 	friend void TransformVertsAndTangents( idDrawVert* targetVerts, const int numVerts, const idDrawVert* baseVerts, const idJointMat* joints );
@@ -793,7 +795,7 @@ ID_INLINE idVec3 idDrawVert::GetSkinnedDrawVertPosition( const idDrawVert& vert,
 	return accum * idVec4( vert.xyz.x, vert.xyz.y, vert.xyz.z, 1.0f );
 }
 
-#if 0
+#if defined( SHADOW_VOLUMES )
 /*
 ===============================================================================
 Shadow Vertex

@@ -29,6 +29,13 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __MODEL_H__
 #define __MODEL_H__
 
+#if defined( SHADOW_VOLUMES )
+	#include "jobs/ShadowShared.h"
+	#include "jobs/prelightshadowvolume/PreLightShadowVolume.h"
+	#include "jobs/staticshadowvolume/StaticShadowVolume.h"
+	#include "jobs/dynamicshadowvolume/DynamicShadowVolume.h"
+#endif
+
 /*
 ===============================================================================
 
@@ -95,7 +102,25 @@ struct srfTriangles_t
 	int							numDupVerts;			// number of duplicate vertexes
 	int* 						dupVerts;				// pairs of the number of the first vertex and the number of the duplicate vertex
 
+#if defined( SHADOW_VOLUMES )
+	int							numSilEdges;			// number of silhouette edges
+	silEdge_t* 					silEdges;				// silhouette edges
+#endif
+
 	dominantTri_t* 				dominantTris;			// [numVerts] for deformed surface fast tangent calculation
+
+#if defined( SHADOW_VOLUMES )
+	int							numShadowIndexesNoFrontCaps;	// shadow volumes with front caps omitted
+	int							numShadowIndexesNoCaps;			// shadow volumes with the front and rear caps omitted
+
+	int							shadowCapPlaneBits;		// bits 0-5 are set when that plane of the interacting light has triangles
+	// projected on it, which means that if the view is on the outside of that
+	// plane, we need to draw the rear caps of the shadow volume
+	// dynamic shadows will have SHADOW_CAP_INFINITE
+
+	idShadowVert* 				preLightShadowVertexes;	// shadow vertices in CPU memory for pre-light shadow volumes
+	idShadowVert* 				staticShadowVertexes;	// shadow vertices in CPU memory for static shadow volumes
+#endif
 
 	srfTriangles_t* 			ambientSurface;			// for light interactions, point back at the original surface that generated
 	// the interaction, which we will get the ambientCache from
@@ -110,6 +135,9 @@ struct srfTriangles_t
 	// data in vertex object space, not directly readable by the CPU
 	vertCacheHandle_t			indexCache;				// GL_INDEX_TYPE
 	vertCacheHandle_t			ambientCache;			// idDrawVert
+#if defined( SHADOW_VOLUMES )
+	vertCacheHandle_t			shadowCache;			// idVec4
+#endif
 
 	DISALLOW_COPY_AND_ASSIGN( srfTriangles_t );
 };

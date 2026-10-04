@@ -55,6 +55,9 @@ static drawSurf_t* R_FinishDeform( drawSurf_t* surf, srfTriangles_t* newTri, con
 	surf->numIndexes = newTri->numIndexes;
 	surf->ambientCache = newTri->ambientCache;
 	surf->indexCache = newTri->indexCache;
+#if defined( SHADOW_VOLUMES )
+	surf->shadowCache = 0;
+#endif
 	surf->jointCache = 0;
 	surf->nextOnLight = NULL;
 
@@ -1103,10 +1106,16 @@ static drawSurf_t* R_ParticleDeform( drawSurf_t* surf, bool useArea, nvrhi::ICom
 		drawSurf->numIndexes = newTri->numIndexes;
 		drawSurf->ambientCache = newTri->ambientCache;
 		drawSurf->indexCache = newTri->indexCache;
+#if defined( SHADOW_VOLUMES )
+		drawSurf->shadowCache = 0;
+#endif
 		drawSurf->jointCache = 0;
 		drawSurf->space = surf->space;
 		drawSurf->scissorRect = surf->scissorRect;
 		drawSurf->extraGLState = 0;
+#if defined( SHADOW_VOLUMES )
+		drawSurf->renderZFail = 0;
+#endif
 
 		R_SetupDrawSurfShader( drawSurf, stage->material, renderEntity );
 

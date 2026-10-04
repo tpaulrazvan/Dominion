@@ -54,7 +54,7 @@ idCVar r_skipShaderPasses( "r_skipShaderPasses", "0", CVAR_RENDERER | CVAR_BOOL,
 idCVar r_skipInteractionFastPath( "r_skipInteractionFastPath", "1", CVAR_RENDERER | CVAR_BOOL, "" );
 idCVar r_useLightStencilSelect( "r_useLightStencilSelect", "0", CVAR_RENDERER | CVAR_BOOL, "use stencil select pass" );
 #if defined(__APPLE__) && !USE_OPTICK
-idCVar r_mvkAMDShadowMappingFix( "r_mvkAMDShadowMappingFix", "1", CVAR_RENDERER | CVAR_BOOL | CVAR_NEW, "Use one command list per light when shadow mapping on macOS/MoltenVK + AMD" );
+	idCVar r_mvkAMDShadowMappingFix( "r_mvkAMDShadowMappingFix", "1", CVAR_RENDERER | CVAR_BOOL | CVAR_NEW, "Use one command list per light when shadow mapping on macOS/MoltenVK + AMD" );
 #endif
 
 extern idCVar stereoRender_swapEyes;
@@ -1382,7 +1382,7 @@ void idRenderBackend::DrawSingleInteraction( drawInteraction_t* din, bool useFas
 			}
 			else
 			{
-				if( !r_skipShadows.GetBool() && din->vLight->globalShadows && din->vLight->shadowLOD > -1 )
+				if( !r_skipShadows.GetBool() && R_GetShadowMode() == SHADOWMODE_MAPS && din->vLight->globalShadows && din->vLight->shadowLOD > -1 )
 				{
 					// RB: we have shadow mapping enabled and shadow maps so do a shadow compare
 
@@ -1506,7 +1506,7 @@ void idRenderBackend::DrawSingleInteraction( drawInteraction_t* din, bool useFas
 			}
 			else
 			{
-				if( !r_skipShadows.GetBool() && din->vLight->globalShadows && din->vLight->shadowLOD > -1 )
+				if( !r_skipShadows.GetBool() && R_GetShadowMode() == SHADOWMODE_MAPS && din->vLight->globalShadows && din->vLight->shadowLOD > -1 )
 				{
 					// RB: we have shadow mapping enabled and shadow maps so do a shadow compare
 
@@ -1731,6 +1731,27 @@ void idRenderBackend::RenderInteractions( const drawSurf_t* surfList, const view
 	idStaticList< const drawSurf_t*, MAX_COMPLEX_INTERACTIONS_PER_LIGHT > complexSurfaces;
 	for( const drawSurf_t* walk = surfList; walk != NULL; walk = walk->nextOnLight )
 	{
+
+#if defined( SHADOW_VOLUMES )
+		if( R_GetShadowMode() == SHADOWMODE_VOLUMES )
+		{
+			// make sure the triangle culling is done
+			if( walk->shadowVolumeState != SHADOWVOLUME_DONE )
+			{
+				assert( walk->shadowVolumeState == SHADOWVOLUME_UNFINISHED || walk->shadowVolumeState == SHADOWVOLUME_DONE );
+
+				uint64 start = Sys_Microseconds();
+				while( walk->shadowVolumeState == SHADOWVOLUME_UNFINISHED )
+				{
+					Sys_Yield();
+				}
+				uint64 end = Sys_Microseconds();
+
+				pc.cpuShadowMicroSec += end - start;
+			}
+		}
+#endif
+
 		const idMaterial* surfaceShader = walk->material;
 		if( surfaceShader->GetFastPathBumpImage() )
 		{
@@ -1749,7 +1770,7 @@ void idRenderBackend::RenderInteractions( const drawSurf_t* surfList, const view
 	bool lightDepthBoundsDisabled = false;
 
 	// RB begin
-	if( !r_skipShadows.GetBool() && vLight->shadowLOD > -1 )
+	if( !r_skipShadows.GetBool() && R_GetShadowMode() == SHADOWMODE_MAPS && vLight->shadowLOD > -1 )
 	{
 		const static int JITTER_SIZE = 128;
 
@@ -1880,7 +1901,7 @@ void idRenderBackend::RenderInteractions( const drawSurf_t* surfList, const view
 		lightStage->texture.image->Bind();
 
 		// SRS - Bind shadow map and jitter images only if we are using them
-		if( !r_skipShadows.GetBool() && vLight->shadowLOD > -1 )
+		if( !r_skipShadows.GetBool() && R_GetShadowMode() == SHADOWMODE_MAPS && vLight->shadowLOD > -1 )
 		{
 			if( r_useShadowAtlas.GetBool() && vLight->ImageAtlasPlaced() )
 			{
@@ -2001,7 +2022,7 @@ void idRenderBackend::RenderInteractions( const drawSurf_t* surfList, const view
 				SetVertexParm( RENDERPARM_LIGHTFALLOFF_S, lightProjection[3].ToFloatPtr() );
 
 				// RB begin
-				if( !r_skipShadows.GetBool() && vLight->shadowLOD > -1 && ( ( r_useShadowAtlas.GetBool() && vLight->ImageAtlasPlaced() ) || !r_useShadowAtlas.GetBool() ) )
+				if( !r_skipShadows.GetBool() && R_GetShadowMode() == SHADOWMODE_MAPS && vLight->shadowLOD > -1 && ( ( r_useShadowAtlas.GetBool() && vLight->ImageAtlasPlaced() ) || !r_useShadowAtlas.GetBool() ) )
 				{
 					if( vLight->parallel )
 					{
@@ -2655,6 +2676,303 @@ void idRenderBackend::AmbientPass( const drawSurf_t* const* drawSurfs, int numDr
 }
 
 // RB end
+
+#if defined( SHADOW_VOLUMES )
+/*
+==============================================================================================
+
+STENCIL SHADOW RENDERING
+
+==============================================================================================
+*/
+
+/*
+=====================
+idRenderBackend::StencilShadowPass
+
+The stencil buffer should have been set to 128 on any surfaces that might receive shadows.
+=====================
+*/
+void idRenderBackend::StencilShadowPass( const drawSurf_t* drawSurfs, const viewLight_t* vLight )
+{
+	if( r_skipShadows.GetBool() )
+	{
+		return;
+	}
+
+	if( drawSurfs == NULL )
+	{
+		return;
+	}
+
+	renderLog.OpenBlock( "Render_StencilShadowPass" );
+
+	renderProgManager.BindShader_Shadow();
+
+	GL_SelectTexture( 0 );
+
+	uint64 glState = 0;
+
+	// for visualizing the shadows
+	if( r_showShadows.GetInteger() )
+	{
+		// set the debug shadow color
+		SetFragmentParm( RENDERPARM_COLOR, colorMagenta.ToFloatPtr() );
+		if( r_showShadows.GetInteger() == 2 )
+		{
+			// draw filled in
+			glState = GLS_DEPTHMASK | GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE | GLS_DEPTHFUNC_LESS;
+		}
+		else
+		{
+			// draw as lines, filling the depth buffer
+			glState = GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO | GLS_POLYMODE_LINE | GLS_DEPTHFUNC_ALWAYS;
+		}
+	}
+	else
+	{
+		// don't write to the color or depth buffer, just the stencil buffer
+		glState = GLS_DEPTHMASK | GLS_COLORMASK | GLS_ALPHAMASK | GLS_DEPTHFUNC_LESS;
+	}
+
+	GL_PolygonOffset( r_shadowPolygonFactor.GetFloat(), -r_shadowPolygonOffset.GetFloat() );
+
+	// the actual stencil func will be set in the draw code, but we need to make sure it isn't
+	// disabled here, and that the value will get reset for the interactions without looking
+	// like a no-change-required
+
+	// Two Sided Stencil reduces two draw calls to one for slightly faster shadows
+	GL_State(
+		glState |
+		GLS_STENCIL_OP_FAIL_KEEP |
+		GLS_STENCIL_OP_ZFAIL_KEEP |
+		GLS_STENCIL_OP_PASS_INCR |
+		GLS_STENCIL_MAKE_REF( STENCIL_SHADOW_TEST_VALUE ) |
+		GLS_STENCIL_MAKE_MASK( STENCIL_SHADOW_MASK_VALUE ) |
+		GLS_POLYGON_OFFSET |
+		GLS_CULL_TWOSIDED );
+
+	// process the chain of shadows with the current rendering state
+	currentSpace = NULL;
+
+	for( const drawSurf_t* drawSurf = drawSurfs; drawSurf != NULL; drawSurf = drawSurf->nextOnLight )
+	{
+		if( drawSurf->scissorRect.IsEmpty() )
+		{
+			continue;	// !@# FIXME: find out why this is sometimes being hit!
+			// temporarily jump over the scissor and draw so the gl error callback doesn't get hit
+		}
+
+		// make sure the shadow volume is done
+		if( drawSurf->shadowVolumeState != SHADOWVOLUME_DONE )
+		{
+			assert( drawSurf->shadowVolumeState == SHADOWVOLUME_UNFINISHED || drawSurf->shadowVolumeState == SHADOWVOLUME_DONE );
+
+			uint64 start = Sys_Microseconds();
+			while( drawSurf->shadowVolumeState == SHADOWVOLUME_UNFINISHED )
+			{
+				Sys_Yield();
+			}
+			uint64 end = Sys_Microseconds();
+
+			pc.cpuShadowMicroSec += end - start;
+		}
+
+		if( drawSurf->numIndexes == 0 )
+		{
+			continue;	// a job may have created an empty shadow volume
+		}
+
+		if( !currentScissor.Equals( drawSurf->scissorRect ) && r_useScissor.GetBool() )
+		{
+			// change the scissor
+#if 1 // Fix: convert the GL scissor to the current DX/Vulkan upper-left origin
+			GL_Scissor( viewDef->viewport.x1 + drawSurf->scissorRect.x1,
+						viewDef->viewport.y2 - drawSurf->scissorRect.y2,
+						drawSurf->scissorRect.x2 + 1 - drawSurf->scissorRect.x1,
+						drawSurf->scissorRect.y2 + 1 - drawSurf->scissorRect.y1 );
+#else
+			GL_Scissor( viewDef->viewport.x1 + drawSurf->scissorRect.x1,
+						viewDef->viewport.y1 + drawSurf->scissorRect.y1,
+						drawSurf->scissorRect.x2 + 1 - drawSurf->scissorRect.x1,
+						drawSurf->scissorRect.y2 + 1 - drawSurf->scissorRect.y1 );
+#endif
+			currentScissor = drawSurf->scissorRect;
+		}
+
+		if( drawSurf->space != currentSpace )
+		{
+			// change the matrix
+			RB_SetMVP( drawSurf->space->mvp );
+
+			// set the local light position to allow the vertex program to project the shadow volume end cap to infinity
+			idVec4 localLight( 0.0f );
+			R_GlobalPointToLocal( drawSurf->space->modelMatrix, vLight->globalLightOrigin, localLight.ToVec3() );
+			SetVertexParm( RENDERPARM_LOCALLIGHTORIGIN, localLight.ToFloatPtr() );
+
+			currentSpace = drawSurf->space;
+		}
+
+		if( r_showShadows.GetInteger() == 0 )
+		{
+			if( drawSurf->jointCache )
+			{
+				renderProgManager.BindShader_ShadowSkinned();
+			}
+			else
+			{
+				renderProgManager.BindShader_Shadow();
+			}
+		}
+		else
+		{
+			if( drawSurf->jointCache )
+			{
+				renderProgManager.BindShader_ShadowDebugSkinned();
+			}
+			else
+			{
+				renderProgManager.BindShader_ShadowDebug();
+			}
+		}
+
+		// set depth bounds per shadow
+		if( r_useShadowDepthBounds.GetBool() )
+		{
+			GL_DepthBoundsTest( drawSurf->scissorRect.zmin, drawSurf->scissorRect.zmax );
+		}
+
+		// Determine whether or not the shadow volume needs to be rendered with Z-pass or
+		// Z-fail. It is worthwhile to spend significant resources to reduce the number of
+		// cases where shadow volumes need to be rendered with Z-fail because Z-fail
+		// rendering can be significantly slower even on today's hardware. For instance,
+		// on NVIDIA hardware Z-fail rendering causes the Z-Cull to be used in reverse:
+		// Z-near becomes Z-far (trivial accept becomes trivial reject). Using the Z-Cull
+		// in reverse is far less efficient because the Z-Cull only stores Z-near per 16x16
+		// pixels while the Z-far is stored per 4x2 pixels. (The Z-near coallesce buffer
+		// which has 4x4 granularity is only used when updating the depth which is not the
+		// case for shadow volumes.) Note that it is also important to NOT use a Z-Cull
+		// reconstruct because that would clear the Z-near of the Z-Cull which results in
+		// no trivial rejection for Z-fail stencil shadow rendering.
+
+		const bool renderZPass = ( drawSurf->renderZFail == 0 ) || r_forceZPassStencilShadows.GetBool();
+
+		DrawStencilShadowPass( drawSurf, renderZPass );
+	}
+
+	// cleanup the shadow specific rendering state
+
+	GL_State( ( glStateBits & ~( GLS_CULL_MASK ) ) | GLS_CULL_FRONTSIDED );
+
+	// reset depth bounds
+	if( r_useShadowDepthBounds.GetBool() )
+	{
+		if( r_useLightDepthBounds.GetBool() )
+		{
+			GL_DepthBoundsTest( vLight->scissorRect.zmin, vLight->scissorRect.zmax );
+		}
+		else
+		{
+			GL_DepthBoundsTest( 0.0f, 0.0f );
+		}
+	}
+
+	renderLog.CloseBlock();
+}
+
+/*
+==================
+idRenderBackend::StencilSelectLight
+
+Deform the zeroOneCubeModel to exactly cover the light volume. Render the deformed cube model to the stencil buffer in
+such a way that only fragments that are directly visible and contained within the volume will be written creating a
+mask to be used by the following stencil shadow and draw interaction passes.
+==================
+*/
+void idRenderBackend::StencilSelectLight( const viewLight_t* vLight )
+{
+	renderLog.OpenBlock( "Stencil Select", colorPink );
+
+	// enable the light scissor
+	if( !currentScissor.Equals( vLight->scissorRect ) && r_useScissor.GetBool() )
+	{
+#if 1 // Fix: convert the GL scissor to the current DX/Vulkan upper-left origin
+		GL_Scissor( viewDef->viewport.x1 + vLight->scissorRect.x1,
+					viewDef->viewport.y2 - vLight->scissorRect.y2,
+					vLight->scissorRect.x2 + 1 - vLight->scissorRect.x1,
+					vLight->scissorRect.y2 + 1 - vLight->scissorRect.y1 );
+#else
+		GL_Scissor( viewDef->viewport.x1 + vLight->scissorRect.x1,
+					viewDef->viewport.y1 + vLight->scissorRect.y1,
+					vLight->scissorRect.x2 + 1 - vLight->scissorRect.x1,
+					vLight->scissorRect.y2 + 1 - vLight->scissorRect.y1 );
+#endif
+		currentScissor = vLight->scissorRect;
+	}
+
+	// clear stencil buffer to 0 (not drawable)
+	uint64 glStateMinusStencil = GL_GetCurrentStateMinusStencil();
+	GL_State(
+		glStateMinusStencil |
+		GLS_STENCIL_FUNC_ALWAYS |
+		GLS_STENCIL_MAKE_REF( STENCIL_SHADOW_TEST_VALUE ) |
+		GLS_STENCIL_MAKE_MASK( STENCIL_SHADOW_MASK_VALUE ) );	// make sure stencil mask passes for the clear
+
+	GL_Clear( false, false, true, 0, 0.0f, 0.0f, 0.0f, 0.0f, false );	// clear to 0 for stencil select
+
+	// set the depthbounds
+	GL_DepthBoundsTest( vLight->scissorRect.zmin, vLight->scissorRect.zmax );
+
+	const byte previousStencilWriteMask = stencilWriteMask;
+
+#if 1
+	stencilWriteMask = STENCIL_SHADOW_TEST_VALUE;
+	GL_State(
+		GLS_COLORMASK |
+		GLS_ALPHAMASK |
+		GLS_CULL_TWOSIDED |
+		GLS_DEPTHMASK |
+		GLS_DEPTHFUNC_LESS |
+		GLS_STENCIL_FUNC_ALWAYS |
+		GLS_STENCIL_OP_FAIL_KEEP | GLS_STENCIL_OP_ZFAIL_INVERT | GLS_STENCIL_OP_PASS_KEEP |
+		GLS_STENCIL_MAKE_REF( STENCIL_SHADOW_TEST_VALUE ) |
+		GLS_STENCIL_MAKE_MASK( STENCIL_SHADOW_MASK_VALUE ) );
+#else
+	GL_State(
+		GLS_COLORMASK |
+		GLS_ALPHAMASK |
+		GLS_CULL_TWOSIDED |
+		GLS_DEPTHMASK |
+		GLS_DEPTHFUNC_LESS |
+		GLS_STENCIL_FUNC_ALWAYS |
+		GLS_STENCIL_OP_FAIL_KEEP | GLS_STENCIL_OP_ZFAIL_REPLACE | GLS_STENCIL_OP_PASS_ZERO |
+		GLS_BACK_STENCIL_OP_FAIL_KEEP | GLS_BACK_STENCIL_OP_ZFAIL_ZERO | GLS_BACK_STENCIL_OP_PASS_REPLACE |
+		GLS_STENCIL_MAKE_REF( STENCIL_SHADOW_TEST_VALUE ) |
+		GLS_STENCIL_MAKE_MASK( STENCIL_SHADOW_MASK_VALUE ) );
+#endif
+
+	renderProgManager.BindShader_Depth();
+
+	// set the matrix for deforming the 'zeroOneCubeModel' into the frustum to exactly cover the light volume
+	idRenderMatrix invProjectMVPMatrix;
+	idRenderMatrix::Multiply( viewDef->worldSpace.mvp, vLight->inverseBaseLightProject, invProjectMVPMatrix );
+	RB_SetMVP( invProjectMVPMatrix );
+
+	DrawElementsWithCounters( &zeroOneCubeSurface );
+
+	// rstore full writes for the following shadow-volume counting passes
+	stencilWriteMask = previousStencilWriteMask;
+	// reset stencil state
+	GL_State( ( glStateBits & ~( GLS_CULL_MASK ) ) | GLS_CULL_FRONTSIDED );
+
+	renderProgManager.Unbind();
+
+	// unset the depthbounds
+	GL_DepthBoundsTest( 0.0f, 0.0f );
+
+	renderLog.CloseBlock();
+}
+#endif
 
 /*
 ==============================================================================================
@@ -3543,7 +3861,7 @@ public:
 
 void idRenderBackend::ShadowAtlasPass( const viewDef_t* _viewDef )
 {
-	if( r_skipShadows.GetBool() || !r_useShadowAtlas.GetBool() || viewDef->viewLights == NULL )
+	if( r_skipShadows.GetBool() || R_GetShadowMode() != SHADOWMODE_MAPS || !r_useShadowAtlas.GetBool() || viewDef->viewLights == NULL )
 	{
 		return;
 	}
@@ -3880,7 +4198,11 @@ void idRenderBackend::DrawInteractions( const viewDef_t* _viewDef )
 
 	GL_SelectTexture( 0 );
 
+#if defined( SHADOW_VOLUMES )
+	const bool useLightDepthBounds = r_useLightDepthBounds.GetBool() && R_GetShadowMode() == SHADOWMODE_VOLUMES;
+#else
 	const bool useLightDepthBounds = false; //r_useLightDepthBounds.GetBool() && !r_useShadowMapping.GetBool();
+#endif
 
 	Framebuffer* previousFramebuffer = Framebuffer::GetActiveFramebuffer();
 
@@ -3915,8 +4237,11 @@ void idRenderBackend::DrawInteractions( const viewDef_t* _viewDef )
 		}
 
 		// RB: render interactions with shadow mapping
+#if defined( SHADOW_VOLUMES )
+		if( R_GetShadowMode() != SHADOWMODE_VOLUMES )
+#endif
 		{
-			if( !r_skipShadows.GetBool() && vLight->shadowLOD > -1 && !r_useShadowAtlas.GetBool() )
+			if( !r_skipShadows.GetBool() && R_GetShadowMode() == SHADOWMODE_MAPS && vLight->shadowLOD > -1 && !r_useShadowAtlas.GetBool() )
 			{
 				int	side, sideStop;
 
@@ -3984,6 +4309,82 @@ void idRenderBackend::DrawInteractions( const viewDef_t* _viewDef )
 				renderLog.CloseBlock();
 			}
 		}
+#if defined( SHADOW_VOLUMES )
+		else
+		{
+			// only need to clear the stencil buffer and perform stencil testing if there are shadows
+			const bool performStencilTest = ( vLight->globalShadows != NULL || vLight->localShadows != NULL ) && R_GetShadowMode() == SHADOWMODE_VOLUMES;
+
+			// mirror flips the sense of the stencil select, and I don't want to risk accidentally breaking it
+			// in the normal case, so simply disable the stencil select in the mirror case
+			const bool useLightStencilSelect = ( r_useLightStencilSelect.GetBool() && viewDef->isMirror == false );
+
+			if( performStencilTest )
+			{
+				if( useLightStencilSelect )
+				{
+					// write a stencil mask for the visible light bounds to hi-stencil
+					StencilSelectLight( vLight );
+				}
+				else
+				{
+					// always clear whole S-Cull tiles
+					idScreenRect rect;
+					rect.x1 = ( vLight->scissorRect.x1 +  0 ) & ~15;
+					rect.y1 = ( vLight->scissorRect.y1 +  0 ) & ~15;
+					rect.x2 = ( vLight->scissorRect.x2 + 15 ) & ~15;
+					rect.y2 = ( vLight->scissorRect.y2 + 15 ) & ~15;
+
+					if( !currentScissor.Equals( rect ) && r_useScissor.GetBool() )
+					{
+#if 1 // Fix: convert the GL scissor to the current DX/Vulkan upper-left origin
+						GL_Scissor( viewDef->viewport.x1 + rect.x1,
+									viewDef->viewport.y2 - rect.y2,
+									rect.x2 + 1 - rect.x1,
+									rect.y2 + 1 - rect.y1 );
+#else
+						GL_Scissor( viewDef->viewport.x1 + rect.x1,
+									viewDef->viewport.y1 + rect.y1,
+									rect.x2 + 1 - rect.x1,
+									rect.y2 + 1 - rect.y1 );
+#endif
+
+						currentScissor = rect;
+					}
+					GL_State( GLS_DEFAULT );	// make sure stencil mask passes for the clear
+					GL_Clear( false, false, true, STENCIL_SHADOW_TEST_VALUE, 0.0f, 0.0f, 0.0f, 0.0f, false );
+				}
+			}
+
+			if( vLight->globalShadows != NULL )
+			{
+				renderLog.OpenBlock( "Global Light Shadows", colorBrown );
+				StencilShadowPass( vLight->globalShadows, vLight );
+				renderLog.CloseBlock();
+			}
+
+			if( vLight->localInteractions != NULL )
+			{
+				renderLog.OpenBlock( "Local Light Interactions", colorPurple );
+				RenderInteractions( vLight->localInteractions, vLight, GLS_DEPTHFUNC_EQUAL, performStencilTest, useLightDepthBounds );
+				renderLog.CloseBlock();
+			}
+
+			if( vLight->localShadows != NULL )
+			{
+				renderLog.OpenBlock( "Local Light Shadows", colorBrown );
+				StencilShadowPass( vLight->localShadows, vLight );
+				renderLog.CloseBlock();
+			}
+
+			if( vLight->globalInteractions != NULL )
+			{
+				renderLog.OpenBlock( "Global Light Interactions", colorPurple );
+				RenderInteractions( vLight->globalInteractions, vLight, GLS_DEPTHFUNC_EQUAL, performStencilTest, useLightDepthBounds );
+				renderLog.CloseBlock();
+			}
+		}
+#endif
 		// RB end
 
 		if( vLight->translucentInteractions != NULL && !r_skipTranslucent.GetBool() )

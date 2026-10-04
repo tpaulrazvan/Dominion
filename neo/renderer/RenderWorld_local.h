@@ -272,6 +272,9 @@ public:
 
 	idRenderModel* 			ParseModel( idLexer* src, const char* mapName, ID_TIME_T mapTimeStamp, idFile* fileOut );
 	void					SetupAreaRefs();
+#if defined( SHADOW_VOLUMES )
+	idRenderModel*			ParseShadowModel( idLexer* src, idFile* fileOut );
+#endif
 	void					ParseInterAreaPortals( idLexer* src, idFile* fileOut );
 	void					ParseNodes( idLexer* src, idFile* fileOut );
 	int						CommonChildrenArea_r( areaNode_t* node );

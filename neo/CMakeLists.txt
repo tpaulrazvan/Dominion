@@ -22,6 +22,12 @@ option(STANDALONE
 option(DOOM_CLASSIC
 		"Build with Doom 1 & 2" ON)
 
+option(SHADOW_VOLUMES
+		"Build with stencil shadow volumes support" ON)
+if(SHADOW_VOLUMES)
+	add_definitions(-DSHADOW_VOLUMES=1)
+endif()
+
 option(FORCE_COLOR_OUTPUT
 		"Always produce ANSI-colored output (GNU/Clang only)." OFF)
 
@@ -514,6 +520,18 @@ file(GLOB RENDERER_COLOR_SOURCES renderer/Color/*.cpp)
 file(GLOB RENDERER_DXT_INCLUDES renderer/DXT/*.h)
 file(GLOB RENDERER_DXT_SOURCES renderer/DXT/*.cpp)
 
+if(SHADOW_VOLUMES)
+	file(GLOB SHADOW_SHARED_SOURCES renderer/Jobs/*.cpp)
+	file(GLOB SHADOW_SHARED_INCLUDES renderer/Jobs/*.h)
+	foreach(SHADOW_JOB dynamicshadowvolume prelightshadowvolume staticshadowvolume)
+		file(GLOB ${SHADOW_JOB}_SOURCES renderer/Jobs/${SHADOW_JOB}/*.cpp)
+		file(GLOB ${SHADOW_JOB}_INCLUDES renderer/Jobs/${SHADOW_JOB}/*.h)
+		list(APPEND SHADOW_VOLUME_SOURCES ${${SHADOW_JOB}_SOURCES})
+		list(APPEND SHADOW_VOLUME_INCLUDES ${${SHADOW_JOB}_INCLUDES})
+	endforeach()
+	list(APPEND SHADOW_VOLUME_SOURCES ${SHADOW_SHARED_SOURCES})
+	list(APPEND SHADOW_VOLUME_INCLUDES ${SHADOW_SHARED_INCLUDES})
+endif()
 
 file(GLOB RENDERER_SMAA_INCLUDES renderer/SMAA/*.h)
 
@@ -841,6 +859,13 @@ source_group("engine\\renderer\\Color" FILES ${RENDERER_COLOR_SOURCES})
 source_group("engine\\renderer\\DXT" FILES ${RENDERER_DXT_INCLUDES})
 source_group("engine\\renderer\\DXT" FILES ${RENDERER_DXT_SOURCES})
 
+if(SHADOW_VOLUMES)
+	source_group("engine\\renderer\\Jobs" FILES ${SHADOW_SHARED_SOURCES} ${SHADOW_SHARED_INCLUDES})
+	foreach(SHADOW_JOB dynamicshadowvolume prelightshadowvolume staticshadowvolume)
+		source_group("engine\\renderer\\Jobs\\${SHADOW_JOB}" FILES ${${SHADOW_JOB}_SOURCES} ${${SHADOW_JOB}_INCLUDES})
+	endforeach()
+endif()
+
 source_group("engine\\renderer\\NVRHI" FILES ${RENDERER_NVRHI_INCLUDES})
 source_group("engine\\renderer\\NVRHI" FILES ${RENDERER_NVRHI_SOURCES})
 
@@ -970,6 +995,7 @@ set(RBDOOM3_INCLUDES
 			${RENDERER_INCLUDES}
 			${RENDERER_COLOR_INCLUDES}
 			${RENDERER_DXT_INCLUDES}
+			${SHADOW_VOLUME_INCLUDES}
 			${RENDERER_PASSES_INCLUDES}
 			
 			${RENDERER_SMAA_INCLUDES}
@@ -1019,6 +1045,7 @@ set(RBDOOM3_SOURCES
 			${RENDERER_SOURCES}
 			${RENDERER_COLOR_SOURCES}
 			${RENDERER_DXT_SOURCES}
+			${SHADOW_VOLUME_SOURCES}
 			${RENDERER_PASSES_SOURCES}
 			${IRRXML_SOURCES}
 			${FRAMEWORK_IMGUI_SOURCES}
@@ -1186,6 +1213,7 @@ if(MSVC)
 		list(REMOVE_ITEM RBDOOM3_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/DXT/DXTDecoder.cpp)
 		list(REMOVE_ITEM RBDOOM3_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/DXT/DXTEncoder.cpp)
 		list(REMOVE_ITEM RBDOOM3_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/DXT/DXTEncoder_SSE2.cpp)
+		list(REMOVE_ITEM RBDOOM3_PRECOMPILED_SOURCES ${SHADOW_VOLUME_SOURCES})
 	
 		#foreach( src_file ${RBDOOM3_PRECOMPILED_SOURCES} )
 		#	message(STATUS "-include precompiled.h for ${src_file}")
@@ -1328,6 +1356,7 @@ else()
 		list(REMOVE_ITEM RBDOOM3_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/DXT/DXTDecoder.cpp)
 		list(REMOVE_ITEM RBDOOM3_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/DXT/DXTEncoder.cpp)
 		list(REMOVE_ITEM RBDOOM3_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/DXT/DXTEncoder_SSE2.cpp)
+		list(REMOVE_ITEM RBDOOM3_PRECOMPILED_SOURCES ${SHADOW_VOLUME_SOURCES})
 
 		foreach( src_file ${RBDOOM3_PRECOMPILED_SOURCES} )
 			#message(STATUS "-include precompiled.h for ${src_file}")

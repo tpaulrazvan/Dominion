@@ -170,6 +170,10 @@ idCVar r_testGammaBias( "r_testGammaBias", "0", CVAR_RENDERER | CVAR_FLOAT, "if 
 idCVar r_lightScale( "r_lightScale", "3", CVAR_ARCHIVE | CVAR_RENDERER | CVAR_FLOAT, "all light intensities are multiplied by this", 0, 100 );
 idCVar r_flareSize( "r_flareSize", "1", CVAR_RENDERER | CVAR_FLOAT, "scale the flare deforms from the material def" );
 
+#if defined( SHADOW_VOLUMES )
+	idCVar r_skipPrelightShadows( "r_skipPrelightShadows", "0", CVAR_RENDERER | CVAR_BOOL, "skip the dmap generated static shadow volumes" );
+#endif
+
 idCVar r_useScissor( "r_useScissor", "1", CVAR_RENDERER | CVAR_BOOL | CVAR_NOCHEAT, "scissor clip as portals and lights are processed" );
 idCVar r_useLightDepthBounds( "r_useLightDepthBounds", "1", CVAR_RENDERER | CVAR_BOOL, "use depth bounds test on lights to reduce both shadow and interaction fill" );
 idCVar r_useShadowDepthBounds( "r_useShadowDepthBounds", "1", CVAR_RENDERER | CVAR_BOOL, "use depth bounds test on individual shadow volumes to reduce shadow fill" );
@@ -240,6 +244,13 @@ idCVar stereoRender_deGhost( "stereoRender_deGhost", "0.05", CVAR_FLOAT | CVAR_A
 idCVar r_useVirtualScreenResolution( "r_useVirtualScreenResolution", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE | CVAR_NEW, "do 2D rendering at 640x480 and stretch to the current resolution" );
 
 // RB: shadow mapping parameters
+idCVar r_shadows( "r_shadows", "2", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "shadow mode: 0 = none, 1 = stencil volumes (requires SHADOW_VOLUMES build option, otherwise maps), 2 = shadow maps", SHADOWMODE_NONE, SHADOWMODE_MAPS, idCmdSystem::ArgCompletion_Integer<SHADOWMODE_NONE, SHADOWMODE_MAPS> );
+
+#if defined( SHADOW_VOLUMES )
+	idCVar r_shadowPolygonOffset( "r_shadowPolygonOffset", "-1", CVAR_RENDERER | CVAR_FLOAT, "bias value added to depth test for stencil shadow drawing" );
+	idCVar r_shadowPolygonFactor( "r_shadowPolygonFactor", "0", CVAR_RENDERER | CVAR_FLOAT, "scale value for stencil shadow drawing" );
+#endif
+
 idCVar r_useShadowAtlas( "r_useShadowAtlas", "1", CVAR_RENDERER | CVAR_INTEGER | CVAR_NEW, "" );
 idCVar r_shadowMapAtlasSize( "r_shadowMapAtlasSize", "8192", CVAR_RENDERER | CVAR_INTEGER | CVAR_ROM | CVAR_NEW, "size of the shadowmap atlas" );
 idCVar r_shadowMapFrustumFOV( "r_shadowMapFrustumFOV", "92", CVAR_RENDERER | CVAR_FLOAT | CVAR_NEW, "oversize FOV for point light side matching" );

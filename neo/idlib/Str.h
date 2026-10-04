@@ -90,8 +90,8 @@ class idVec4;
 #endif
 
 #if defined( DOMINION ) // Two-digit color code
-// color escape bits
-const int COLOR_BITS				= 15;
+	// color escape bits
+	const int COLOR_BITS				= 15;
 #endif // DOMINION -> Two-digit color code
 
 // color escape character
@@ -107,7 +107,7 @@ const int C_COLOR_WHITE				= '7';
 const int C_COLOR_GRAY				= '8';
 const int C_COLOR_BLACK				= '9';
 #if defined( DOMINION ) // Two-digit color code
-const int C_COLOR_GOLD				= '10';
+	const int C_COLOR_GOLD				= '10';
 #endif // DOMINION -> Two-digit color code
 
 // color escape string
@@ -122,7 +122,7 @@ const int C_COLOR_GOLD				= '10';
 #define S_COLOR_GRAY				"^8"
 #define S_COLOR_BLACK				"^9"
 #if defined( DOMINION ) // Two-digit color code
-#define S_COLOR_GOLD				"^10"
+	#define S_COLOR_GOLD				"^10"
 #endif // DOMINION -> Two-digit color code
 
 // make idStr a multiple of 16 bytes long

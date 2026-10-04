@@ -142,6 +142,91 @@ idRenderModel* idRenderWorldLocal::ReadBinaryModel( idFile* fileIn )
 
 extern idCVar binaryLoadRenderModels;
 
+#if defined( SHADOW_VOLUMES )
+/*
+================
+idRenderWorldLocal::ParseShadowModel
+================
+*/
+idRenderModel* idRenderWorldLocal::ParseShadowModel( idLexer* src, idFile* fileOut )
+{
+	idToken token;
+
+	src->ExpectTokenString( "{" );
+
+	// parse the name
+	src->ExpectAnyToken( &token );
+
+	idRenderModel* model = renderModelManager->AllocModel();
+	model->InitEmpty( token );
+
+	if( fileOut != NULL )
+	{
+		// write out the type so the binary reader knows what to instantiate
+		fileOut->WriteString( "shadowmodel" );
+		fileOut->WriteString( token );
+	}
+
+	srfTriangles_t* tri = R_AllocStaticTriSurf();
+
+	tri->numVerts = src->ParseInt();
+	tri->numShadowIndexesNoCaps = src->ParseInt();
+	tri->numShadowIndexesNoFrontCaps = src->ParseInt();
+	tri->numIndexes = src->ParseInt();
+	tri->shadowCapPlaneBits = src->ParseInt();
+
+	assert( ( tri->numVerts & 1 ) == 0 );
+
+	R_AllocStaticTriSurfPreLightShadowVerts( tri, ALIGN( tri->numVerts, 2 ) );
+	tri->bounds.Clear();
+	for( int j = 0; j < tri->numVerts; j++ )
+	{
+		float vec[8];
+
+		src->Parse1DMatrix( 3, vec );
+		tri->preLightShadowVertexes[j].xyzw[0] = vec[0];
+		tri->preLightShadowVertexes[j].xyzw[1] = vec[1];
+		tri->preLightShadowVertexes[j].xyzw[2] = vec[2];
+		tri->preLightShadowVertexes[j].xyzw[3] = 1.0f;		// no homogenous value
+
+		tri->bounds.AddPoint( tri->preLightShadowVertexes[j].xyzw.ToVec3() );
+	}
+	// clear the last vertex if it wasn't stored
+	if( ( tri->numVerts & 1 ) != 0 )
+	{
+		tri->preLightShadowVertexes[ALIGN( tri->numVerts, 2 ) - 1].xyzw.Zero();
+	}
+
+	// to be consistent set the number of vertices to half the number of shadow vertices
+	tri->numVerts = ALIGN( tri->numVerts, 2 ) / 2;
+
+	R_AllocStaticTriSurfIndexes( tri, tri->numIndexes );
+	for( int j = 0; j < tri->numIndexes; j++ )
+	{
+		tri->indexes[j] = src->ParseInt();
+	}
+
+	// add the completed surface to the model
+	modelSurface_t surf;
+	surf.id = 0;
+	surf.shader = tr.defaultMaterial;
+	surf.geometry = tri;
+
+	model->AddSurface( surf );
+
+	src->ExpectTokenString( "}" );
+
+	// NOTE: we do NOT do a model->FinishSurfaceces, because we don't need sil edges, planes, tangents, etc.
+
+	if( fileOut != NULL && model->SupportsBinaryModel() && binaryLoadRenderModels.GetBool() )
+	{
+		model->WriteBinaryModel( fileOut, &mapTimeStamp );
+	}
+
+	return model;
+}
+#endif
+
 /*
 ================
 idRenderWorldLocal::ParseModel
@@ -781,7 +866,12 @@ bool idRenderWorldLocal::InitFromMap( const char* name )
 
 
 	static const unsigned int BPROC_MAGIC_BFG = ( 'P' << 24 ) | ( 'R' << 16 ) | ( 'O' << 8 ) | BPROC_VERSION_BFG;
+#if defined( SHADOW_VOLUMES )
+	static const int BPROC_SHADOW_VERSION = BPROC_VERSION + 1;
+	static const unsigned int BPROC_MAGIC = ( 'P' << 24 ) | ( 'R' << 16 ) | ( 'O' << 8 ) | BPROC_SHADOW_VERSION;
+#else
 	static const unsigned int BPROC_MAGIC = ( 'P' << 24 ) | ( 'R' << 16 ) | ( 'O' << 8 ) | BPROC_VERSION;
+#endif
 	bool loaded = false;
 	idFileLocal file( fileSystem->OpenFileReadMemory( generatedFileName ) );
 	if( file != NULL )
@@ -811,7 +901,12 @@ bool idRenderWorldLocal::InitFromMap( const char* name )
 					renderModelManager->AddModel( lastModel );
 					localModels.Append( lastModel );
 				}
+
+#if defined( SHADOW_VOLUMES )
+				else if( type == "shadowmodel" )
+#else
 				else if( type == "shadowmodel" && magic == BPROC_MAGIC_BFG )
+#endif
 				{
 					// RB: the original BFG .bproc just saved all models as "shadowmodel"
 					idRenderModel* lastModel = ReadBinaryModel( file );
@@ -899,11 +994,19 @@ bool idRenderWorldLocal::InitFromMap( const char* name )
 
 			if( token == "shadowModel" )
 			{
+#if defined( SHADOW_VOLUMES )
+				lastModel = ParseShadowModel( src, outputFile );
+				renderModelManager->AddModel( lastModel );
+				localModels.Append( lastModel );
+				numEntries++;
+				continue;
+#else
 				// RB: just parse the model but don't do anything with it
 				//lastModel = ParseShadowModel( src, outputFile );
 				src->SkipBracedSection();
 				lastModel = NULL;
 				continue;
+#endif
 			}
 
 			if( token == "interAreaPortals" )

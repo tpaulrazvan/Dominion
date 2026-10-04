@@ -90,7 +90,7 @@ typedef enum
 	CVAR_SOUND				= BIT( 5 ),		// sound variable
 	CVAR_GUI				= BIT( 6 ),		// gui variable
 	CVAR_GAME				= BIT( 7 ),		// game variable
-	CVAR_TOOL				= BIT( 8 ),		// tool variable	
+	CVAR_TOOL				= BIT( 8 ),		// tool variable
 #if defined( DOMINION ) // Debug CVars
 	CVAR_DEBUG				= BIT( 9 ),		// debug variable
 #endif // DOMINION -> Debug CVars

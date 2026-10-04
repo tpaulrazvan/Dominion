@@ -230,6 +230,10 @@ void DmapHelp()
 		"blockSize <x> <y> <z>  = cut BSP along these dimensions or disable with 0 0 0\n"
 		"obj                    = export BSP render surfaces as .obj file\n"
 		"debug                  = export BSP portals and other details as .obj files\n"
+#if defined( SHADOW_VOLUMES )
+		"shadowOpt <0..5>        = precalculate stencil volumes (0 = off, current default)\n"
+		"noShadows              = skip precalculated stencil volumes\n"
+#endif
 		""
 	);
 }
@@ -268,6 +272,12 @@ void ResetDmapGlobals()
 	dmapGlobals.blockSize = idVec3( 1024.0f, 1024.0f, 1024.0f );	// default block size for splitting
 	dmapGlobals.inlineStatics = false;
 	dmapGlobals.totalInlinedModels = 0;
+#if defined( SHADOW_VOLUMES )
+	dmapGlobals.shadowOptLevel = SO_NONE;
+	dmapGlobals.noShadow = false;
+	dmapGlobals.totalShadowTriangles = 0;
+	dmapGlobals.totalShadowVerts = 0;
+#endif
 }
 
 /*
@@ -366,6 +376,21 @@ void Dmap( const idCmdArgs& args )
 			common->Printf( "noFlood = true\n" );
 			dmapGlobals.noFlood = true;
 		}
+#if defined( SHADOW_VOLUMES )
+		else if( !idStr::Icmp( s, "shadowOpt" ) )
+		{
+			if( i + 2 >= args.Argc() )
+			{
+				common->Error( "usage: dmap shadowOpt <0..5> [options] mapfile" );
+				return;
+			}
+			dmapGlobals.shadowOptLevel = ( shadowOptLevel_t )idMath::ClampInt( SO_NONE, SO_SIL_OPTIMIZE, atoi( args.Argv( ++i ) ) );
+		}
+		else if( !idStr::Icmp( s, "noShadows" ) )
+		{
+			dmapGlobals.noShadow = true;
+		}
+#endif
 		else if( !idStr::Icmp( s, "noLightCarve" ) )
 		{
 			common->Printf( "noLightCarve = true\n" );

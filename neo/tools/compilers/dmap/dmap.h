@@ -213,6 +213,11 @@ typedef struct
 {
 	idRenderLightLocal	def;
 
+#if defined( SHADOW_VOLUMES )
+	srfTriangles_t* shadowTris;
+	idStr name;
+#endif
+
 	idPlane				frustumPlanes[6];		// RB: should be calculated after R_DeriveLightData()
 } mapLight_t;
 
@@ -295,6 +300,13 @@ typedef struct
 	bool	noFlood;
 	bool	noClipSides;		// don't cut sides by solid leafs, use the entire thing
 	bool	noLightCarve;		// extra triangle subdivision by light frustums
+
+#if defined( SHADOW_VOLUMES )
+	shadowOptLevel_t shadowOptLevel;
+	bool	noShadow;
+	int		totalShadowTriangles;
+	int		totalShadowVerts;
+#endif
 
 	idBounds	drawBounds;
 	bool	drawflag;
@@ -519,3 +531,31 @@ void WriteOutputFile();
 
 //=============================================================================
 
+
+
+#if defined( SHADOW_VOLUMES )
+struct shadowCompileSpace_t
+{
+	float modelMatrix[16];
+};
+enum shadowGen_t { SG_STATIC, SG_DYNAMIC, SG_OFFLINE };
+struct optimizedShadow_t
+{
+	int numVerts;
+	idVec3* verts;
+	int numFrontCapIndexes;
+	int numRearCapIndexes;
+	int numSilPlaneIndexes;
+	int totalIndexes;
+	triIndex_t* indexes;
+};
+void R_MakeShadowFrustums( idRenderLightLocal* light );
+void R_LightProjectionMatrix( const idVec3& origin, const idPlane& rearPlane, idVec4 mat[4] );
+srfTriangles_t* R_CreateShadowVolume( const shadowCompileSpace_t* ent, const srfTriangles_t* tri, const idRenderLightLocal* light, shadowGen_t optimize, srfCullInfo_t& cullInfo );
+optimizedShadow_t SuperOptimizeOccluders( idVec4* verts, triIndex_t* indexes, int numIndexes, idPlane projectionPlane, idVec3 projectionOrigin );
+srfTriangles_t* CreateLightShadow( optimizeGroup_t* shadowerGroups, const mapLight_t* light );
+
+void CleanupOptimizedShadowTris( srfTriangles_t* tri );
+void R_CalcInteractionFacing( const shadowCompileSpace_t* ent, const srfTriangles_t* tri, const idRenderLightLocal* light, srfCullInfo_t& cullInfo );
+void R_FreeInteractionCullInfo( srfCullInfo_t& cullInfo );
+#endif

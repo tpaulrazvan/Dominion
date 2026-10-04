@@ -106,6 +106,12 @@ set(MC_RENDERER_SOURCES
 	../../renderer/Model_obj.cpp
 	)
 	
+if(SHADOW_VOLUMES)
+	list(APPEND MC_RENDERER_SOURCES ../../renderer/tr_stencilshadow.cpp)
+	set(MC_SHADOW_SHARED_INCLUDES ../../renderer/jobs/ShadowShared.h)
+	set(MC_SHADOW_SHARED_SOURCES ../../renderer/jobs/ShadowShared.cpp)
+endif()
+
 file(GLOB MC_MIKKTSPACE_INCLUDES ../../libs/mikktspace/*.h)
 file(GLOB MC_MIKKTSPACE_SOURCES ../../libs/mikktspace/*.c)
 
@@ -181,6 +187,7 @@ set(MC_INCLUDES_ALL
 			${MC_INCLUDES}
 			${MC_FRAMEWORK_INCLUDES}
 			${MC_RENDERER_INCLUDES}
+			${MC_SHADOW_SHARED_INCLUDES}
 			${MC_DMAP_INCLUDES}
 			${MC_AAS_INCLUDES}
 			${MC_AASBUILD_INCLUDES}
@@ -197,6 +204,7 @@ set(MC_SOURCES_ALL
 			${MC_SOURCES}
 			${MC_FRAMEWORK_SOURCES}
 			${MC_RENDERER_SOURCES}
+			${MC_SHADOW_SHARED_SOURCES}
 			${MC_DMAP_SOURCES}
 			${MC_AAS_SOURCES}
 			${MC_AASBUILD_SOURCES}
@@ -217,6 +225,9 @@ source_group("engine\\framework" FILES ${MC_FRAMEWORK_INCLUDES})
 source_group("engine\\framework" FILES ${MC_FRAMEWORK_SOURCES})
 source_group("engine\\renderer" FILES ${MC_RENDERER_INCLUDES})
 source_group("engine\\renderer" FILES ${MC_RENDERER_SOURCES})
+if(SHADOW_VOLUMES)
+	source_group("engine\\renderer\\Jobs" FILES ${MC_SHADOW_SHARED_INCLUDES} ${MC_SHADOW_SHARED_SOURCES})
+endif()
 source_group("engine\\aas" FILES ${MC_AAS_INCLUDES})
 source_group("engine\\aas" FILES ${MC_AAS_SOURCES})
 source_group("aasbuild" FILES ${MC_AASBUILD_INCLUDES})
@@ -241,6 +252,8 @@ source_group("decls" FILES ${MC_DECLS_SOURCES})
 
 set(MC_PRECOMPILED_SOURCES ${MC_SOURCES_ALL})
 list(REMOVE_ITEM MC_PRECOMPILED_SOURCES ${MC_MIKKTSPACE_SOURCES} ${MC_IMGUI_SOURCES} ${MC_IMTUI_SOURCES} ${MC_ZLIB_SOURCES} ${MC_MINIZIP_SOURCES})
+# Stencil Shadows: this job uses its own minimal headers.
+list(REMOVE_ITEM MC_PRECOMPILED_SOURCES ../../renderer/jobs/ShadowShared.cpp)
 
 include_directories(
 	.

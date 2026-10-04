@@ -1114,20 +1114,20 @@ bool DeviceManager_VK::createDevice()
 		const int ver_minor = ( prop.driverVersion - ver_major * 10000 ) / 100;
 		const int ver_patch = ( prop.driverVersion - ver_major * 10000 - ver_minor * 100 );
 		version_string.Format( "%s %d.%d.%d",
-								&driverProperties.driverName,
-							    ver_major,
-							    ver_minor,
-							    ver_patch );
+							   &driverProperties.driverName,
+							   ver_major,
+							   ver_minor,
+							   ver_patch );
 	}
 	// KosmicKrisp
 	else
 	{
 		// Use Vulkan version conventions for KosmicKrisp
 		version_string.Format( "%s %d.%d.%d",
-								&driverProperties.driverName,
-							  ( prop.driverVersion >> 22 ) & 0x3ff,
-							  ( prop.driverVersion >> 12 ) & 0x3ff,
-							  ( prop.driverVersion ) & 0xfff );
+							   &driverProperties.driverName,
+							   ( prop.driverVersion >> 22 ) & 0x3ff,
+							   ( prop.driverVersion >> 12 ) & 0x3ff,
+							   ( prop.driverVersion ) & 0xfff );
 	}
 #else
 	// This section is adapted from php code at vulkan.gpuinfo.org/functions.php by Sascha Willems. See the following link:
@@ -1136,20 +1136,20 @@ bool DeviceManager_VK::createDevice()
 	if( glConfig.vendor == VENDOR_NVIDIA )
 	{
 		version_string.Format( "%s %d.%d.%d.%d",
-								&driverProperties.driverName,
-							  ( prop.driverVersion >> 22 ) & 0x3ff,
-							  ( prop.driverVersion >> 14 ) & 0x0ff,
-							  ( prop.driverVersion >> 6 ) & 0x0ff,
-							  ( prop.driverVersion ) & 0x003f );
+							   &driverProperties.driverName,
+							   ( prop.driverVersion >> 22 ) & 0x3ff,
+							   ( prop.driverVersion >> 14 ) & 0x0ff,
+							   ( prop.driverVersion >> 6 ) & 0x0ff,
+							   ( prop.driverVersion ) & 0x003f );
 	}
 #if defined(_WIN32)
 	// INTEL on Windows
 	else if( glConfig.vendor == VENDOR_INTEL )
 	{
 		version_string.Format( "%s %d.%d",
-								&driverProperties.driverName,
-							  ( prop.driverVersion >> 14 ) & 0x3ffff,
-							  ( prop.driverVersion ) & 0x3fff );
+							   &driverProperties.driverName,
+							   ( prop.driverVersion >> 14 ) & 0x3ffff,
+							   ( prop.driverVersion ) & 0x3fff );
 	}
 #endif
 	// AMD + OTHER
@@ -1157,10 +1157,10 @@ bool DeviceManager_VK::createDevice()
 	{
 		// Use Vulkan version conventions if vendor mapping is not available
 		version_string.Format( "%s %d.%d.%d",
-								&driverProperties.driverName,
-							  ( prop.driverVersion >> 22 ) & 0x3ff,
-							  ( prop.driverVersion >> 12 ) & 0x3ff,
-							  ( prop.driverVersion ) & 0xfff );
+							   &driverProperties.driverName,
+							   ( prop.driverVersion >> 22 ) & 0x3ff,
+							   ( prop.driverVersion >> 12 ) & 0x3ff,
+							   ( prop.driverVersion ) & 0xfff );
 	}
 #endif
 

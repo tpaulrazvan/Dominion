@@ -497,7 +497,11 @@ void idRenderWorldLocal::UpdateLightDef( qhandle_t lightHandle, const renderLigh
 				rlight->parallel == light->parms.parallel && rlight->pointLight == light->parms.pointLight &&
 				rlight->right == light->parms.right && rlight->start == light->parms.start &&
 				rlight->target == light->parms.target && rlight->up == light->parms.up &&
+#if defined( SHADOW_VOLUMES )
+				rlight->shader == light->lightShader && rlight->prelightModel == light->parms.prelightModel )
+#else
 				rlight->shader == light->lightShader )
+#endif
 		{
 			justUpdate = true;
 		}
@@ -519,6 +523,14 @@ void idRenderWorldLocal::UpdateLightDef( qhandle_t lightHandle, const renderLigh
 	}
 
 	light->parms = *rlight;
+
+#if defined( SHADOW_VOLUMES )
+	if( light->lightHasMoved )
+	{
+		light->parms.prelightModel = NULL;
+	}
+#endif
+
 	light->lastModifiedFrameNum = tr.frameCount;
 
 	// new for BFG edition: force noShadows on spectrum lights so teleport spawns

@@ -146,6 +146,12 @@ public:
 
 	static void			ImGui_RenderDrawLists( ImDrawData* draw_data );
 
+#if defined( SHADOW_VOLUMES )
+	void				DrawStencilShadowPass( const drawSurf_t* drawSurf, const bool renderZPass );
+	void				StencilSelectLight( const viewLight_t* vLight );
+	void				StencilShadowPass( const drawSurf_t* drawSurfs, const viewLight_t* vLight );
+#endif
+
 	void				DrawElementsWithCounters( const drawSurf_t* surf, bool shadowCounter = false );
 
 private:
@@ -377,6 +383,10 @@ private:
 	nvrhi::IBuffer*					currentJointBuffer;
 	uint							currentJointOffset;
 	nvrhi::GraphicsPipelineHandle	currentPipeline;
+
+#if defined( SHADOW_VOLUMES )
+	byte							stencilWriteMask = 0xFF;
+#endif
 
 	idStaticList<nvrhi::BindingSetHandle, nvrhi::c_MaxBindingLayouts> currentBindingSets;
 	idStaticList<idStaticList<nvrhi::BindingSetDesc, nvrhi::c_MaxBindingLayouts>, NUM_BINDING_LAYOUTS> pendingBindingSetDescs;

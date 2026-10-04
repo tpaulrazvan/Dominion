@@ -2730,6 +2730,18 @@ void idMaterial::ParseMaterial( idLexer& src )
 		else if( !token.Icmp( "twoSided" ) )
 		{
 			cullType = CT_TWO_SIDED;
+
+#if defined( SHADOW_VOLUMES )
+#if 0
+			// twoSided implies no-shadows, because the shadow
+			// volume would be coplanar with the surface, giving depth fighting
+			// we could make this no-self-shadows, but it may be more important
+			if( R_GetShadowMode() == SHADOWMODE_VOLUMES ) // motorsep 11-08-2014; when shadow mapping is on, we allow two-sided surfaces to cast shadows
+			{
+				SetMaterialFlag( MF_NOSHADOWS );
+			}
+#endif
+#endif
 		}
 		// backSided
 		else if( !token.Icmp( "backSided" ) )

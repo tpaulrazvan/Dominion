@@ -29,7 +29,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#if 0
+#if defined( SHADOW_VOLUMES )
 /*
 ============
 idShadowVert::CreateShadowCache

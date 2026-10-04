@@ -381,7 +381,11 @@ void PipelineCache::GetRenderState( uint64 stateBits, PipelineKey key, nvrhi::Re
 
 		depthStencilState.setStencilRefValue( ref );
 		depthStencilState.setStencilReadMask( mask );
+#if defined( SHADOW_VOLUMES )
+		depthStencilState.setStencilWriteMask( key.stencilWriteMask );
+#else
 		depthStencilState.setStencilWriteMask( 0xFF );
+#endif
 	}
 
 	nvrhi::DepthStencilState::StencilOpDesc stencilFuncOp;

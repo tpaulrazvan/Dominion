@@ -34,6 +34,8 @@ If you have questions concerning this license or the applicable additional terms
 
 #ifdef DMAP
 
+idCVar r_shadows( "r_shadows", "2", CVAR_RENDERER | CVAR_INTEGER, "", SHADOWMODE_NONE, SHADOWMODE_MAPS );
+
 idRenderLightLocal::idRenderLightLocal()
 {
 	memset( &parms, 0, sizeof( parms ) );

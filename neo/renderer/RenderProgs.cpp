@@ -41,7 +41,7 @@ If you have questions concerning this license or the applicable additional terms
 extern DeviceManager* deviceManager;
 
 #if defined(__APPLE__) && !USE_OPTICK
-extern idCVar r_mvkAMDShadowMappingFix;
+	extern idCVar r_mvkAMDShadowMappingFix;
 #endif
 
 idRenderProgManager renderProgManager;
@@ -168,7 +168,7 @@ void idRenderProgManager::Init( nvrhi::IDevice* device )
 		.setOffset( offsetof( idDrawVert, color ) )
 		.setElementStride( sizeof( idDrawVert ) ) );
 
-	/*
+#if defined( SHADOW_VOLUMES )
 	// === Shadow vertex ===
 
 	vertexLayoutDescs[LAYOUT_DRAW_SHADOW_VERT].Append(
@@ -194,7 +194,7 @@ void idRenderProgManager::Init( nvrhi::IDevice* device )
 		.setFormat( nvrhi::Format::RGBA8_UNORM )
 		.setOffset( offsetof( idShadowVertSkinned, color ) )
 		.setElementStride( sizeof( idShadowVertSkinned ) ) );
-	*/
+#endif
 
 	bindingLayouts.SetNum( NUM_BINDING_LAYOUTS );
 
@@ -453,6 +453,13 @@ void idRenderProgManager::Init( nvrhi::IDevice* device )
 	bindingLayouts[BINDING_LAYOUT_DEBUG_SKINNED] = { uniformsLayout( BINDING_LAYOUT_DEBUG_SKINNED, true ), defaultLayout, samplerOneBindingLayout };
 
 	bindingLayouts[BINDING_LAYOUT_POST_PROCESS] = { uniformsLayout( BINDING_LAYOUT_POST_PROCESS, false ), defaultLayout, samplerOneBindingLayout };
+
+#if defined( SHADOW_VOLUMES )
+	layoutTypeAttributes[BINDING_LAYOUT_SHADOW_VOLUME].pcEnabled = false;
+	layoutTypeAttributes[BINDING_LAYOUT_SHADOW_VOLUME_SKINNED].pcEnabled = false;
+	bindingLayouts[BINDING_LAYOUT_SHADOW_VOLUME] = { uniformsLayout( BINDING_LAYOUT_SHADOW_VOLUME, false ) };
+	bindingLayouts[BINDING_LAYOUT_SHADOW_VOLUME_SKINNED] = { uniformsLayout( BINDING_LAYOUT_SHADOW_VOLUME_SKINNED, true ) };
+#endif
 
 	bindingLayouts[BINDING_LAYOUT_CONSTANT_BUFFER_ONLY] = { uniformsLayout( BINDING_LAYOUT_CONSTANT_BUFFER_ONLY, false ) };
 	bindingLayouts[BINDING_LAYOUT_CONSTANT_BUFFER_ONLY_SKINNED] = { uniformsLayout( BINDING_LAYOUT_CONSTANT_BUFFER_ONLY_SKINNED, true ) };
@@ -894,6 +901,14 @@ void idRenderProgManager::Init( nvrhi::IDevice* device )
 		{ BUILTIN_DEPTH, "builtin/depth", "", { { "USE_GPU_SKINNING", "0" }, { "USE_PUSH_CONSTANTS", usePushConstants( BINDING_LAYOUT_CONSTANT_BUFFER_ONLY ) } }, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_CONSTANT_BUFFER_ONLY },
 		{ BUILTIN_DEPTH_SKINNED, "builtin/depth", "_skinned", { { "USE_GPU_SKINNING", "1" }, { "USE_PUSH_CONSTANTS", usePushConstants( BINDING_LAYOUT_CONSTANT_BUFFER_ONLY_SKINNED ) } }, true, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_CONSTANT_BUFFER_ONLY_SKINNED },
 
+#if defined( SHADOW_VOLUMES )
+		{ BUILTIN_SHADOW, "builtin/lighting/shadow", "", { {"USE_GPU_SKINNING", "0" }, {"USE_PUSH_CONSTANTS", "0" } }, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_SHADOW_VERT, BINDING_LAYOUT_SHADOW_VOLUME },
+		{ BUILTIN_SHADOW_SKINNED, "builtin/lighting/shadow", "_skinned", { {"USE_GPU_SKINNING", "1" }, {"USE_PUSH_CONSTANTS", "0" } }, true, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_SHADOW_VERT_SKINNED, BINDING_LAYOUT_SHADOW_VOLUME_SKINNED },
+
+		{ BUILTIN_SHADOW_DEBUG, "builtin/debug/shadowDebug", "", { {"USE_GPU_SKINNING", "0" }, {"USE_PUSH_CONSTANTS", "0" } }, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_SHADOW_VERT, BINDING_LAYOUT_SHADOW_VOLUME },
+		{ BUILTIN_SHADOW_DEBUG_SKINNED, "builtin/debug/shadowDebug", "_skinned", { {"USE_GPU_SKINNING", "1" }, {"USE_PUSH_CONSTANTS", "0" } }, true, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_SHADOW_VERT_SKINNED, BINDING_LAYOUT_SHADOW_VOLUME_SKINNED },
+#endif
+
 		{ BUILTIN_BLENDLIGHT, "builtin/fog/blendlight", "",  { { "USE_GPU_SKINNING", "0" }, { "USE_PUSH_CONSTANTS", usePushConstants( BINDING_LAYOUT_BLENDLIGHT ) } }, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_BLENDLIGHT },
 		{ BUILTIN_BLENDLIGHT_SKINNED, "builtin/fog/blendlight", "_skinned",  { { "USE_GPU_SKINNING", "1" }, { "USE_PUSH_CONSTANTS", usePushConstants( BINDING_LAYOUT_BLENDLIGHT_SKINNED ) } }, true, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_BLENDLIGHT_SKINNED },
 		{ BUILTIN_FOG, "builtin/fog/fog", "", { { "USE_GPU_SKINNING", "0" }, { "USE_PUSH_CONSTANTS", usePushConstants( BINDING_LAYOUT_FOG ) } }, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_FOG },
@@ -967,6 +982,10 @@ void idRenderProgManager::Init( nvrhi::IDevice* device )
 
 	for( int i = 0; i < numBuiltins; i++ )
 	{
+#if defined( SHADOW_VOLUMES )
+		// BindShader_Builtin and GetProgramInfo index this table directly by builtin ID.
+		assert( builtins[i].index == i );
+#endif
 		renderProg_t& prog = renderProgs[i];
 
 		prog.name = builtins[i].name;
@@ -1032,6 +1051,10 @@ void idRenderProgManager::Init( nvrhi::IDevice* device )
 		renderProgs[builtinShaders[BUILTIN_BUMPY_ENVIRONMENT2_SKINNED]].usesJoints = true;
 		renderProgs[builtinShaders[BUILTIN_BUMPY_ENVIRONMENT2_SSR_SKINNED]].usesJoints = true;
 		renderProgs[builtinShaders[BUILTIN_DEPTH_SKINNED]].usesJoints = true;
+#if defined( SHADOW_VOLUMES )
+		renderProgs[builtinShaders[BUILTIN_SHADOW_SKINNED]].usesJoints = true;
+		renderProgs[builtinShaders[BUILTIN_SHADOW_DEBUG_SKINNED]].usesJoints = true;
+#endif
 		renderProgs[builtinShaders[BUILTIN_BLENDLIGHT_SKINNED]].usesJoints = true;
 		renderProgs[builtinShaders[BUILTIN_FOG_SKINNED]].usesJoints = true;
 

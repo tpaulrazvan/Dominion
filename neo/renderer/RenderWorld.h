@@ -209,6 +209,10 @@ typedef struct renderLight_s
 	const idMaterial* 		shader;				// NULL = either lights/defaultPointLight or lights/defaultProjectedLight
 	float					shaderParms[MAX_ENTITY_SHADER_PARMS];		// can be used in any way by shader
 	idSoundEmitter* 		referenceSound;		// for shader sound tables, allowing effects to vary with sounds
+
+#if defined( SHADOW_VOLUMES )
+	idRenderModel*			prelightModel;	// dmap-generated static shadow volume
+#endif
 } renderLight_t;
 
 
