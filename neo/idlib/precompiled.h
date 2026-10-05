@@ -177,9 +177,9 @@ constexpr uint32 NUM_FRAME_DATA	= 3;
 		#include "../framework/EditField.h"
 		#include "../framework/DebugGraph.h"
 		#include "../framework/Console.h"
-#if defined( RENDERDEMOS )
-		#include "../framework/DemoFile.h"
-#endif
+		#if defined( RENDERDEMOS )
+			#include "../framework/DemoFile.h"
+		#endif
 		#include "../framework/Common_dialog.h"
 
 	#endif /* !GAME_DLL */

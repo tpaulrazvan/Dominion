@@ -72,7 +72,7 @@ class idSoundWorld;
 class idSession;
 class idCommonDialog;
 #if defined( RENDERDEMOS )
-class idDemoFile;
+	class idDemoFile;
 #endif
 class idUserInterface;
 class idSaveLoadParms;

@@ -40,7 +40,7 @@ If you have questions concerning this license or the applicable additional terms
 
 class idFile;
 #if defined( RENDERDEMOS )
-class idDemoFile;
+	class idDemoFile;
 #endif
 
 class idUserInterface

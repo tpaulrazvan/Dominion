@@ -1269,7 +1269,7 @@ extern idCVar r_showSilhouette;				// highlight edges that are casting shadow pl
 extern idCVar r_showVertexColor;			// draws all triangles with the solid vertex color
 extern idCVar r_showUpdates;				// report entity and light updates and ref counts
 #if defined( RENDERDEMOS )
-extern idCVar r_showDemo;					// report reads and writes to the demo file
+	extern idCVar r_showDemo;					// report reads and writes to the demo file
 #endif
 extern idCVar r_showDynamic;				// report stats on dynamic surface generation
 extern idCVar r_showIntensity;				// draw the screen colors based on intensity, red = 0, green = 128, blue = 255

@@ -46,7 +46,7 @@ idCVar s_showVoices( "s_showVoices", "0", CVAR_BOOL, "show active voices" );
 idCVar s_volume_dB( "s_volume_dB", "0", CVAR_ARCHIVE | CVAR_FLOAT, "volume in dB" );
 
 #if defined( RENDERDEMOS )
-extern void WriteDeclCache( idDemoFile* f, int demoCategory, int demoCode, declType_t  declType );
+	extern void WriteDeclCache( idDemoFile* f, int demoCategory, int demoCode, declType_t  declType );
 #endif
 
 /*

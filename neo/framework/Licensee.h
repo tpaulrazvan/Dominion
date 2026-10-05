@@ -73,10 +73,10 @@ If you have questions concerning this license or the applicable additional terms
 #define ASYNC_PROTOCOL_MAJOR			1
 
 #if defined( RENDERDEMOS )
-// <= Doom v1.1: 1. no DS_VERSION token ( default )
-// Doom v1.2:  2
-// Doom 3 BFG: 3
-#define RENDERDEMO_VERSION				3
+	// <= Doom v1.1: 1. no DS_VERSION token ( default )
+	// Doom v1.2:  2
+	// Doom 3 BFG: 3
+	#define RENDERDEMO_VERSION				3
 #endif
 
 // win32 info

@@ -58,7 +58,7 @@ public:
 	}
 
 #if defined( RENDERDEMOS )
-		void			ReadFromDemoFile( idDemoFile* f );
+	void			ReadFromDemoFile( idDemoFile* f );
 	void				WriteToDemoFile( idDemoFile* f );
 #endif
 
