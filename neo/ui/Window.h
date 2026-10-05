@@ -295,6 +295,11 @@ public:
 	virtual void HandleBuddyUpdate( idWindow* buddy ) {};
 	virtual void StateChanged( bool redraw );
 
+#if defined( RENDERDEMOS )
+	virtual void ReadFromDemoFile( class idDemoFile* f, bool rebuild = true );
+	virtual void WriteToDemoFile( class idDemoFile* f );
+#endif
+
 	// SaveGame support
 	void			WriteSaveGameString( const char* string, idFile* savefile );
 	void			WriteSaveGameTransition( idTransitionData& trans, idFile* savefile );

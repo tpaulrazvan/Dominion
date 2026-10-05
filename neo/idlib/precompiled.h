@@ -41,6 +41,9 @@ If you have questions concerning this license or the applicable additional terms
 
 #define ID_TIME_T int64 // Signed because -1 means "File not found" and we don't want that to compare > than any other time
 
+// timdemos
+#define RENDERDEMOS	1
+
 // non-portable system services
 #include "../sys/sys_public.h"
 
@@ -174,6 +177,9 @@ constexpr uint32 NUM_FRAME_DATA	= 3;
 		#include "../framework/EditField.h"
 		#include "../framework/DebugGraph.h"
 		#include "../framework/Console.h"
+#if defined( RENDERDEMOS )
+		#include "../framework/DemoFile.h"
+#endif
 		#include "../framework/Common_dialog.h"
 
 	#endif /* !GAME_DLL */

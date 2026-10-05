@@ -45,7 +45,14 @@ idRenderModelOverlay::idRenderModelOverlay() :
 	nextOverlay( 0 ),
 	firstDeferredOverlay( 0 ),
 	nextDeferredOverlay( 0 ),
+#if defined( RENDERDEMOS )
+	numOverlayMaterials( 0 ),
+	index( -1 ),
+	demoSerialWrite( 0 ),
+	demoSerialCurrent( 0 )
+#else
 	numOverlayMaterials( 0 )
+#endif
 {
 	memset( overlays, 0, sizeof( overlays ) );
 }
@@ -75,6 +82,9 @@ void idRenderModelOverlay::ReUse()
 	firstDeferredOverlay = 0;
 	nextDeferredOverlay = 0;
 	numOverlayMaterials = 0;
+#if defined( RENDERDEMOS )
+	demoSerialCurrent++;
+#endif
 
 	for( unsigned int i = 0; i < MAX_OVERLAYS; i++ )
 	{
@@ -491,6 +501,10 @@ void idRenderModelOverlay::CreateOverlay( const idRenderModel* model, const idPl
 			overlayIndexes[numIndexes + 2] = 0;
 		}
 
+#if defined( RENDERDEMOS )
+		demoSerialCurrent++;
+#endif
+
 		// allocate a new overlay
 		overlay_t& overlay = overlays[nextOverlay++ & ( MAX_OVERLAYS - 1 )];
 		FreeOverlay( overlay );
@@ -504,6 +518,10 @@ void idRenderModelOverlay::CreateOverlay( const idRenderModel* model, const idPl
 		overlay.verts = ( overlayVertex_t* )Mem_Alloc( numVerts * sizeof( overlay.verts[0] ), TAG_MODEL );
 		memcpy( overlay.verts, overlayVerts.Ptr(), numVerts * sizeof( overlay.verts[0] ) );
 		overlay.maxReferencedVertex = maxReferencedVertex;
+
+#if defined( RENDERDEMOS )
+		overlay.writtenToDemo = false;
+#endif
 
 		if( nextOverlay - firstOverlay > MAX_OVERLAYS )
 		{
@@ -794,4 +812,108 @@ drawSurf_t* idRenderModelOverlay::CreateOverlayDrawSurf( const viewEntity_t* spa
 	return drawSurf;
 }
 
+#if defined( RENDERDEMOS )
+/*
+====================
+idRenderModelOverlay::ReadFromDemoFile
+====================
+*/
+void idRenderModelOverlay::ReadFromDemoFile( idDemoFile* f )
+{
+	f->ReadUnsignedInt( firstOverlay );
+	f->ReadUnsignedInt( nextOverlay );
 
+	for( unsigned int i = firstOverlay; i < nextOverlay; i++ )
+	{
+		overlay_t& overlay = overlays[ i & ( MAX_OVERLAYS - 1 ) ];
+
+		bool overlayWritten = false;
+		f->ReadBool( overlayWritten );
+		if( !overlayWritten )
+		{
+			continue;
+		}
+
+		f->ReadInt( overlay.surfaceNum );
+		f->ReadInt( overlay.surfaceId );
+		f->ReadInt( overlay.maxReferencedVertex );
+
+		const char* matName = f->ReadHashString();
+		overlay.material = matName[ 0 ] ? declManager->FindMaterial( matName ) : NULL;
+
+		int numVerts = 0;
+		int numIndices = 0;
+
+		f->ReadInt( numVerts );
+
+		if( numVerts > 0 )
+		{
+			if( overlay.numVerts != numVerts )
+			{
+				Mem_Free( overlay.verts );
+				overlay.numVerts = numVerts;
+				overlay.verts = ( overlayVertex_t* )Mem_Alloc( overlay.numVerts * sizeof( overlayVertex_t ), TAG_MODEL );
+			}
+
+			f->Read( overlay.verts, sizeof( overlayVertex_t ) * overlay.numVerts );
+		}
+
+		f->ReadInt( numIndices );
+
+		if( numIndices > 0 )
+		{
+			if( overlay.numIndexes != numIndices )
+			{
+				Mem_Free( overlay.indexes );
+				overlay.numIndexes = numIndices;
+				overlay.indexes = ( triIndex_t* )Mem_Alloc( overlay.numIndexes * sizeof( triIndex_t ), TAG_MODEL );
+			}
+
+			f->Read( overlay.indexes, sizeof( triIndex_t ) * overlay.numIndexes );
+		}
+	}
+}
+
+/*
+====================
+idRenderModelOverlay::WriteToDemoFile
+====================
+*/
+void idRenderModelOverlay::WriteToDemoFile( idDemoFile* f ) const
+{
+	f->WriteUnsignedInt( firstOverlay );
+	f->WriteUnsignedInt( nextOverlay );
+
+	for( unsigned int i = firstOverlay; i < nextOverlay; i++ )
+	{
+		const overlay_t& overlay = overlays[ i & ( MAX_OVERLAYS - 1 ) ];
+
+		if( overlay.writtenToDemo )
+		{
+			f->WriteBool( false );
+			continue;
+		}
+
+		f->WriteBool( true );
+		f->WriteInt( overlay.surfaceNum );
+		f->WriteInt( overlay.surfaceId );
+		f->WriteInt( overlay.maxReferencedVertex );
+		f->WriteHashString( overlay.material ? overlay.material->GetName() : "" );
+
+		f->WriteInt( overlay.numVerts );
+		for( int j = 0; j < overlay.numVerts; j++ )
+		{
+			f->Write( &overlay.verts[ j ], sizeof( overlayVertex_t ) );
+		}
+
+		f->WriteInt( overlay.numIndexes );
+		for( int j = 0; j < overlay.numIndexes; j++ )
+		{
+			f->Write( &overlay.indexes[ j ], sizeof( triIndex_t ) );
+		}
+
+		// so it won't be written again
+		overlay.writtenToDemo = true;
+	}
+}
+#endif

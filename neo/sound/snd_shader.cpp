@@ -163,6 +163,12 @@ idSoundShader::Parse
 */
 bool idSoundShader::Parse( const char* text, const int textLength, bool allowBinaryVersion )
 {
+#if defined( RENDERDEMOS )
+	if( soundSystemLocal.currentSoundWorld )
+	{
+		soundSystemLocal.currentSoundWorld->WriteSoundShaderLoad( this );
+	}
+#endif
 	idLexer	src;
 
 	src.LoadMemory( text, textLength, GetFileName(), GetLineNum() );

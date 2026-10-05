@@ -610,11 +610,22 @@ public:
 	virtual bool			        SkipCinematicScene();
 	virtual bool                    CheckInCinematic();
 
+#if defined( RENDERDEMOS )
+	virtual void					StartDemoPlayback( idRenderWorld* renderworld );
+
+	void							DemoWriteGameInfo();
+#endif
+
+	// these shuld be under #RENDERDEMOS too ?
 	enum gameDemoCommand_t
 	{
 		GCMD_UNKNOWN,
 		GCMD_GAMETIME,
 	};
+
+#if defined( RENDERDEMOS )
+	virtual bool					ProcessDemoCommand( idDemoFile* readDemo );
+#endif
 
 	void					Shell_ClearRepeater();
 

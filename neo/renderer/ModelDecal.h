@@ -91,6 +91,9 @@ struct decalProjectionParms_t
 	int						numIndexes;
 	int						startTime;
 	const idMaterial* 		material;
+#if defined( RENDERDEMOS )
+	mutable bool			writtenToDemo;
+#endif
 }
 #if !defined(_WIN32)
 	ALIGNTYPE16
@@ -124,6 +127,15 @@ public:
 
 	unsigned int				GetNumDecalDrawSurfs();
 	struct drawSurf_t* 			CreateDecalDrawSurf( const struct viewEntity_t* space, unsigned int index );
+
+#if defined( RENDERDEMOS )
+	void						ReadFromDemoFile( class idDemoFile* f );
+	void						WriteToDemoFile( class idDemoFile* f ) const;
+
+	qhandle_t 					index; // Used for Demo files.
+	int							demoSerialWrite;
+	int							demoSerialCurrent;
+#endif
 
 private:
 	decal_t						decals[MAX_DECALS];

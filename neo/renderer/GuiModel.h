@@ -52,6 +52,11 @@ public:
 
 	void		Clear();
 
+#if defined( RENDERDEMOS )
+	void		WriteToDemo( idDemoFile* demo );
+	void		ReadFromDemo( idDemoFile* demo );
+#endif
+
 	// allocates memory for verts and indexes in frame-temporary buffer memory
 	void		BeginFrame();
 

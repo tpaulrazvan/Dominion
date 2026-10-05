@@ -45,6 +45,10 @@ idCVar s_drawSounds( "s_drawSounds", "0", CVAR_INTEGER, "", 0, 2, idCmdSystem::A
 idCVar s_showVoices( "s_showVoices", "0", CVAR_BOOL, "show active voices" );
 idCVar s_volume_dB( "s_volume_dB", "0", CVAR_ARCHIVE | CVAR_FLOAT, "volume in dB" );
 
+#if defined( RENDERDEMOS )
+extern void WriteDeclCache( idDemoFile* f, int demoCategory, int demoCode, declType_t  declType );
+#endif
+
 /*
 ========================
 idSoundWorldLocal::idSoundWorldLocal
@@ -58,6 +62,10 @@ idSoundWorldLocal::idSoundWorldLocal()
 		soundClassFade[i].Clear();
 	}
 	renderWorld = NULL;
+
+#if defined( RENDERDEMOS )
+	writeDemo = NULL;
+#endif
 
 	listener.axis.Identity();
 	listener.pos.Zero();
@@ -164,6 +172,17 @@ idSoundWorldLocal::PlaceListener
 */
 void idSoundWorldLocal::PlaceListener( const idVec3& origin, const idMat3& axis, const int id )
 {
+#if defined( RENDERDEMOS )
+	if( writeDemo )
+	{
+		writeDemo->WriteInt( DS_SOUND );
+		writeDemo->WriteInt( SCMD_PLACE_LISTENER );
+		writeDemo->WriteVec3( origin );
+		writeDemo->WriteMat3( axis );
+		writeDemo->WriteInt( id );
+	}
+#endif
+
 	if( s_lockListener.GetBool() )
 	{
 		return;
@@ -182,6 +201,24 @@ void idSoundWorldLocal::PlaceListener( const idVec3& origin, const idMat3& axis,
 		listener.area = 0;
 	}
 }
+
+#if defined( RENDERDEMOS )
+/*
+========================
+idSoundWorldLocal::WriteSoundShaderLoad
+========================
+*/
+void idSoundWorldLocal::WriteSoundShaderLoad( const idSoundShader* snd )
+{
+	if( writeDemo )
+	{
+		writeDemo->WriteInt( DS_SOUND );
+		writeDemo->WriteInt( SCMD_CACHESOUNDSHADER );
+		writeDemo->WriteInt( 1 );
+		writeDemo->WriteHashString( snd->GetName() );
+	}
+}
+#endif
 
 /*
 ========================
@@ -837,7 +874,185 @@ void idSoundWorldLocal::ResolveOrigin( const int stackDepth, const soundPortalTr
 	}
 }
 
+#if defined( RENDERDEMOS )
+
 /*
+========================
+idSoundWorldLocal::StartWritingDemo
+========================
+*/
+void idSoundWorldLocal::StartWritingDemo( idDemoFile* demo )
+{
+	writeDemo = demo;
+
+	WriteDeclCache( writeDemo, DS_SOUND, SCMD_CACHESOUNDSHADER, DECL_SOUND );
+
+	writeDemo->WriteInt( DS_SOUND );
+	writeDemo->WriteInt( SCMD_STATE );
+
+	// use the normal save game code to archive all the emitters
+	WriteToSaveGame( writeDemo );
+}
+
+/*
+========================
+idSoundWorldLocal::StopWritingDemo
+========================
+*/
+void idSoundWorldLocal::StopWritingDemo()
+{
+	writeDemo = NULL;
+}
+
+/*
+========================
+idSoundWorldLocal::ProcessDemoCommand
+========================
+*/
+void idSoundWorldLocal::ProcessDemoCommand( idDemoFile* readDemo )
+{
+
+	if( !readDemo )
+	{
+		return;
+	}
+
+	int index;
+	soundDemoCommand_t	dc;
+
+	if( !readDemo->ReadInt( ( int& )dc ) )
+	{
+		return;
+	}
+
+	switch( dc )
+	{
+		case SCMD_CACHESOUNDSHADER:
+		{
+			int numCaches = 0;
+			readDemo->ReadInt( numCaches );
+			for( int i = 0; i < numCaches; ++i )
+			{
+				const char* declName = readDemo->ReadHashString();
+				declManager->FindSound( declName );
+			}
+			break;
+		}
+		case SCMD_STATE:
+		{
+			ReadFromSaveGame( readDemo );
+			UnPause();
+			break;
+		}
+		case SCMD_PLACE_LISTENER:
+		{
+			idVec3	origin;
+			idMat3	axis;
+			int		listenerId;
+
+			readDemo->ReadVec3( origin );
+			readDemo->ReadMat3( axis );
+			readDemo->ReadInt( listenerId );
+
+			PlaceListener( origin, axis, listenerId );
+		};
+		break;
+		case SCMD_ALLOC_EMITTER:
+		{
+			readDemo->ReadInt( index );
+
+			while( emitters.Num() <= index )
+			{
+				// append a brand new one
+				AllocSoundEmitter();
+			}
+		}
+		break;
+		case SCMD_FREE:
+		{
+			int	immediate;
+
+			readDemo->ReadInt( index );
+			readDemo->ReadInt( immediate );
+			EmitterForIndex( index )->Free( immediate != 0 );
+		}
+		break;
+		case SCMD_UPDATE:
+		{
+			idVec3 origin;
+			int listenerId;
+			soundShaderParms_t parms;
+
+			readDemo->ReadInt( index );
+			readDemo->ReadVec3( origin );
+			readDemo->ReadInt( listenerId );
+			readDemo->ReadFloat( parms.minDistance );
+			readDemo->ReadFloat( parms.maxDistance );
+			readDemo->ReadFloat( parms.volume );
+			readDemo->ReadFloat( parms.shakes );
+			readDemo->ReadInt( parms.soundShaderFlags );
+			readDemo->ReadInt( parms.soundClass );
+			EmitterForIndex( index )->UpdateEmitter( origin, listenerId, &parms );
+		}
+		break;
+		case SCMD_START:
+		{
+			const idSoundShader* shader;
+			int			channel;
+			float		diversity;
+			int			shaderFlags;
+
+			readDemo->ReadInt( index );
+			shader = declManager->FindSound( readDemo->ReadHashString() );
+			readDemo->ReadInt( channel );
+			readDemo->ReadFloat( diversity );
+			readDemo->ReadInt( shaderFlags );
+			EmitterForIndex( index )->StartSound( shader, ( s_channelType )channel, diversity, shaderFlags );
+		}
+		break;
+		case SCMD_MODIFY:
+		{
+			int		channel;
+			soundShaderParms_t parms;
+
+			readDemo->ReadInt( index );
+			readDemo->ReadInt( channel );
+			readDemo->ReadFloat( parms.minDistance );
+			readDemo->ReadFloat( parms.maxDistance );
+			readDemo->ReadFloat( parms.volume );
+			readDemo->ReadFloat( parms.shakes );
+			readDemo->ReadInt( parms.soundShaderFlags );
+			readDemo->ReadInt( parms.soundClass );
+			EmitterForIndex( index )->ModifySound( ( s_channelType )channel, &parms );
+		}
+		break;
+		case SCMD_STOP:
+		{
+			int		channel;
+
+			readDemo->ReadInt( index );
+			readDemo->ReadInt( channel );
+			EmitterForIndex( index )->StopSound( ( s_channelType )channel );
+		}
+		break;
+		case SCMD_FADE:
+		{
+			int		channel;
+			float	to, over;
+
+			readDemo->ReadInt( index );
+			readDemo->ReadInt( channel );
+			readDemo->ReadFloat( to );
+			readDemo->ReadFloat( over );
+			EmitterForIndex( index )->FadeSound( ( s_channelType )channel, to, over );
+		}
+		break;
+	}
+}
+#endif
+
+/*
+=================
 idSoundWorldLocal::WriteToSaveGame
 =================
 */

@@ -449,7 +449,22 @@ public:
 	// Traces vs the world model bsp tree.
 	virtual bool			FastWorldTrace( modelTrace_t& trace, const idVec3& start, const idVec3& end ) const = 0;
 
+#if defined( RENDERDEMOS )
 	//-------------- Demo Control  -----------------
+
+	// Writes a loadmap command to the demo, and clears archive counters.
+	virtual void			StartWritingDemo( idDemoFile* demo ) = 0;
+	virtual void			StopWritingDemo() = 0;
+
+	// Returns true when demoRenderView has been filled in.
+	// adds/updates/frees entityDefs and lightDefs based on the current demo file
+	// and returns the renderView to be used to render this frame.
+	// a demo file may need to be advanced multiple times if the framerate
+	// is less than 30hz
+	// demoTimeOffset will be set if a new map load command was processed before
+	// the next renderScene
+	virtual bool			ProcessDemoCommand( idDemoFile* readDemo, renderView_t* demoRenderView, int* demoTimeOffset ) = 0;
+#endif
 
 	// this is used to regenerate all interactions ( which is currently only done during influences ), there may be a less
 	// expensive way to do it

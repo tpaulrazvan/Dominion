@@ -51,6 +51,35 @@ const float	DEFAULT_FOG_DISTANCE	= 500.0f;
 const int FOG_ENTER_SIZE			= 64;
 const float FOG_ENTER				= ( FOG_ENTER_SIZE + 1.0f ) / ( FOG_ENTER_SIZE * 2 );
 
+#if defined( RENDERDEMOS )
+enum demoCommand_t
+{
+	DC_BAD,
+	DC_RENDERVIEW,
+	DC_UPDATE_ENTITYDEF,
+	DC_DELETE_ENTITYDEF,
+	DC_UPDATE_LIGHTDEF,
+	DC_DELETE_LIGHTDEF,
+	DC_LOADMAP,
+	DC_CROP_RENDER,
+	DC_UNCROP_RENDER,
+	DC_CAPTURE_RENDER,
+	DC_END_FRAME,
+	DC_DEFINE_MODEL,
+	DC_SET_PORTAL_STATE,
+	DC_UPDATE_SOUNDOCCLUSION,
+	DC_GUI_MODEL,
+	DC_UPDATE_ENVPROBEDEF,
+	DC_DELETE_ENVPROBEDEF,
+	DC_UPDATE_DECAL,
+	DC_DELETE_DECAL,
+	DC_UPDATE_OVERLAY,
+	DC_DELETE_OVERLAY,
+	DC_CACHE_SKINS,
+	DC_CACHE_PARTICLES,
+	DC_CACHE_MATERIALS,
+};
+#endif
 
 /*
 ==============================================================================
@@ -215,6 +244,10 @@ public:
 	// and should go in the dynamic frame memory, or kept
 	// in the cached memory
 
+#if defined( RENDERDEMOS )
+	bool					archived;				// for demo writing
+#endif
+
 	// derived information
 	idPlane					lightProject[4];		// old style light projection where Z and W are flipped and projected lights lightProject[3] is divided by ( zNear + zFar )
 	idRenderMatrix			baseLightProject;		// global xyz1 to projected light strq
@@ -263,6 +296,10 @@ public:
 	// and should go in the dynamic frame memory, or kept
 	// in the cached memory
 
+#if defined( RENDERDEMOS )
+	bool						archived;				// for demo writing
+#endif
+
 	// derived information
 	idRenderMatrix				inverseBaseProbeProject;// transforms the zero-to-one cube to exactly cover the light in world space
 
@@ -295,6 +332,12 @@ public:
 	virtual void			RemoveDecals();
 
 	bool					IsDirectlyVisible() const;
+
+#if defined( RENDERDEMOS )
+	void					ReadFromDemoFile( class idDemoFile* f );
+	void					WriteToDemoFile( class idDemoFile* f ) const;
+#endif
+
 	renderEntity_t			parms;
 
 	float					modelMatrix[16];		// this is just a rearrangement of parms.axis and parms.origin
@@ -307,6 +350,10 @@ public:
 	int						lastModifiedFrameNum;	// to determine if it is constantly changing,
 	// and should go in the dynamic frame memory, or kept
 	// in the cached memory
+
+#if defined( RENDERDEMOS )
+	bool					archived;				// for demo writing
+#endif
 
 	idRenderModel* 			dynamicModel;			// if parms.model->IsDynamicModel(), this is the generated data
 	int						dynamicModelFrameCount;	// continuously animating dynamic models will recreate
@@ -976,6 +1023,12 @@ public:
 
 	virtual void			DrawCRTPostFX(); // RB
 
+#if defined( RENDERDEMOS )
+	virtual void			WriteDemoPics();
+	virtual void			WriteEndFrame();
+	virtual void			DrawDemoPics();
+#endif
+
 	virtual const emptyCommand_t* 	SwapCommandBuffers( uint64* frontEndMicroSec, uint64* backEndMicroSec, uint64* mocMicroSec, uint64* gpuMicroSec, backEndCounters_t* bc, performanceCounters_t* pc );
 
 	virtual void					SwapCommandBuffers_FinishRendering( uint64* frontEndMicroSec, uint64* backEndMicroSec, uint64* mocMicroSec, uint64* gpuMicroSec, backEndCounters_t* bc, performanceCounters_t* pc );
@@ -1215,6 +1268,9 @@ extern idCVar r_showUnsmoothedTangents;		// highlight geometry rendered with uns
 extern idCVar r_showSilhouette;				// highlight edges that are casting shadow planes
 extern idCVar r_showVertexColor;			// draws all triangles with the solid vertex color
 extern idCVar r_showUpdates;				// report entity and light updates and ref counts
+#if defined( RENDERDEMOS )
+extern idCVar r_showDemo;					// report reads and writes to the demo file
+#endif
 extern idCVar r_showDynamic;				// report stats on dynamic surface generation
 extern idCVar r_showIntensity;				// draw the screen colors based on intensity, red = 0, green = 128, blue = 255
 extern idCVar r_showTrace;					// show the intersection of an eye trace with the world
@@ -1387,7 +1443,6 @@ ID_INLINE shadowMode_t R_GetShadowMode()
 	return mode;
 }
 #if defined( SHADOW_VOLUMES )
-
 	extern idCVar r_shadowPolygonOffset;
 	extern idCVar r_shadowPolygonFactor;
 #endif

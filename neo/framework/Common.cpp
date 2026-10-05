@@ -200,11 +200,19 @@ idCommonLocal::idCommonLocal() :
 	soundWorld = NULL;
 	menuSoundWorld = NULL;
 
+#if defined( RENDERDEMOS )
+	readDemo = NULL;
+	writeDemo = NULL;
+#endif
+
 	gameFrame = 0;
 	gameTimeResidual = 0;
 	syncNextGameFrame = true;
 	mapSpawned = false;
+
+#if defined( RENDERDEMOS )
 	timeDemo = TD_NO;
+#endif
 
 	nextSnapshotSendTime = 0;
 	nextUsercmdSendTime = 0;
@@ -1791,7 +1799,12 @@ idCommonLocal::ProcessEvent
 bool idCommonLocal::ProcessEvent( const sysEvent_t* event )
 {
 	// hitting escape anywhere brings up the menu
+#if defined( RENDERDEMOS )
+	// SRS - allow escape during demo playback to cancel
+	if( game && ( game->IsInGame() || readDemo ) )
+#else
 	if( game && game->IsInGame() )
+#endif
 	{
 		if( event->evType == SE_KEY && event->evValue2 == 1 && ( event->evValue == K_ESCAPE || event->evValue == K_JOY9 ) )
 		{
@@ -1811,7 +1824,20 @@ bool idCommonLocal::ProcessEvent( const sysEvent_t* event )
 
 					console->Close();
 
+#if defined( RENDERDEMOS )
+					// SRS - cancel demo playback and return to the main menu
+					if( readDemo )
+					{
+						LeaveGame();
+					}
+					else
+					{
+						StartMenu();
+					}
+#else
 					StartMenu();
+#endif
+
 					return true;
 				}
 				else

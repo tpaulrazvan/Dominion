@@ -188,6 +188,12 @@ public:
 	virtual void				Shell_SetGameComplete() = 0;
 	virtual bool				SkipCinematicScene() = 0;
 	virtual bool				CheckInCinematic() = 0;
+
+#if defined( RENDERDEMOS )
+	// Demo helper functions
+	virtual void				StartDemoPlayback( idRenderWorld* renderworld ) = 0;
+	virtual bool				ProcessDemoCommand( idDemoFile* readDemo ) = 0;
+#endif
 };
 
 extern idGame* 					game;

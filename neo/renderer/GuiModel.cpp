@@ -52,6 +52,26 @@ idGuiModel::idGuiModel()
 	}
 }
 
+#if defined( RENDERDEMOS )
+/*
+================
+idGuiModel::WriteToDemo
+================
+*/
+void idGuiModel::WriteToDemo( idDemoFile* demo )
+{
+}
+
+/*
+================
+idGuiModel::ReadFromDemo
+================
+*/
+void idGuiModel::ReadFromDemo( idDemoFile* demo )
+{
+}
+#endif
+
 /*
 ================
 idGuiModel::Clear

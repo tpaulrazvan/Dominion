@@ -165,6 +165,9 @@ idRenderWorldLocal::idRenderWorldLocal()
 		decals[i].entityHandle = -1;
 		decals[i].lastStartTime = 0;
 		decals[i].decals = new( TAG_MODEL ) idRenderModelDecal();
+#if defined( RENDERDEMOS )
+		decals[i].decals->index = i;
+#endif
 	}
 
 	for( int i = 0; i < overlays.Num(); i++ )
@@ -172,6 +175,9 @@ idRenderWorldLocal::idRenderWorldLocal()
 		overlays[i].entityHandle = -1;
 		overlays[i].lastStartTime = 0;
 		overlays[i].overlays = new( TAG_MODEL ) idRenderModelOverlay();
+#if defined( RENDERDEMOS )
+		overlays[i].overlays->index = i;
+#endif
 	}
 }
 
@@ -351,6 +357,10 @@ void idRenderWorldLocal::UpdateEntityDef( qhandle_t entityHandle, const renderEn
 
 	def->lastModifiedFrameNum = tr.frameCount;
 
+#if defined( RENDERDEMOS )
+	def->archived = false;
+#endif
+
 	// optionally immediately issue any callbacks
 	if( !r_useEntityCallbacks.GetBool() && def->parms.callback != NULL )
 	{
@@ -395,6 +405,13 @@ void idRenderWorldLocal::FreeEntityDef( qhandle_t entityHandle )
 	}
 
 	R_FreeEntityDefDerivedData( def, false, false );
+
+#if defined( RENDERDEMOS )
+	if( common->WriteDemo() && def->archived )
+	{
+		WriteFreeEntity( entityHandle );
+	}
+#endif
 
 	// if we are playing a demo, these will have been freed
 	// in R_FreeEntityDefDerivedData(), otherwise the gui
@@ -533,6 +550,14 @@ void idRenderWorldLocal::UpdateLightDef( qhandle_t lightHandle, const renderLigh
 
 	light->lastModifiedFrameNum = tr.frameCount;
 
+#if defined( RENDERDEMOS )
+	if( common->WriteDemo() && light->archived )
+	{
+		WriteFreeLight( lightHandle );
+		light->archived = false;
+	}
+#endif
+
 	// new for BFG edition: force noShadows on spectrum lights so teleport spawns
 	// don't cause such a slowdown.  Hell writing shouldn't be shadowed anyway...
 	if( light->parms.shader && light->parms.shader->Spectrum() )
@@ -572,6 +597,13 @@ void idRenderWorldLocal::FreeLightDef( qhandle_t lightHandle )
 	}
 
 	R_FreeLightDefDerivedData( light );
+
+#if defined( RENDERDEMOS )
+	if( common->WriteDemo() && light->archived )
+	{
+		WriteFreeLight( lightHandle );
+	}
+#endif
 
 	delete light;
 	lightDefs[lightHandle] = NULL;
@@ -684,6 +716,14 @@ void idRenderWorldLocal::UpdateEnvprobeDef( qhandle_t envprobeHandle, const rend
 	probe->parms = *ep;
 	probe->lastModifiedFrameNum = tr.frameCount;
 
+#if defined( RENDERDEMOS )
+	if( common->WriteDemo() && probe->archived )
+	{
+		WriteFreeEnvprobe( envprobeHandle );
+		probe->archived = false;
+	}
+#endif
+
 	if( !justUpdate )
 	{
 		R_CreateEnvprobeRefs( probe );
@@ -716,6 +756,13 @@ void idRenderWorldLocal::FreeEnvprobeDef( qhandle_t envprobeHandle )
 	}
 
 	R_FreeEnvprobeDefDerivedData( probe );
+
+#if defined( RENDERDEMOS )
+	if( common->WriteDemo() && probe->archived )
+	{
+		WriteFreeEnvprobe( envprobeHandle );
+	}
+#endif
 
 	delete probe;
 	envprobeDefs[envprobeHandle] = NULL;
@@ -807,6 +854,10 @@ void idRenderWorldLocal::ProjectDecalOntoWorld( const idFixedWinding& winding, c
 				def->decals = AllocDecal( def->index, startTime );
 			}
 			def->decals->AddDeferredDecal( localParms );
+
+#if defined( RENDERDEMOS )
+			def->archived = false;
+#endif
 		}
 	}
 }
@@ -862,6 +913,10 @@ void idRenderWorldLocal::ProjectDecal( qhandle_t entityHandle, const idFixedWind
 		def->decals = AllocDecal( def->index, startTime );
 	}
 	def->decals->AddDeferredDecal( localParms );
+
+#if defined( RENDERDEMOS )
+	def->archived = false;
+#endif
 }
 
 /*
@@ -900,6 +955,10 @@ void idRenderWorldLocal::ProjectOverlay( qhandle_t entityHandle, const idPlane l
 		def->overlays = AllocOverlay( def->index, startTime );
 	}
 	def->overlays->AddDeferredOverlay( localParms );
+
+#if defined( RENDERDEMOS )
+	def->archived = false;
+#endif
 }
 
 /*
@@ -933,6 +992,13 @@ idRenderModelDecal* idRenderWorldLocal::AllocDecal( qhandle_t newEntityHandle, i
 	decals[oldest].entityHandle = newEntityHandle;
 	decals[oldest].lastStartTime = startTime;
 	decals[oldest].decals->ReUse();
+
+#if defined( RENDERDEMOS )
+	if( common->WriteDemo() )
+	{
+		WriteFreeDecal( common->WriteDemo(), oldest );
+	}
+#endif
 
 	return decals[oldest].decals;
 }
@@ -1121,6 +1187,15 @@ void idRenderWorldLocal::RenderScene( const renderView_t* renderView )
 
 	// render any post processing after the view and all its subviews has been draw
 	R_RenderPostProcess( parms );
+
+#if defined( RENDERDEMOS )
+	// now write delete commands for any modified-but-not-visible entities, and
+	// add the renderView command to the demo
+	if( common->WriteDemo() )
+	{
+		WriteRenderView( renderView );
+	}
+#endif
 
 #if 0
 	for( int i = 0; i < entityDefs.Num(); i++ )

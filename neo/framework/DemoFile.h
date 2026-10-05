@@ -3,6 +3,8 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
+Copyright (C) 2014-2016 Robert Beckebans
+Copyright (C) 2014-2016 Kot in Action Creative Artel
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
@@ -25,101 +27,77 @@ If you have questions concerning this license or the applicable additional terms
 
 ===========================================================================
 */
-#ifndef __GUISCRIPT_H
-#define __GUISCRIPT_H
-
-#include "Window.h"
-#include "Winvar.h"
-
-struct idGSWinVar
-{
-	idGSWinVar()
-	{
-		var = NULL;
-		own = false;
-	}
-	idWinVar* var;
-	bool own;
-};
-
-class idGuiScriptList;
-
-class idGuiScript
-{
-	friend class idGuiScriptList;
-	friend class idWindow;
-
-public:
-	idGuiScript();
-	~idGuiScript();
-
-	bool Parse( idTokenParser* src );
-	void Execute( idWindow* win )
-	{
-		if( handler )
-		{
-			handler( win, &parms );
-		}
-	}
-	void FixupParms( idWindow* win );
-	size_t Size()
-	{
-		int sz = sizeof( *this );
-		for( int i = 0; i < parms.Num(); i++ )
-		{
-			sz += parms[i].var->Size();
-		}
-		return sz;
-	}
-
-	void WriteToSaveGame( idFile* savefile );
-	void ReadFromSaveGame( idFile* savefile );
-
-protected:
-	int conditionReg;
-	idGuiScriptList* ifList;
-	idGuiScriptList* elseList;
-	idList<idGSWinVar, TAG_OLD_UI> parms;
-	void ( *handler )( idWindow* window, idList<idGSWinVar, TAG_OLD_UI>* src );
-
-};
-
-
-class idGuiScriptList
-{
-	idList<idGuiScript*, TAG_OLD_UI> list;
-public:
-	idGuiScriptList()
-	{
-		list.SetGranularity( 4 );
-	};
-	~idGuiScriptList()
-	{
-		list.DeleteContents( true );
-	};
-	void Execute( idWindow* win );
-	void Append( idGuiScript* gs )
-	{
-		list.Append( gs );
-	}
-	size_t Size()
-	{
-		int sz = sizeof( *this );
-		for( int i = 0; i < list.Num(); i++ )
-		{
-			sz += list[i]->Size();
-		}
-		return sz;
-	}
-	void FixupParms( idWindow* win );
 
 #if defined( RENDERDEMOS )
-	void ReadFromDemoFile( class idDemoFile* f ) {};
-	void WriteToDemoFile( class idDemoFile* f ) {};
-#endif
 
-	void WriteToSaveGame( idFile* savefile );
-	void ReadFromSaveGame( idFile* savefile );
+#ifndef __DEMOFILE_H__
+#define __DEMOFILE_H__
+
+/*
+===============================================================================
+
+	Demo file
+
+===============================================================================
+*/
+
+typedef enum
+{
+	DS_FINISHED,
+	DS_RENDER,
+	DS_SOUND,
+	DS_GAME,
+	DS_VERSION
+} demoSystem_t;
+
+class idDemoFile : public idFile
+{
+public:
+	idDemoFile();
+	~idDemoFile();
+
+	const char* 	GetName()
+	{
+		return ( f ? f->GetName() : "" );
+	}
+	const char* 	GetFullPath()
+	{
+		return ( f ? f->GetFullPath() : "" );
+	}
+
+	void			SetLog( bool b, const char* p );
+	void			Log( const char* p );
+	bool			OpenForReading( const char* fileName );
+	bool			OpenForWriting( const char* fileName );
+	void			Close();
+
+	const char* 	ReadHashString();
+	void			WriteHashString( const char* str );
+
+	void			ReadDict( idDict& dict );
+	void			WriteDict( const idDict& dict );
+
+	int				Read( void* buffer, int len );
+	int				Write( const void* buffer, int len );
+
+private:
+	static idCompressor* AllocCompressor( int type );
+
+	bool			writing;
+	byte* 			fileImage;
+	idFile* 		f;
+	idCompressor* 	compressor;
+
+	idList<idStr*>	demoStrings;
+	idFile* 		fLog;
+	bool			log;
+	idStr			logStr;
+
+	static idCVar	com_logDemos;
+	static idCVar	com_compressDemos;
+	static idCVar	com_preloadDemos;
 };
 
-#endif // __GUISCRIPT_H
+#endif /* !__DEMOFILE_H__ */
+
+#endif

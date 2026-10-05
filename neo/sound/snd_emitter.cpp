@@ -467,6 +467,15 @@ void idSoundEmitterLocal::Init( int i, idSoundWorldLocal* sw )
 	spatializedOrigin.Zero();
 
 	memset( &parms, 0, sizeof( parms ) );
+
+#if defined( RENDERDEMOS )
+	if( soundWorld && soundWorld->writeDemo )
+	{
+		soundWorld->writeDemo->WriteInt( DS_SOUND );
+		soundWorld->writeDemo->WriteInt( SCMD_ALLOC_EMITTER );
+		soundWorld->writeDemo->WriteInt( index );
+	}
+#endif
 }
 
 /*
@@ -689,6 +698,16 @@ void idSoundEmitterLocal::Free( bool immediate )
 		return;
 	}
 
+#if defined( RENDERDEMOS )
+	if( soundWorld && soundWorld->writeDemo )
+	{
+		soundWorld->writeDemo->WriteInt( DS_SOUND );
+		soundWorld->writeDemo->WriteInt( SCMD_FREE );
+		soundWorld->writeDemo->WriteInt( index );
+		soundWorld->writeDemo->WriteInt( immediate );
+	}
+#endif
+
 	if( immediate )
 	{
 		Reset();
@@ -706,6 +725,23 @@ void idSoundEmitterLocal::UpdateEmitter( const idVec3& origin, int listenerId, c
 {
 	assert( soundWorld != NULL );
 	assert( soundWorld->emitters[this->index] == this );
+
+#if defined( RENDERDEMOS )
+	if( soundWorld && soundWorld->writeDemo )
+	{
+		soundWorld->writeDemo->WriteInt( DS_SOUND );
+		soundWorld->writeDemo->WriteInt( SCMD_UPDATE );
+		soundWorld->writeDemo->WriteInt( index );
+		soundWorld->writeDemo->WriteVec3( origin );
+		soundWorld->writeDemo->WriteInt( listenerId );
+		soundWorld->writeDemo->WriteFloat( parms->minDistance );
+		soundWorld->writeDemo->WriteFloat( parms->maxDistance );
+		soundWorld->writeDemo->WriteFloat( parms->volume );
+		soundWorld->writeDemo->WriteFloat( parms->shakes );
+		soundWorld->writeDemo->WriteInt( parms->soundShaderFlags );
+		soundWorld->writeDemo->WriteInt( parms->soundClass );
+	}
+#endif
 
 	this->origin = origin;
 	this->emitterId = listenerId;
@@ -732,6 +768,21 @@ int idSoundEmitterLocal::StartSound( const idSoundShader* shader, const s_channe
 	{
 		return 0;
 	}
+
+#if defined( RENDERDEMOS )
+	if( soundWorld && soundWorld->writeDemo )
+	{
+		soundWorld->writeDemo->WriteInt( DS_SOUND );
+		soundWorld->writeDemo->WriteInt( SCMD_START );
+		soundWorld->writeDemo->WriteInt( index );
+
+		soundWorld->writeDemo->WriteHashString( shader->GetName() );
+
+		soundWorld->writeDemo->WriteInt( channel );
+		soundWorld->writeDemo->WriteFloat( diversity );
+		soundWorld->writeDemo->WriteInt( shaderFlags );
+	}
+#endif
 
 	if( s_noSound.GetBool() )
 	{
@@ -961,6 +1012,16 @@ void idSoundEmitterLocal::StopSound( const s_channelType channel )
 	assert( soundWorld != NULL );
 	assert( soundWorld->emitters[this->index] == this );
 
+#if defined( RENDERDEMOS )
+	if( soundWorld && soundWorld->writeDemo )
+	{
+		soundWorld->writeDemo->WriteInt( DS_SOUND );
+		soundWorld->writeDemo->WriteInt( SCMD_STOP );
+		soundWorld->writeDemo->WriteInt( index );
+		soundWorld->writeDemo->WriteInt( channel );
+	}
+#endif
+
 	for( int i = 0; i < channels.Num(); i++ )
 	{
 		idSoundChannel* chan = channels[i];
@@ -989,6 +1050,22 @@ void idSoundEmitterLocal::ModifySound( const s_channelType channel, const soundS
 	assert( soundWorld != NULL );
 	assert( soundWorld->emitters[this->index] == this );
 
+#if defined( RENDERDEMOS )
+	if( soundWorld && soundWorld->writeDemo )
+	{
+		soundWorld->writeDemo->WriteInt( DS_SOUND );
+		soundWorld->writeDemo->WriteInt( SCMD_MODIFY );
+		soundWorld->writeDemo->WriteInt( index );
+		soundWorld->writeDemo->WriteInt( channel );
+		soundWorld->writeDemo->WriteFloat( parms->minDistance );
+		soundWorld->writeDemo->WriteFloat( parms->maxDistance );
+		soundWorld->writeDemo->WriteFloat( parms->volume );
+		soundWorld->writeDemo->WriteFloat( parms->shakes );
+		soundWorld->writeDemo->WriteInt( parms->soundShaderFlags );
+		soundWorld->writeDemo->WriteInt( parms->soundClass );
+	}
+#endif
+
 	for( int i = channels.Num() - 1; i >= 0; i-- )
 	{
 		idSoundChannel* chan = channels[i];
@@ -1015,6 +1092,18 @@ void idSoundEmitterLocal::FadeSound( const s_channelType channel, float to, floa
 {
 	assert( soundWorld != NULL );
 	assert( soundWorld->emitters[this->index] == this );
+
+#if defined( RENDERDEMOS )
+	if( soundWorld->writeDemo )
+	{
+		soundWorld->writeDemo->WriteInt( DS_SOUND );
+		soundWorld->writeDemo->WriteInt( SCMD_FADE );
+		soundWorld->writeDemo->WriteInt( index );
+		soundWorld->writeDemo->WriteInt( channel );
+		soundWorld->writeDemo->WriteFloat( to );
+		soundWorld->writeDemo->WriteFloat( over );
+	}
+#endif
 
 	int overMSec = SEC2MS( over );
 

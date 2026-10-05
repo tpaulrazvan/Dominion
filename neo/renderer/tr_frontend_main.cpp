@@ -885,6 +885,14 @@ void R_RenderView( viewDef_t* parms )
 	// RB: find closest environment probes so we can interpolate between them in the ambient shaders
 	R_FindClosestEnvironmentProbes();
 
+#if defined( RENDERDEMOS )
+	// write everything needed to the demo file
+	if( common->WriteDemo() )
+	{
+		static_cast<idRenderWorldLocal*>( parms->renderWorld )->WriteVisibleDefs( tr.viewDef );
+	}
+#endif
+
 	// add the rendering commands for this viewDef
 	R_AddDrawViewCmd( parms, false );
 

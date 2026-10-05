@@ -224,11 +224,22 @@ Exits with mapSpawned = false
 */
 void idCommonLocal::UnloadMap()
 {
+#if defined( RENDERDEMOS )
+	StopPlayingRenderDemo();
+#endif
+
 	// end the current map in the game
 	if( game )
 	{
 		game->MapShutdown();
 	}
+
+#if defined( RENDERDEMOS )
+	if( writeDemo )
+	{
+		StopRecordingRenderDemo();
+	}
+#endif
 
 	mapSpawned = false;
 }

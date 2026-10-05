@@ -101,6 +101,12 @@ public:
 	virtual const idJointQuat* 	GetDefaultPose() const;
 	virtual int					NearestJoint( int surfaceNum, int a, int b, int c ) const;
 	virtual idBounds			Bounds( const struct renderEntity_s* ent ) const;
+
+#if defined( RENDERDEMOS )
+	virtual void				ReadFromDemoFile( class idDemoFile* f );
+	virtual void				WriteToDemoFile( class idDemoFile* f );
+#endif
+
 	virtual float				DepthHack() const;
 
 	virtual bool				ModelHasDrawingSurfaces() const

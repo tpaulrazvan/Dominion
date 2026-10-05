@@ -205,6 +205,17 @@ public:
 	virtual int					ButtonState( int key );
 	virtual int					KeyState( int key );
 
+#if defined( RENDERDEMOS )
+	virtual idDemoFile* 		ReadDemo()
+	{
+		return readDemo;
+	}
+	virtual idDemoFile* 		WriteDemo()
+	{
+		return writeDemo;
+	}
+#endif
+
 	virtual idGame* 			Game()
 	{
 		return game;
@@ -481,6 +492,17 @@ public:	// These are public because they are called directly by static functions
 	void	StartNewGame( const char* mapName, bool devmap, int gameMode );
 	void	LeaveGame();
 
+#if defined( RENDERDEMOS )
+	// time demos
+	void	DemoShot( const char* name );
+	void	StartRecordingRenderDemo( const char* name );
+	void	StopRecordingRenderDemo();
+	void	StartPlayingRenderDemo( idStr name );
+	void	StopPlayingRenderDemo();
+	void	CompressDemoFile( const char* scheme, const char* name );
+	void	TimeRenderDemo( const char* name, bool twice = false, bool quit = false );
+#endif
+
 	// localization
 	void	InitLanguageDict();
 	void	LocalizeGui( const char* fileName, idLangDict& langDict );
@@ -522,6 +544,13 @@ private:
 	// The main render world and sound world
 	idRenderWorld* 		renderWorld;
 	idSoundWorld* 		soundWorld;
+
+#if defined( RENDERDEMOS )
+	// The renderer and sound system will write changes to writeDemo.
+	// Demos can be recorded and played at the same time when splicing.
+	idDemoFile* 		readDemo;
+	idDemoFile* 		writeDemo;
+#endif
 
 	bool				menuActive;
 	idSoundWorld* 		menuSoundWorld;			// so the game soundWorld can be muted
@@ -605,6 +634,7 @@ private:
 	double				gameTimeResidual;	// left over msec from the last game frame
 	bool				syncNextGameFrame;
 
+#if defined( RENDERDEMOS )
 	enum timeDemo_t
 	{
 		TD_NO,
@@ -617,6 +647,7 @@ private:
 	int                 numShotFrames;      // SRS - for demoShot playback timeout
 	int					demoTimeOffset;
 	renderView_t		currentDemoRenderView;
+#endif
 
 	idStrList			mpGameModes;
 	idStrList			mpDisplayGameModes;
@@ -724,6 +755,10 @@ private:
 
 	void	StartMenu( bool playIntro = false );
 	void	GuiFrameEvents();
+
+#if defined( RENDERDEMOS )
+	void	AdvanceRenderDemo( bool singleFrameOnly );
+#endif
 
 	void	ProcessGameReturn( const gameReturn_t& ret );
 

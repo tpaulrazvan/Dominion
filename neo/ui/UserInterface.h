@@ -39,7 +39,9 @@ If you have questions concerning this license or the applicable additional terms
 */
 
 class idFile;
-
+#if defined( RENDERDEMOS )
+class idDemoFile;
+#endif
 
 class idUserInterface
 {
@@ -100,6 +102,11 @@ public:
 
 	// Triggers the gui and runs the onTrigger scripts.
 	virtual void				Trigger( int time ) = 0;
+
+#if defined( RENDERDEMOS )
+	virtual	void				ReadFromDemoFile( class idDemoFile* f ) = 0;
+	virtual	void				WriteToDemoFile( class idDemoFile* f ) = 0;
+#endif
 
 	virtual bool				WriteToSaveGame( idFile* savefile ) const = 0;
 	virtual bool				ReadFromSaveGame( idFile* savefile ) = 0;

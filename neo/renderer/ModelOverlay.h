@@ -76,6 +76,9 @@ struct overlay_t
 	int					numVerts;
 	overlayVertex_t* 	verts;
 	const idMaterial* 	material;
+#if defined( RENDERDEMOS )
+	mutable bool		writtenToDemo;
+#endif
 };
 
 class idRenderModelOverlay
@@ -91,6 +94,16 @@ public:
 
 	unsigned int				GetNumOverlayDrawSurfs();
 	struct drawSurf_t* 			CreateOverlayDrawSurf( const struct viewEntity_t* space, const idRenderModel* baseModel, unsigned int index );
+
+#if defined( RENDERDEMOS )
+	
+	void						ReadFromDemoFile( class idDemoFile* f );
+	void						WriteToDemoFile( class idDemoFile* f ) const;
+
+	int							index;
+	int							demoSerialWrite;
+	int							demoSerialCurrent;
+#endif
 
 private:
 	overlay_t					overlays[MAX_OVERLAYS];

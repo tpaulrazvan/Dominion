@@ -97,6 +97,10 @@ bool R_IssueEntityDefCallback( idRenderEntityLocal* def )
 {
 	idBounds oldBounds = def->localReferenceBounds;
 
+#if defined( RENDERDEMOS )
+	def->archived = false;		// will need to be written to the demo file
+#endif
+
 	bool update;
 	if( tr.viewDef != NULL )
 	{
