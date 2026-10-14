@@ -8,16 +8,16 @@
 #include "imgui_stdlib.h"
 
 // RB: replaced std::string with idStr
-#include "sys/sys_defines.h"
-#include "sys/sys_builddefines.h"
-#include "sys/sys_includes.h"
-#include "sys/sys_assert.h"
-#include "sys/sys_types.h"
-#include "sys/sys_intrinsics.h"
-#include "sys/sys_threading.h"
+#include "Sys/sys_defines.h"
+#include "Sys/sys_builddefines.h"
+#include "Sys/sys_includes.h"
+#include "Sys/sys_assert.h"
+#include "Sys/sys_types.h"
+#include "Sys/sys_intrinsics.h"
+#include "Sys/sys_threading.h"
 
 #include "CmdArgs.h"
-#include "containers/Sort.h"
+#include "Containers/Sort.h"
 #include "Str.h"
 
 struct InputTextCallback_UserData

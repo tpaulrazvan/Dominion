@@ -37,7 +37,7 @@ If you have questions concerning this license or the applicable additional terms
 ===============================================================================
 */
 
-#include "../containers/Array.h"	// for idTupleSize
+#include "../Containers/Array.h"	// for idTupleSize
 
 class idVec3;
 class idAngles;

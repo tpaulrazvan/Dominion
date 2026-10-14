@@ -31,7 +31,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "imgui.h"
 
-#include "../idLib/math/Vector.h"
+#include "../idLib/Math/Vector.h"
 
 // add custom functions for imgui
 namespace ImGui

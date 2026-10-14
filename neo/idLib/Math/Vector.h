@@ -38,7 +38,7 @@ If you have questions concerning this license or the applicable additional terms
 ===============================================================================
 */
 
-#include "../containers/Array.h" // for idTupleSize
+#include "../Containers/Array.h" // for idTupleSize
 
 #define VECTOR_EPSILON		0.001f
 

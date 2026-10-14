@@ -27,7 +27,7 @@ If you have questions concerning this license or the applicable additional terms
 */
 
 #pragma once
-#include "containers/StrList.h"
+#include "Containers/StrList.h"
 #include <functional>
 #include "gltfProperties.h"
 

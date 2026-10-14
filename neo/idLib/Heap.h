@@ -41,7 +41,7 @@ If you have questions concerning this license or the applicable additional terms
 enum memTag_t
 {
 #define MEM_TAG( x )	TAG_##x,
-#include "sys/sys_alloc_tags.h"
+#include "Sys/sys_alloc_tags.h"
 	TAG_NUM_TAGS,
 };
 
@@ -694,7 +694,7 @@ void idDynamicAlloc<type, baseBlockSize, minBlockSize>::Clear()
 ==============================================================================
 */
 
-#include "containers/BTree.h"
+#include "Containers/BTree.h"
 
 //#define DYNAMIC_BLOCK_ALLOC_CHECK
 

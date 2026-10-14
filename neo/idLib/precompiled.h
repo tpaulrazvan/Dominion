@@ -29,13 +29,13 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __PRECOMPILED_H__
 #define __PRECOMPILED_H__
 
-#include "sys/sys_defines.h"
-#include "sys/sys_builddefines.h"
-#include "sys/sys_includes.h"
-#include "sys/sys_assert.h"
-#include "sys/sys_types.h"
-#include "sys/sys_intrinsics.h"
-#include "sys/sys_threading.h"
+#include "Sys/sys_defines.h"
+#include "Sys/sys_builddefines.h"
+#include "Sys/sys_includes.h"
+#include "Sys/sys_assert.h"
+#include "Sys/sys_types.h"
+#include "Sys/sys_intrinsics.h"
+#include "Sys/sys_threading.h"
 
 //-----------------------------------------------------
 
@@ -53,7 +53,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "../idLib/gltfParser.h"
 
 
-#include "sys/sys_filesystem.h"
+#include "Sys/sys_filesystem.h"
 
 // framework
 #include "../framework/BuildVersion.h"

@@ -29,8 +29,8 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "DynamicShadowVolume_local.h"
 
-#include "../../../idLib/sys/sys_intrinsics.h"
-#include "../../../idLib/geometry/DrawVert_intrinsics.h"
+#include "../../../idLib/Sys/sys_intrinsics.h"
+#include "../../../idLib/Geometry/DrawVert_intrinsics.h"
 
 #if defined(USE_INTRINSICS_SSE)
 	static const __m128i vector_int_neg_one		= _mm_set_epi32( -1, -1, -1, -1 );

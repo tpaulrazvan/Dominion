@@ -683,7 +683,7 @@ freely, subject to the following restrictions:
 
 MD4 Message-Digest Algorithm
 -----------------------------------------------------------------------------
-neo/idLib/hashing/MD4.cpp
+neo/idLib/Hashing/MD4.cpp
 Copyright (C) 1991-2, RSA Data Security, Inc. Created 1991. All
 rights reserved.
 
@@ -707,7 +707,7 @@ documentation and/or software.
 
 MD5 Message-Digest Algorithm
 -----------------------------------------------------------------------------
-neo/idLib/hashing/MD5.cpp
+neo/idLib/Hashing/MD5.cpp
 This code implements the MD5 message-digest algorithm.
 The algorithm is due to Ron Rivest.  This code was
 written by Colin Plumb in 1993, no copyright is claimed.
@@ -715,7 +715,7 @@ This code is in the public domain; do with it what you wish.
 
 CRC32 Checksum
 -----------------------------------------------------------------------------
-neo/idLib/hashing/CRC32.cpp
+neo/idLib/Hashing/CRC32.cpp
 Copyright (C) 1995-1998 Mark Adler
 
 

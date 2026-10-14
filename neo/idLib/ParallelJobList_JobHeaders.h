@@ -37,7 +37,7 @@ If you have questions concerning this license or the applicable additional terms
 ================================================================================================
 */
 
-#include "sys/sys_defines.h"
+#include "Sys/sys_defines.h"
 
 #include <stddef.h>					// for offsetof
 #include <stdio.h>
@@ -75,10 +75,10 @@ If you have questions concerning this license or the applicable additional terms
 
 
 
-#include "sys/sys_assert.h"
-#include "sys/sys_types.h"
-#include "sys/sys_intrinsics.h"
-#include "math/Math.h"
+#include "Sys/sys_assert.h"
+#include "Sys/sys_types.h"
+#include "Sys/sys_intrinsics.h"
+#include "Math/Math.h"
 #include "ParallelJobList.h"
 
 #if _MSC_VER >= 1600

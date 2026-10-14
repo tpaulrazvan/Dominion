@@ -27,11 +27,11 @@ If you have questions concerning this license or the applicable additional terms
 */
 
 #pragma once
-#include "containers/StrList.h"
+#include "Containers/StrList.h"
 #include <functional>
-#include "math/Quat.h"
+#include "Math/Quat.h"
 #include "Lib.h"
-#include "containers/List.h"
+#include "Containers/List.h"
 
 enum gltfProperty
 {

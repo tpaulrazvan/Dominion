@@ -28,13 +28,13 @@ If you have questions concerning this license or the applicable additional terms
 */
 
 #include "../ParallelJobList_JobHeaders.h"
-#include "../math/Math.h"
-#include "../math/Vector.h"
-#include "../math/Matrix.h"
-#include "../math/Rotation.h"
-#include "../math/Plane.h"
-#include "../bv/Sphere.h"
-#include "../bv/Bounds.h"
+#include "../Math/Math.h"
+#include "../Math/Vector.h"
+#include "../Math/Matrix.h"
+#include "../Math/Rotation.h"
+#include "../Math/Plane.h"
+#include "../BV/Sphere.h"
+#include "../BV/Bounds.h"
 #include "RenderMatrix.h"
 
 // FIXME:	it would be nice if all render matrices were 16-byte aligned
