@@ -33,7 +33,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "RenderCommon.h"
 #include "Model_local.h"
 
-#include "../idlib/geometry/DrawVert_intrinsics.h"
+#include "../idLib/geometry/DrawVert_intrinsics.h"
 
 /*
 ====================

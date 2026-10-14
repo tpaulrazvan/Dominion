@@ -472,7 +472,7 @@ if(OPTICK)
 	source_group("libs\\optick" FILES ${OPTICK_SOURCES})
 endif()
 
-add_subdirectory(idlib)
+add_subdirectory(idLib)
 
 if(USE_INTRINSICS_SSE)
 	add_subdirectory(libs/moc)
@@ -1105,7 +1105,7 @@ add_definitions(-D__DOOM__)
 
 include_directories(
 			.
-			idlib
+			idLib
             )
 
 if(MSVC)
@@ -1243,7 +1243,7 @@ if(MSVC)
 	list(APPEND RBDOOM3_SOURCES ${WIN32_RESOURCES})
 	
 	add_executable(${APP_NAME} WIN32 ${RBDOOM3_INCLUDES} ${RBDOOM3_SOURCES})
-	add_dependencies(${APP_NAME} idlib)
+	add_dependencies(${APP_NAME} idLib)
     
     if(USE_DX12)
 		add_dependencies(${APP_NAME} nvrhi_d3d12)
@@ -1253,7 +1253,7 @@ if(MSVC)
 		add_dependencies(${APP_NAME} nvrhi_vk)
 	endif()
 	target_link_libraries(${APP_NAME}
-		idlib
+		idLib
 		${DirectX_LIBRARIES}
 		dbghelp
 		#eaxguid
@@ -1347,7 +1347,7 @@ else()
 	
 	if(USE_PRECOMPILED_HEADERS)
 		# we need to recreate the precompiled header for RBDoom3BFG
-		# (i.e. can't use the one created for idlib before)
+		# (i.e. can't use the one created for idLib before)
 		# because some definitions (e.g. -D__IDLIB__ -D__DOOM_DLL__) differ
 
 		set(RBDOOM3_PRECOMPILED_SOURCES ${RBDOOM3_SOURCES})
@@ -1363,7 +1363,7 @@ else()
 			set_source_files_properties(
 				${src_file}
 				PROPERTIES
-				COMPILE_FLAGS "-include ${CMAKE_CURRENT_SOURCE_DIR}/idlib/precompiled.h"
+				COMPILE_FLAGS "-include ${CMAKE_CURRENT_SOURCE_DIR}/idLib/precompiled.h"
 				)
 		endforeach()
 
@@ -1391,13 +1391,13 @@ else()
 		endif()
 
 		add_custom_target(precomp_header_rbdoom3bfg ALL
-				COMMAND ${CMAKE_CXX_COMPILER} ${_compiler_FLAGS} -x c++-header idlib/precompiled.h -o idlib/precompiled.h.gch
+				COMMAND ${CMAKE_CXX_COMPILER} ${_compiler_FLAGS} -x c++-header idLib/precompiled.h -o idLib/precompiled.h.gch
 				WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-				COMMENT "Creating idlib/precompiled.h.gch for ${APP_NAME}"
+				COMMENT "Creating idLib/precompiled.h.gch for ${APP_NAME}"
 				)
 
-		# make sure this is run after creating idlib
-		add_dependencies(precomp_header_rbdoom3bfg idlib)
+		# make sure this is run after creating idLib
+		add_dependencies(precomp_header_rbdoom3bfg idLib)
 	endif()
 
 	# SRS - disable certain gcc/clang warnings for select third-party source libraries, consider updating versions in the future?
@@ -1456,9 +1456,9 @@ else()
 		# delete precompiled header file after executable is compiled: command line build case
 		if(CMAKE_GENERATOR MATCHES "Makefiles" OR CMAKE_GENERATOR MATCHES "Ninja")
 			add_custom_target(rm_precomp_header ALL
-					COMMAND ${remove_command} "idlib/precompiled.h.gch"
+					COMMAND ${remove_command} "idLib/precompiled.h.gch"
 					WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-					COMMENT "remove idlib/precompiled.h.gch"
+					COMMENT "remove idLib/precompiled.h.gch"
 					)
 			add_dependencies(rm_precomp_header ${APP_NAME})
 
@@ -1466,9 +1466,9 @@ else()
 		else()
 			add_custom_command(TARGET ${APP_NAME} POST_BUILD
 					# SRS - added wildcards to remove tmp files from cmake ZERO_CHECK regeneration
-					COMMAND ${remove_command} "idlib/precompiled.h*.gch*"
+					COMMAND ${remove_command} "idLib/precompiled.h*.gch*"
 					WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-					COMMENT "remove idlib/precompiled.h.gch"
+					COMMENT "remove idLib/precompiled.h.gch"
 			)
 		endif()
 	endif()
@@ -1479,7 +1479,7 @@ else()
 		endif()
 
 		target_link_libraries(${APP_NAME}
-			idlib
+			idLib
 			${Vulkan_LIBRARY}
 			pthread
 			${RT_LIBRARY}

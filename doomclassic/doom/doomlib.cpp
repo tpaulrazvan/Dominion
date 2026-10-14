@@ -32,7 +32,7 @@ If you have questions concerning this license or the applicable additional terms
 #include <assert.h>
 #include "Main.h"
 #include "sys/sys_session.h"
-#include "idlib/Thread.h"
+#include "idLib/Thread.h"
 
 
 #include <sys/types.h>

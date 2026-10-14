@@ -26,7 +26,7 @@ If you have questions concerning this license or the applicable additional terms
 
 ===========================================================================
 */
-#include "../../idlib/precompiled.h"
+#include "../../idLib/precompiled.h"
 #include "../sys_local.h"
 
 #include <sys/types.h>

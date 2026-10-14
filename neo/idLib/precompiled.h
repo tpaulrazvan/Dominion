@@ -48,9 +48,9 @@ If you have questions concerning this license or the applicable additional terms
 #include "../sys/sys_public.h"
 
 // id lib
-#include "../idlib/Lib.h"
-#include "../idlib/gltfProperties.h"
-#include "../idlib/gltfParser.h"
+#include "../idLib/Lib.h"
+#include "../idLib/gltfProperties.h"
+#include "../idLib/gltfParser.h"
 
 
 #include "sys/sys_filesystem.h"

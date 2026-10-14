@@ -4139,7 +4139,7 @@ enum ImGuiModFlags_ { ImGuiModFlags_None = 0, ImGuiModFlags_Ctrl = ImGuiMod_Ctrl
 	#include "imgui_user.h"
 #endif
 
-// RB: added idlib idStr integration for string inputs
+// RB: added idLib idStr integration for string inputs
 #include "imgui_stdlib.h"
 
 #endif // #ifndef IMGUI_DISABLE

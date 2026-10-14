@@ -113,8 +113,8 @@ The file was renamed from unzip.c to unzip.cpp so we can use C++ functions from 
 	// doom3 headers are included through precompiled.h at the beginning of the file
 	/*
 	#include "sys/platform.h"
-	#include "idlib/Heap.h"
-	#include "idlib/Lib.h"
+	#include "idLib/Heap.h"
+	#include "idLib/Lib.h"
 	*/
 	// we don't need crypt support
 	#define NOUNCRYPT 1

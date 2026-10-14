@@ -48,7 +48,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "i_system.h"
 #include "z_zone.h"
 
-#include "idlib/precompiled.h"
+#include "idLib/precompiled.h"
 
 
 //

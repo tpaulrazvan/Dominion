@@ -17,7 +17,7 @@ namespace irr
 namespace io
 {
 
-// RB: changed CFileReadCallback to use the idlib filesystem
+// RB: changed CFileReadCallback to use the idLib filesystem
 class CFileReadCallBack : public IFileReadCallBack
 {
 public:

@@ -25,7 +25,7 @@ If you have questions concerning this license or the applicable additional terms
 
 ===========================================================================
 */
-#include "../../idlib/precompiled.h"
+#include "../../idLib/precompiled.h"
 #include "posix_public.h"
 
 #include <string.h>

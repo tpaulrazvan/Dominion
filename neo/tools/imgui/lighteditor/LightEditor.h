@@ -34,7 +34,7 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef NEO_TOOLS_EDITORS_LIGHTEDITOR_H_
 #define NEO_TOOLS_EDITORS_LIGHTEDITOR_H_
 
-#include <idlib/Dict.h>
+#include <idLib/Dict.h>
 #include "../../edit_public.h"
 
 #include "../imgui/BFGimgui.h"

@@ -560,7 +560,7 @@ It's hard to tell in these screenshots but the new SSAO gives most scenes a lot 
 
 <img src="https://imgur.com/nU13NP6.jpg" width="576">
 
-Harrie van Ginneken contributed a new glTF 2 loader written from scratch using the awesome id Tech 4 idlib framework.
+Harrie van Ginneken contributed a new glTF 2 loader written from scratch using the awesome id Tech 4 idLib framework.
 Also a big thanks here because this is huge and took a lot of time to develop.
 
 The importer is not designed to work with all glTF 2 models you can find on the internet but it serves as a solid import facility from Blender. It can read ASCII .gltf and binary .glb models. It is recommend to use .glb for faster load times.

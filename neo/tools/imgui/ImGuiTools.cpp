@@ -31,7 +31,7 @@ If you have questions concerning this license or the applicable additional terms
 #pragma hdrstop
 
 #include "../imgui/BFGimgui.h"
-#include "../idlib/CmdArgs.h"
+#include "../idLib/CmdArgs.h"
 
 #include "afeditor/AfEditor.h"
 #include "lighteditor/LightEditor.h"

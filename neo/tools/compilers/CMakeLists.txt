@@ -54,7 +54,7 @@ set(MC_FRAMEWORK_INCLUDES
 	../../framework/File_Zip.h
 	../../framework/FileSystem.h
 	../../framework/Licensee.h
-	../../idlib/precompiled.h
+	../../idLib/precompiled.h
 	)
 set(MC_FRAMEWORK_SOURCES
 	../../framework/CmdSystem.cpp
@@ -257,7 +257,7 @@ list(REMOVE_ITEM MC_PRECOMPILED_SOURCES ../../renderer/jobs/ShadowShared.cpp)
 
 include_directories(
 	.
-	../../idlib
+	../../idLib
 	../../libs/
 	)
 
@@ -269,7 +269,7 @@ if(MSVC)
 	#	message(STATUS "-include precompiled.h for ${src_file}")
 	#endforeach()
 
-    #set_target_properties(idlib PROPERTIES COMPILE_FLAGS "/Yuprecompiled.h")
+    #set_target_properties(idLib PROPERTIES COMPILE_FLAGS "/Yuprecompiled.h")
     set_source_files_properties(precompiled.cpp
         PROPERTIES
         COMPILE_FLAGS "/Ycprecompiled.h"
@@ -299,8 +299,8 @@ if(MSVC)
 			)
 
     add_executable(rbdmap ${MC_SOURCES_ALL} ${MC_INCLUDES_ALL})
-	add_dependencies(rbdmap idlib  ${ISPC_TEXCOMP_LIBRARY})
-	target_link_libraries(rbdmap idlib winmm imtui-pdcurses Shlwapi ${ZLIB_LIBRARY} ${ISPC_TEXCOMP_LIBRARY})
+	add_dependencies(rbdmap idLib  ${ISPC_TEXCOMP_LIBRARY})
+	target_link_libraries(rbdmap idLib winmm imtui-pdcurses Shlwapi ${ZLIB_LIBRARY} ${ISPC_TEXCOMP_LIBRARY})
 
 	# set MSVC default debug directory on executable	
 	if(CMAKE_MAJOR_VERSION EQUAL 3 AND CMAKE_MINOR_VERSION GREATER_EQUAL 8)
@@ -337,7 +337,7 @@ else()
 			LIST(APPEND _compiler_FLAGS "-D${item}")
 		ENDFOREACH(item)
 
-		# SRS - USE_OPTICK not useful for rbdmap, but definition required to avoid mismatch with idlib precompiled header
+		# SRS - USE_OPTICK not useful for rbdmap, but definition required to avoid mismatch with idLib precompiled header
 		if(OPTICK)
 			LIST(APPEND _compiler_FLAGS -DUSE_OPTICK=1)
 		else()
@@ -360,7 +360,7 @@ else()
 			)
 
 	add_executable(rbdmap ${MC_SOURCES_ALL} ${MC_INCLUDES_ALL})
-	add_dependencies(rbdmap idlib ${ISPC_TEXCOMP_LIBRARY})
+	add_dependencies(rbdmap idLib ${ISPC_TEXCOMP_LIBRARY})
 
 	if (USE_PRECOMPILED_HEADERS)
 		add_dependencies(rbdmap precomp_header_rbdmap)
@@ -391,7 +391,7 @@ else()
 		endif()
 	endif()
 
-	target_link_libraries(rbdmap idlib ${CURSES_NCURSES_LIBRARY} ${ZLIB_LIBRARY} ${ISPC_TEXCOMP_LIBRARY})
+	target_link_libraries(rbdmap idLib ${CURSES_NCURSES_LIBRARY} ${ZLIB_LIBRARY} ${ISPC_TEXCOMP_LIBRARY})
 endif()
 	
 

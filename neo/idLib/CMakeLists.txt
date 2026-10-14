@@ -86,7 +86,7 @@ list(REMOVE_ITEM ID_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/SoftwareCach
 if(MSVC)
     list(REMOVE_ITEM ID_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/precompiled.cpp)
 
-    #set_target_properties(idlib PROPERTIES COMPILE_FLAGS "/Yuprecompiled.h")
+    #set_target_properties(idLib PROPERTIES COMPILE_FLAGS "/Yuprecompiled.h")
     set_source_files_properties(precompiled.cpp
         PROPERTIES
         COMPILE_FLAGS "/Ycprecompiled.h"
@@ -99,7 +99,7 @@ if(MSVC)
             OBJECT_DEPENDS "precompiled.pch"
             )
 
-    add_library(idlib ${ID_SOURCES_ALL} ${ID_INCLUDES_ALL})
+    add_library(idLib ${ID_SOURCES_ALL} ${ID_INCLUDES_ALL})
 else()
 
 	include_directories(.)
@@ -137,27 +137,27 @@ else()
 			LIST(APPEND _compiler_FLAGS -DUSE_OPTICK=0)
 		endif()
 
-		add_custom_target(precomp_header_idlib ALL
+		add_custom_target(precomp_header_idLib ALL
 						COMMAND ${CMAKE_CXX_COMPILER} ${_compiler_FLAGS} -x c++-header precompiled.h -o precompiled.h.gch
 						WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-						COMMENT "Creating idlib/precompiled.h.gch for idlib"
+						COMMENT "Creating idLib/precompiled.h.gch for idLib"
 						)
 	endif()
 	
-	add_library(idlib ${ID_SOURCES_ALL} ${ID_INCLUDES_ALL})
+	add_library(idLib ${ID_SOURCES_ALL} ${ID_INCLUDES_ALL})
 
 	if (USE_PRECOMPILED_HEADERS)
-		add_dependencies(idlib precomp_header_idlib)
+		add_dependencies(idLib precomp_header_idLib)
 	endif()
 	
 endif()
 
-target_include_directories(idlib PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(idLib PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 
 if(OPTICK)
-	target_compile_definitions(idlib PUBLIC USE_OPTICK=1)
+	target_compile_definitions(idLib PUBLIC USE_OPTICK=1)
 else()
-	target_compile_definitions(idlib PUBLIC USE_OPTICK=0)
+	target_compile_definitions(idLib PUBLIC USE_OPTICK=0)
 endif()
 
 # if(MSVC)
@@ -166,5 +166,5 @@ endif()
         # # COMPILE_FLAGS "/Ycprecompiled.h"
         # # )
 		
-	# #set_target_properties(idlib PROPERTIES COMPILE_FLAGS "/Yuprecompiled.h")
+	# #set_target_properties(idLib PROPERTIES COMPILE_FLAGS "/Yuprecompiled.h")
 # endif()

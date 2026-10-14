@@ -30,19 +30,19 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __DYNAMICSHADOWVOLUME_LOCAL_H__
 	#define __DYNAMICSHADOWVOLUME_LOCAL_H__
 
-	#include "../../../idlib/ParallelJobList_JobHeaders.h"
-	#include "../../../idlib/SoftwareCache.h"
+	#include "../../../idLib/ParallelJobList_JobHeaders.h"
+	#include "../../../idLib/SoftwareCache.h"
 
-	#include "../../../idlib/math/Vector.h"
-	#include "../../../idlib/math/Matrix.h"
-	#include "../../../idlib/math/Quat.h"
-	#include "../../../idlib/math/Rotation.h"
-	#include "../../../idlib/math/Plane.h"
-	#include "../../../idlib/bv/Sphere.h"
-	#include "../../../idlib/bv/Bounds.h"
-	#include "../../../idlib/geometry/JointTransform.h"
-	#include "../../../idlib/geometry/DrawVert.h"
-	#include "../../../idlib/geometry/RenderMatrix.h"
+	#include "../../../idLib/math/Vector.h"
+	#include "../../../idLib/math/Matrix.h"
+	#include "../../../idLib/math/Quat.h"
+	#include "../../../idLib/math/Rotation.h"
+	#include "../../../idLib/math/Plane.h"
+	#include "../../../idLib/bv/Sphere.h"
+	#include "../../../idLib/bv/Bounds.h"
+	#include "../../../idLib/geometry/JointTransform.h"
+	#include "../../../idLib/geometry/DrawVert.h"
+	#include "../../../idLib/geometry/RenderMatrix.h"
 	#include "../ShadowShared.h"
 	#include "DynamicShadowVolume.h"
 

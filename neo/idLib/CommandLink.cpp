@@ -33,7 +33,7 @@ If you have questions concerning this license or the applicable additional terms
 CommandLinks
 
 The command system is not required for idLib, but we want to be able
-to use the CONSOLE_COMMAND() macro inside idlib, so these must be here.
+to use the CONSOLE_COMMAND() macro inside idLib, so these must be here.
 ========================
 */
 idCommandLink* CommandLinks( idCommandLink* cl )
