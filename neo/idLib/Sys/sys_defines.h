@@ -188,6 +188,24 @@ Defines and macros usable in all code
 ================================================================================================
 */
 
+// Macros to suppress warnings on one line or within a code region
+#define SUPPRESS_SPECIFIC_WARNINGS	1
+
+#if defined( _MSC_VER ) && SUPPRESS_SPECIFIC_WARNINGS
+	#define SUPPRESS_WARNING( num )			__pragma( warning( push ) ) __pragma( warning( disable : num ) )
+	#define SUPPRESS_WARNING_ONCE( num )	__pragma( warning( suppress : num ) )
+	#define RESTORE_WARNINGS()				__pragma( warning( pop ) )
+#else
+	#define SUPPRESS_WARNING( num )
+	#define SUPPRESS_WARNING_ONCE( num )
+	#define RESTORE_WARNINGS()
+#endif
+
+// C6255: _alloca indicates failure by raising a stack overflow exception. Consider using _malloca instead
+#define WARNING_UNPROTECTED_ALLOCA			6255	// https://learn.microsoft.com/en-us/cpp/code-quality/c6255
+// C26495: Variable 'variable' is uninitialized. Always initialize a member variable (type.6).
+#define WARNING_UNINITIALIZED_MEMBERS		26495	// https://learn.microsoft.com/en-us/cpp/code-quality/c26495
+
 #define ALIGN( x, a ) ( ( ( x ) + ((a)-1) ) & ~((a)-1) )
 
 
