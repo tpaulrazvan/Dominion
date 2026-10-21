@@ -2044,7 +2044,7 @@ struct testEndianNess_t
 			i[index] = 0x37;
 		}
 	}
-	bool operator==( testEndianNess_t& test ) const
+	bool operator==( const testEndianNess_t& test ) const
 	{
 		return a == test.a &&
 			   b == test.b &&

@@ -2033,18 +2033,21 @@ void EmailCrashReport( LPSTR messageText )
 		LPMAPISENDMAIL	MAPISendMail = ( LPMAPISENDMAIL )GetProcAddress( mapi, "MAPISendMail" );
 		if( MAPISendMail )
 		{
+			char recipientName[] = "DOOM 3 Crash";
+			char recipientAddress[] = "SMTP:programmers@idsoftware.com";
+			char subject[] = "DOOM 3 Fatal Error";
 			MapiRecipDesc toProgrammers =
 			{
-				0,										// ulReserved
+				0,									// ulReserved
 				MAPI_TO,							// ulRecipClass
-				"DOOM 3 Crash",						// lpszName
-				"SMTP:programmers@idsoftware.com",	// lpszAddress
+				recipientName,						// lpszName
+				recipientAddress,					// lpszAddress
 				0,									// ulEIDSize
 				0									// lpEntry
 			};
 
 			MapiMessage		message = {};
-			message.lpszSubject = "DOOM 3 Fatal Error";
+			message.lpszSubject = subject;
 			message.lpszNoteText = messageText;
 			message.nRecipCount = 1;
 			message.lpRecips = &toProgrammers;

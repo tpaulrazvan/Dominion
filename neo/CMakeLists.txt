@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.12)
 
 if(NOT DEFINED APP_NAME)
 	# RB: This sets the name of the .exe and is the only line needed for a different mod executable.
@@ -7,7 +7,9 @@ if(NOT DEFINED APP_NAME)
 endif()
 project(${APP_NAME})
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -152,17 +154,6 @@ if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID MATCHES "Clang")
 	add_compile_options(-Werror=format)
 	add_compile_options(-Wno-format-zero-length)
 	add_compile_options(-Wno-nonnull)
-
-	# Compiler check (needs -std=c++17 flag)
-	include(CheckCXXCompilerFlag)
-	CHECK_CXX_COMPILER_FLAG("-std=c++17" COMPILER_SUPPORTS_CXX17)
-	if(COMPILER_SUPPORTS_CXX17)
-		set(CMAKE_CXX_STANDARD 17)
-		set(CMAKE_CXX_STANDARD_REQUIRED ON)
-		set(CMAKE_CXX_EXTENSIONS OFF)
-	else()
-		message(FATAL_ERROR "The compiler ${CMAKE_CXX_COMPILER} has no C++17 support. Please use a different C++ compiler.")
-	endif()
 
 	if(CPU_TYPE)
 		add_definitions(-DCPUSTRING="${CPU_TYPE}")

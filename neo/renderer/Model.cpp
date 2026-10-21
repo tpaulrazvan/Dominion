@@ -3415,6 +3415,10 @@ idRenderModelStatic::ReadFromDemoFile
 */
 void idRenderModelStatic::ReadFromDemoFile( class idDemoFile* f )
 {
+#if defined( DMAP )
+	common->FatalError( "Render demo playback is unavailable in rbdamp" );
+#else
+
 	PurgeModel();
 
 	InitEmpty( f->ReadHashString() );
@@ -3460,6 +3464,7 @@ void idRenderModelStatic::ReadFromDemoFile( class idDemoFile* f )
 
 	// RB: don't use mikktspace here because it is slower
 	this->FinishSurfaces( false );
+#endif
 }
 
 /*
@@ -3469,6 +3474,10 @@ idRenderModelStatic::WriteToDemoFile
 */
 void idRenderModelStatic::WriteToDemoFile( class idDemoFile* f )
 {
+#if defined( DMAP )
+	common->FatalError( "Render demo playback is unavailable in rbdamp" );
+#else
+
 	// note that it has been updated
 	lastArchivedFrame = tr.frameCount;
 
@@ -3502,6 +3511,7 @@ void idRenderModelStatic::WriteToDemoFile( class idDemoFile* f )
 			f->WriteUnsignedChar( tri->verts[j].color[3] );
 		}
 	}
+#endif
 }
 #endif
 

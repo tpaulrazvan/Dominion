@@ -959,25 +959,25 @@ void idMenuScreen_Shell_Credits::UpdateCredits()
 
 				if( heading )
 				{
-					heading->SetText( type == 3 ? entry : "" );
+					heading->SetText( type == 3 ? entry.c_str() : "" );
 					heading->SetStrokeInfo( true );
 				}
 
 				if( subHeading )
 				{
-					subHeading->SetText( type == 2 ? entry : "" );
+					subHeading->SetText( type == 2 ? entry.c_str() : "" );
 					subHeading->SetStrokeInfo( true );
 				}
 
 				if( title )
 				{
-					title->SetText( type == 1 ? entry : "" );
+					title->SetText( type == 1 ? entry.c_str() : "" );
 					title->SetStrokeInfo( true );
 				}
 
 				if( txtEntry )
 				{
-					txtEntry->SetText( type == 0 ? entry : "" );
+					txtEntry->SetText( type == 0 ? entry.c_str() : "" );
 					txtEntry->SetStrokeInfo( true );
 				}
 

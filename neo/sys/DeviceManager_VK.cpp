@@ -28,6 +28,7 @@
 #pragma hdrstop
 
 #include <string>
+#include <sstream>
 #include <queue>
 #include <unordered_set>
 

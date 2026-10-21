@@ -1100,6 +1100,12 @@ public:
 		return false;
 	};
 
+	// stubs
+#if defined( RENDERDEMOS )
+	virtual idDemoFile*		ReadDemo() override { return nullptr; }
+	virtual idDemoFile*		WriteDemo() override { return nullptr; }
+#endif
+
 	// Returns true if the player has ever enabled the console
 	virtual bool				GetConsoleUsed()
 	{
