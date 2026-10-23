@@ -805,7 +805,7 @@ ID_INLINE _type_& idList<_type_, _tag_>::operator[]( int index )
 ================
 idList<_type_,_tag_>::Ptr
 
-Returns a pointer to the begining of the array.  Useful for iterating through the list in loops.
+Returns a pointer to the beginning of the array.  Useful for iterating through the list in loops.
 
 Note: may return NULL if the list is empty.
 
@@ -822,7 +822,7 @@ ID_INLINE _type_* idList<_type_, _tag_>::Ptr()
 ================
 idList<_type_,_tag_>::Ptr
 
-Returns a pointer to the begining of the array.  Useful for iterating through the list in loops.
+Returns a pointer to the beginning of the array.  Useful for iterating through the list in loops.
 
 Note: may return NULL if the list is empty.
 

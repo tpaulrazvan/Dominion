@@ -159,6 +159,9 @@ struct globalFramebuffers_t
 	Framebuffer*				smaaBlendFBO;
 	Framebuffer*				guiRenderTargetFBO;
 	Framebuffer*				accumFBO;
+#if defined( DOMINION )
+	Framebuffer*				ssrFBO; // give SSR it's own render target
+#endif
 };
 
 extern globalFramebuffers_t globalFramebuffers;

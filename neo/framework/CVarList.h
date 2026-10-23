@@ -31,11 +31,12 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "CVarSystem.h"
 
-#if defined( DOMINION ) // Debug CVars
-	extern idCVar	com_testBool;
-	extern idCVar	com_testInt;
-	extern idCVar	com_testFloat;
-	extern idCVar	com_testString;
-#endif // DOMINION -> Debug CVars
+extern idCVar	com_testBool;
+extern idCVar	com_testInt;
+extern idCVar	com_testFloat;
+extern idCVar	com_testString;
+
+extern idCVar	r_remoteRenderScale;
+extern idCVar	r_xRayRenderScale;
 
 #endif /* !__CVAR_ENGINE_H__ */

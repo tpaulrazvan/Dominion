@@ -29,9 +29,10 @@ If you have questions concerning this license or the applicable additional terms
 #include "Precompiled.h"
 #pragma hdrstop
 
-#if defined( DOMINION ) // Debug CVars
 idCVar com_testBool(	"com_testBool",						"0",		CVAR_BOOL | CVAR_DEBUG,			"Utility bool variable for internal development and testing engine side code" );
 idCVar com_testInt(	"com_testInt",						"0",		CVAR_INTEGER | CVAR_DEBUG,		"Utility integer variable for internal development and testing engine side code" );
 idCVar com_testFloat(	"com_testFloat",					"0",		CVAR_FLOAT | CVAR_DEBUG,		"Utility float variable for internal development and testing engine side code" );
 idCVar com_testString(	"com_testString",					"",			CVAR_DEBUG,						"Utility string variable for internal development and testing engine side code" );
-#endif // DOMINION -> Debug CVars
+
+idCVar r_remoteRenderScale( "r_remoteRenderScale",			"1",		CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "remote render resolution multiplier", 0.25f, 8.0f );
+idCVar r_xRayRenderScale( "r_xRayRenderScale",				"1",		CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "x-ray render resolution multiplier", 0.25f, 8.0f );
