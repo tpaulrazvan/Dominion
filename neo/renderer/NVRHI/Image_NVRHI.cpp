@@ -261,38 +261,6 @@ CopyFramebuffer
 */
 void idImage::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight )
 {
-#if defined( DOMINION )
-	nvrhi::TextureHandle source = globalImages->ldrImage->GetTextureHandle();
-	const nvrhi::TextureDesc& sourceDesc = source->getDesc();
-	if( imageWidth <= 0 || imageHeight <= 0 || x < 0 || y < 0 || x + imageWidth > int( sourceDesc.width ) || y + imageHeight > int( sourceDesc.height ) )
-	{
-		common->Warning( "CopyFramebuffer: invalid capture rectangle for %s", GetName() );
-		return;
-	}
-
-	const bool sharedTarget = this == globalImages->currentRenderImage || this == globalImages->accumImage;
-	if( !opts.isRenderTarget || !texture || ( !sharedTarget && ( opts.width != imageWidth || opts.height != imageHeight ) ) )
-	{
-		idImageOpts captureOpts;
-		captureOpts.format = FMT_RGBA8;
-		captureOpts.width = imageWidth;
-		captureOpts.height = imageHeight;
-		captureOpts.numLevels = 1;
-		captureOpts.isRenderTarget = true;
-		AllocImage( captureOpts, TF_LINEAR, TR_CLAMP );
-		isLoaded = true;
-	}
-
-	nvrhi::FramebufferHandle target = deviceManager->GetDevice()->createFramebuffer( nvrhi::FramebufferDesc().addColorAttachment( texture ) );
-
-	BlitParameters blitParms;
-	blitParms.sourceTexture = source;
-	blitParms.targetFramebuffer = target;
-	blitParms.targetViewport = nvrhi::Viewport( opts.width, opts.height );
-	blitParms.sourceBox = idVec4( float( x ) / sourceDesc.width, float( y + imageHeight ) / sourceDesc.height, float( imageWidth ) / sourceDesc.width, -float( imageHeight ) / sourceDesc.height );
-	backEnd.GetCommonPasses().BlitTexture( backEnd.GL_GetCommandList(), blitParms );
-#endif
-
 	backEnd.pc.c_copyFrameBuffer++;
 }
 

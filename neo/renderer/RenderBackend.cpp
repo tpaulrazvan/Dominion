@@ -480,11 +480,7 @@ void idRenderBackend::PrepareStageTexturing( const shaderStage_t* pStage,  const
 			bumpStage->texture.image->Bind();
 
 			GL_SelectTexture( 1 );
-#if defined( DOMINION )
-			globalImages->ssrRenderImage->Bind();
-#else
 			globalImages->currentRenderImage->Bind();
-#endif
 
 			GL_SelectTexture( 2 );
 			globalImages->gbufferNormalsRoughnessImage->Bind();
@@ -1265,12 +1261,7 @@ void idRenderBackend::DrawSingleInteraction( drawInteraction_t* din, bool useFas
 		globalImages->brdfLutImage->Bind();
 
 		GL_SelectTexture( INTERACTION_TEXUNIT_PROJECTION );
-#if defined( DOMINION )
-		// skip AO for subviews for now, although they should genereate their own AO
-		if( !r_useSSAO.GetBool() || viewDef->isSubview || ( viewDef->renderView.rdflags & ( RDF_NOAMBIENT | RDF_IRRADIANCE ) ) )
-#else
 		if( !r_useSSAO.GetBool() || ( viewDef->renderView.rdflags & ( RDF_NOAMBIENT | RDF_IRRADIANCE ) ) )
-#endif
 		{
 			globalImages->whiteImage->Bind();
 		}
@@ -1348,12 +1339,7 @@ void idRenderBackend::DrawSingleInteraction( drawInteraction_t* din, bool useFas
 		globalImages->brdfLutImage->Bind();
 
 		GL_SelectTexture( INTERACTION_TEXUNIT_PROJECTION );
-#if defined( DOMINION )
-		// skip AO for subviews for now, although they should genereate their own AO
-		if( !r_useSSAO.GetBool() || viewDef->isSubview || ( viewDef->renderView.rdflags & ( RDF_NOAMBIENT | RDF_IRRADIANCE ) ) )
-#else
 		if( !r_useSSAO.GetBool() || ( viewDef->renderView.rdflags & ( RDF_NOAMBIENT | RDF_IRRADIANCE ) ) )
-#endif
 		{
 			globalImages->whiteImage->Bind();
 		}
@@ -2268,11 +2254,7 @@ void idRenderBackend::AmbientPass( const drawSurf_t* const* drawSurfs, int numDr
 	}
 
 	// RB: TODO remove this
-#if defined( DOMINION )
-	if( !fillGbuffer && r_useSSAO.GetBool() && !viewDef->isSubview && !( viewDef->renderView.rdflags & ( RDF_NOAMBIENT | RDF_IRRADIANCE ) ) && r_ssaoDebug.GetBool() )
-#else
 	if( !fillGbuffer && r_useSSAO.GetBool() && r_ssaoDebug.GetBool() )
-#endif
 	{
 		GL_State( GLS_DEPTHMASK | GLS_DEPTHFUNC_ALWAYS | GLS_CULL_TWOSIDED );
 
@@ -2389,13 +2371,6 @@ void idRenderBackend::AmbientPass( const drawSurf_t* const* drawSurfs, int numDr
 	{
 		const drawSurf_t* drawSurf = drawSurfs[i];
 		const idMaterial* surfaceMaterial = drawSurf->material;
-
-#if defined( DOMINION )
-		if( !fillGbuffer && viewDef->isXraySubview && drawSurf->space->entityDef && drawSurf->space->entityDef->parms.xrayIndex != 2 )
-		{
-			continue;
-		}
-#endif
 
 		// translucent surfaces don't put anything in the depth buffer and don't
 		// test against it, which makes them fail the mirror clip plane operation
@@ -6284,23 +6259,6 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 	{
 		OPTICK_GPU_EVENT( "Resolve_Screen4SSR" );
 
-#if defined( DOMINION )
-		// ambient sky stages have not drawn yet
-		// overwriting _currentRender here replaces their portal capture with this main view.
-		renderLog.OpenBlock( "Capture SSR color" );
-		if( R_GetMSAASamples() > 1 )
-		{
-			commandList->resolveTexture( globalImages->ssrRenderImage->GetTextureHandle(), nvrhi::AllSubresources, globalImages->currentRenderHDRImage->GetTextureHandle(), nvrhi::AllSubresources );
-		}
-		else
-		{
-			BlitParameters blitParms;
-			blitParms.sourceTexture = currentFrameBuffer->GetApiObject()->getDesc().colorAttachments[0].texture;
-			blitParms.targetFramebuffer = globalFramebuffers.ssrFBO->GetApiObject();
-			blitParms.targetViewport = nvrhi::Viewport( renderSystem->GetWidth(), renderSystem->GetHeight() );
-			commonPasses.BlitTexture( commandList, blitParms, &bindingCache );
-		}
-#else
 		if( R_GetMSAASamples() > 1 )
 		{
 			renderLog.OpenBlock( "Resolve to _currentRender" );
@@ -6318,7 +6276,7 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 			blitParms.targetViewport = nvrhi::Viewport( renderSystem->GetWidth(), renderSystem->GetHeight() );
 			commonPasses.BlitTexture( commandList, blitParms, &bindingCache );
 		}
-#endif
+
 		renderLog.CloseBlock();
 	}
 
@@ -6449,11 +6407,7 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 		renderLog.OpenBlock( "Render_ToneMapPass", colorBlue );
 
 		ToneMappingParameters parms;
-#if defined( DOMINION )
-		if( R_UseTemporalAA() && !viewDef->isSubview && !( viewDef->renderView.rdflags & ( RDF_NOAMBIENT | RDF_IRRADIANCE ) ) )
-#else
 		if( R_UseTemporalAA() )
-#endif
 		{
 			toneMapPass->SimpleRender( commandList, parms, viewDef, globalImages->taaResolvedImage->GetTextureHandle(), globalFramebuffers.ldrFBO->GetApiObject() );
 		}
@@ -6796,9 +6750,6 @@ void idRenderBackend::CopyRender( const void* data )
 	{
 		renderLog.OpenBlock( cmd->image->GetName() );
 
-#if defined( DOMINION )
-		cmd->image->CopyFramebuffer( cmd->x, cmd->y, cmd->imageWidth, cmd->imageHeight );
-#else
 		BlitParameters blitParms;
 		blitParms.sourceTexture = ( nvrhi::ITexture* )globalImages->ldrImage->GetTextureID();
 		nvrhi::IFramebuffer* framebuffer = globalFramebuffers.postProcFBO->GetApiObject();
@@ -6811,29 +6762,18 @@ void idRenderBackend::CopyRender( const void* data )
 		commonPasses.BlitTexture( commandList, blitParms, &bindingCache );
 
 		cmd->image->CopyFramebuffer( cmd->x, cmd->y, cmd->imageWidth, cmd->imageHeight );
-#endif
+
 		renderLog.CloseBlock();
 	}
 
 	if( cmd->clearColorAfterCopy )
 	{
-#if defined( DOMINION )
-		nvrhi::FramebufferHandle clearFramebuffer = deviceManager->GetDevice()->createFramebuffer(
-					nvrhi::FramebufferDesc().addColorAttachment( globalImages->ldrImage->GetTextureHandle() ) );
-		BlitParameters clearParms;
-		clearParms.sourceTexture = globalImages->blackImage->GetTextureHandle();
-		clearParms.targetFramebuffer = clearFramebuffer;
-		clearParms.targetViewport = nvrhi::Viewport( float( cmd->x ), float( cmd->x + cmd->imageWidth ),
-									float( cmd->y ), float( cmd->y + cmd->imageHeight ), 0.0f, 1.0f );
-		commonPasses.BlitTexture( commandList, clearParms, &bindingCache );
-#else
 		nvrhi::IFramebuffer* framebuffer = globalFramebuffers.postProcFBO->GetApiObject();
 		if( cmd->image == globalImages->accumImage )
 		{
 			framebuffer = globalFramebuffers.accumFBO->GetApiObject();
 		}
 		nvrhi::utils::ClearColorAttachment( commandList, framebuffer, 0, nvrhi::Color( 0.f ) );
-#endif
 	}
 
 	renderLog.CloseBlock();

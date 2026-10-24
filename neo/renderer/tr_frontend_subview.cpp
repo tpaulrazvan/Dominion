@@ -33,7 +33,6 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "RenderCommon.h"
 #include "Model_local.h"
-#include "../framework/CVarList.h"
 
 /*
 ==========================================================================================
@@ -383,28 +382,6 @@ static viewDef_t* R_XrayViewBySurface( const drawSurf_t* drawSurf )
 	return parms;
 }
 
-#if defined( DOMINION )
-/*
-========================
-R_ScaleSubviewRenderSize
-========================
-*/
-static void R_ScaleSubviewRenderSize( int& width, int& height, float scale )
-{
-	if( scale == 1.0f )
-	{
-		return;
-	}
-	idScreenRect crop;
-	tr.GetCroppedViewport( &crop );
-	scale = idMath::ClampFloat( 0.25f, 8.0f, scale );
-	scale = idMath::ClampFloat( 0.0f, float( crop.GetWidth() ) / width, scale );
-	scale = idMath::ClampFloat( 0.0f, float( crop.GetHeight() ) / height, scale );
-	width = idMath::ClampInt( 1, crop.GetWidth(), idMath::Ftoi( width * scale ) );
-	height = idMath::ClampInt( 1, crop.GetHeight(), idMath::Ftoi( height * scale ) );
-}
-#endif
-
 /*
 ===============
 R_RemoteRender
@@ -436,10 +413,6 @@ static void R_RemoteRender( const drawSurf_t* surf, textureStage_t* stage )
 	parms->initialViewAreaOrigin = parms->renderView.vieworg;
 	parms->isSubview = true;
 	parms->isMirror = false;
-
-#if defined( DOMINION )
-	R_ScaleSubviewRenderSize( stageWidth, stageHeight, r_remoteRenderScale.GetFloat() );
-#endif
 
 	tr.CropRenderSize( stageWidth, stageHeight );
 
@@ -535,10 +508,6 @@ void R_XrayRender( const drawSurf_t* surf, textureStage_t* stage, idScreenRect s
 
 	int stageWidth = stage->width;
 	int stageHeight = stage->height;
-
-#if defined( DOMINION )
-	R_ScaleSubviewRenderSize( stageWidth, stageHeight, r_xRayRenderScale.GetFloat() );
-#endif
 
 	tr.CropRenderSize( stageWidth, stageHeight );
 

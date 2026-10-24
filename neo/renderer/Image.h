@@ -638,9 +638,6 @@ public:
 	idImage* 			hellLoadingIconImage;			// loading icon must exist always
 	idImage*			guiEdit;						// SP: GUI editor image
 	idImage*			guiEditDepthStencilImage;		// SP: Gui-editor image depth-stencil
-#if defined( DOMINION )
-	idImage*			ssrRenderImage;					// give SSR it's own render target
-#endif
 
 	//--------------------------------------------------------
 

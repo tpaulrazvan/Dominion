@@ -1149,10 +1149,6 @@ void idImageManager::CreateIntrinsicImages()
 	guiEdit = ImageFromFunction( "_guiEdit", R_GuiEditFunction );
 	guiEditDepthStencilImage = ImageFromFunction( "_guiEditDepthStencil", R_GuiEditDepthStencilFunction );
 
-#if defined( DOMINION )
-	ssrRenderImage = ImageFromFunction( "_ssrRender", R_HDR_RGBA16FImage_ResNative );
-#endif
-
 	release_assert( loadingIconImage->referencedOutsideLevelLoad );
 	release_assert( hellLoadingIconImage->referencedOutsideLevelLoad );
 }
