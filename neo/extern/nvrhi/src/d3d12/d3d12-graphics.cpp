@@ -311,8 +311,14 @@ namespace nvrhi::d3d12
         const bool updateStencilRef = !m_CurrentGraphicsStateValid || m_CurrentGraphicsState.dynamicStencilRefValue != effectiveStencilRefValue;
         
         const bool updateIndexBuffer = !m_CurrentGraphicsStateValid || m_CurrentGraphicsState.indexBuffer != state.indexBuffer;
+#if 1 // #if defined( DOMINION )
+        // refresh vertex buffer strides when the input layout changes
+        // vulkan already applies the correct strides when binding the pipeline
+        const bool updateInputLayout = !m_CurrentGraphicsStateValid || m_CurrentGraphicsState.pipeline == nullptr || checked_cast<GraphicsPipeline*>(m_CurrentGraphicsState.pipeline)->desc.inputLayout != pso->desc.inputLayout;
+        const bool updateVertexBuffers = !m_CurrentGraphicsStateValid || updateInputLayout || arraysAreDifferent(m_CurrentGraphicsState.vertexBuffers, state.vertexBuffers);
+#else
         const bool updateVertexBuffers = !m_CurrentGraphicsStateValid || arraysAreDifferent(m_CurrentGraphicsState.vertexBuffers, state.vertexBuffers);
-
+#endif
         const bool updateShadingRate = !m_CurrentGraphicsStateValid || m_CurrentGraphicsState.shadingRateState != state.shadingRateState;
 
         uint32_t bindingUpdateMask = 0;
