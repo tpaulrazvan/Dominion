@@ -203,8 +203,14 @@ static srfTriangles_t* R_CreateInteractionLightTris( const idRenderEntityLocal* 
 
 	// it is debatable if non-shadowing lights should light back faces. we aren't at the moment
 	// RB: now we do, so don't cull back faces if we have smooth shadowing enabled
+#if defined( DOMINION )
+	// retain backfaces for shadow maps
+	if( r_lightAllBackFaces.GetBool() || R_GetShadowMode() == SHADOWMODE_MAPS || light->lightShader->LightEffectsBackSides()
+			|| shader->ReceivesLightingOnBackSides() || ent->parms.noSelfShadow || ent->parms.noShadow )
+#else
 	if( r_lightAllBackFaces.GetBool() || light->lightShader->LightEffectsBackSides()
 			|| shader->ReceivesLightingOnBackSides() || ent->parms.noSelfShadow || ent->parms.noShadow )
+#endif
 	{
 		includeBackFaces = true;
 	}
