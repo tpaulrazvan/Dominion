@@ -1195,8 +1195,17 @@ void R_AddSingleModel( viewEntity_t* vEntity )
 				// If the shadow is drawn (or translucent), but the model isn't, we must include the shadow caps
 				// because we may be able to see into the shadow volume even though the view is outside it.
 				// This happens for the player world weapon and possibly some animations in multiplayer.
+#if defined( DOMINION )
+				// surface bounds cover camera inside the surface's box, but missed other surfaces belonging to the same model
+				// const bool forceShadowCaps = !addInteractions || r_forceShadowCaps.GetBool() || tri->bounds.Expand( znear * INSIDE_SHADOW_VOLUME_EXTRA_STRETCH ).ContainsPoint( localViewOrigin );
+				// full model bounds covered the camera inside the model's whole box, but missed camera outside the box but inside its shadow projection
+				// const bool forceShadowCaps = !addInteractions || r_forceShadowCaps.GetBool() || entityDef->localReferenceBounds.Expand( znear * INSIDE_SHADOW_VOLUME_EXTRA_STRETCH ).ContainsPoint( localViewOrigin );
+				// full projection + open surface guard cover the above ones + exposed caps through open surfaces, right now it looks like no issues
+				// retain caps for open surfaces, or when the view/near plane may enter // the shadow projection of the full model bounds.
+				const bool forceShadowCaps = !addInteractions || r_forceShadowCaps.GetBool() || ( !tri->perfectHull || R_ViewPotentiallyInsideInfiniteShadowVolume( entityDef->localReferenceBounds, localLightOrigin, localViewOrigin, znear * INSIDE_SHADOW_VOLUME_EXTRA_STRETCH ) );
+#else
 				const bool forceShadowCaps = !addInteractions || r_forceShadowCaps.GetBool();
-
+#endif
 				drawSurf_t* shadowDrawSurf = ( drawSurf_t* )R_FrameAlloc( sizeof( *shadowDrawSurf ), FRAME_ALLOC_DRAW_SURFACE );
 
 				if( surfInter != NULL )
@@ -1544,6 +1553,8 @@ void R_AddModels()
 	else
 	{
 		if( r_useParallelAddShadows.GetInteger() == 1 )
+			// TODO: submit these jobs in batches. maps/game/commoutside can exceed the 2048 job budget at (2353.5, -733.6, 1070.5) 134.9 with MOC off / com_smp off (1829 static + 786 dynamic in this view > 2048)
+			// It's inside a building non accessible by the player without noclip but it is proof this can happen
 		{
 			for( viewEntity_t* vEntity = tr.viewDef->viewEntitys; vEntity != NULL; vEntity = vEntity->next )
 			{

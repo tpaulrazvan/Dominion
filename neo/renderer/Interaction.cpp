@@ -205,6 +205,8 @@ static srfTriangles_t* R_CreateInteractionLightTris( const idRenderEntityLocal* 
 	// RB: now we do, so don't cull back faces if we have smooth shadowing enabled
 #if defined( DOMINION )
 	// retain backfaces for shadow maps
+	// FIXME: When we load a map with shadow volumes, all is fine, even if we switch to maps. But if we load with maps and then switch to volumes,
+	// the wall flickering appears again
 	if( r_lightAllBackFaces.GetBool() || R_GetShadowMode() == SHADOWMODE_MAPS || light->lightShader->LightEffectsBackSides()
 			|| shader->ReceivesLightingOnBackSides() || ent->parms.noSelfShadow || ent->parms.noShadow )
 #else
