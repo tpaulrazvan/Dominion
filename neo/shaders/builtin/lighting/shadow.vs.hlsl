@@ -92,16 +92,30 @@ void main( VS_IN vertex, out VS_OUT result )
 	modelPosition.z = dot4( matZ, vertexPosition );
 	modelPosition.w = vertex.position.w;
 
-	float4 vPos = modelPosition - pc.rpLocalLightOrigin;
-	vPos = ( vPos.wwww * pc.rpLocalLightOrigin ) + vPos;
+//	float4 vPos = modelPosition - pc.rpLocalLightOrigin;
+//	vPos = ( vPos.wwww * pc.rpLocalLightOrigin ) + vPos;
 
+	// Dark Mod: preserve near-cap positions to avoid subtract/add precision loss
+	float4 vPos = modelPosition;
+	if( vPos.w != 1.0 )
+	{
+		vPos -= pc.rpLocalLightOrigin;
+	}
+	
 	result.position.x = dot4( vPos, pc.rpMVPmatrixX );
 	result.position.y = dot4( vPos, pc.rpMVPmatrixY );
 	result.position.z = dot4( vPos, pc.rpMVPmatrixZ );
 	result.position.w = dot4( vPos, pc.rpMVPmatrixW );
 #else
-	float4 vPos = vertex.position - pc.rpLocalLightOrigin;
-	vPos = ( vPos.wwww * pc.rpLocalLightOrigin ) + vPos;
+//	float4 vPos = vertex.position - pc.rpLocalLightOrigin;
+//	vPos = ( vPos.wwww * pc.rpLocalLightOrigin ) + vPos;
+
+	// Dark Mod: preserve near-cap positions to avoid subtract/add precision loss
+	float4 vPos = vertex.position;
+	if( vPos.w != 1.0 )
+	{
+		vPos -= pc.rpLocalLightOrigin;
+	}
 
 	result.position.x = dot4( vPos, pc.rpMVPmatrixX );
 	result.position.y = dot4( vPos, pc.rpMVPmatrixY );
