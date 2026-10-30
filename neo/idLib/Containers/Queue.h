@@ -28,6 +28,8 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __QUEUE_H__
 #define __QUEUE_H__
 
+// #define idQueue( type, next )		idQueueTemplate<type, offsetof( type, next )>
+
 /*
 ===============================================================================
 
@@ -35,7 +37,7 @@ If you have questions concerning this license or the applicable additional terms
 
 ===============================================================================
 */
-template< class type, int nextOffset >
+template< class type, size_t nextOffset /* int nextOffset */ >
 class idQueueTemplate
 {
 public:
@@ -51,13 +53,13 @@ private:
 
 #define QUEUE_NEXT_PTR( element )		(*((type**)(((byte*)element)+nextOffset)))
 
-template< class type, int nextOffset >
+template< class type, size_t nextOffset /* int nextOffset */ >
 idQueueTemplate<type, nextOffset>::idQueueTemplate()
 {
 	first = last = NULL;
 }
 
-template< class type, int nextOffset >
+template< class type, size_t nextOffset /* int nextOffset */ >
 void idQueueTemplate<type, nextOffset>::Add( type* element )
 {
 	QUEUE_NEXT_PTR( element ) = NULL;
@@ -72,7 +74,7 @@ void idQueueTemplate<type, nextOffset>::Add( type* element )
 	last = element;
 }
 
-template< class type, int nextOffset >
+template< class type, size_t nextOffset /* int nextOffset */ >
 type* idQueueTemplate<type, nextOffset>::Get()
 {
 	type* element;

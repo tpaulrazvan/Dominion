@@ -638,8 +638,8 @@ private:
 		Type		value;
 		hashnode_s* next;
 
-		hashnode_s( const idStr& k, Type v, hashnode_s* n ) : key( k ), value( v ), next( n ) {};
-		hashnode_s( const char* k, Type v, hashnode_s* n ) : key( k ), value( v ), next( n ) {};
+		hashnode_s( const idStr& k, Type v, hashnode_s* n ) : key( k ), value( v ), next( n ) {};	// n = nextNode
+		hashnode_s( const char* k, Type v, hashnode_s* n ) : key( k ), value( v ), next( n ) {};	// n = nextNode
 	};
 
 	hashnode_s** 	heads;
@@ -838,6 +838,7 @@ ID_INLINE Type* idHashTable<Type>::GetIndex( int index ) const
 	int			count;
 	int			i;
 
+	// TODO:  eviljoel:  Consider correcting this to index >= numentries
 	if( ( index < 0 ) || ( index > numentries ) )
 	{
 		assert( 0 );

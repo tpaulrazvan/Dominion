@@ -898,7 +898,7 @@ ID_INLINE int idList<_type_, _tag_>::Append( _type_ const& obj )
 ================
 idList<_type_,_tag_>::Insert
 
-Increases the size of the list by at leat one element if necessary
+Increases the size of the list by at least one element if necessary
 and inserts the supplied data into it.
 
 Returns the index of the new element.
@@ -1189,7 +1189,7 @@ ID_INLINE bool idList<_type_, _tag_>::Remove( _type_ const& obj )
 //	}
 //	typedef int cmp_c(const void *, const void *);
 //
-//	cmp_c *vCompare = (cmp_c *)compare;
+//	cmp_c *vCompare = (cmp_c *)compare; // compareThunk
 //	qsort( ( void * )list, ( size_t )num, sizeof( _type_ ), vCompare );
 //}
 
@@ -1236,7 +1236,7 @@ ID_INLINE void idList<_type_, _tag_>::SortWithTemplate( const idSort<_type_>& so
 //	}
 //	typedef int cmp_c(const void *, const void *);
 //
-//	cmp_c *vCompare = (cmp_c *)compare;
+//	cmp_c *vCompare = (cmp_c *)compare;	// compareThunk
 //	qsort( ( void * )( &list[startIndex] ), ( size_t )( endIndex - startIndex + 1 ), sizeof( _type_ ), vCompare );
 //}
 

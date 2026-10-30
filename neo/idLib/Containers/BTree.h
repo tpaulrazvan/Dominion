@@ -47,7 +47,7 @@ public:
 	objType* 						object;			// if != NULL pointer to object stored in leaf node
 	idBTreeNode* 					parent;			// parent node
 	idBTreeNode* 					next;			// next sibling
-	idBTreeNode* 					prev;			// prev sibling
+	idBTreeNode* 					prev;			// previous sibling
 	int								numChildren;	// number of children
 	idBTreeNode* 					firstChild;		// first child
 	idBTreeNode* 					lastChild;		// last child

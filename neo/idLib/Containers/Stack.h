@@ -29,6 +29,7 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __STACK_H__
 #define __STACK_H__
 
+
 /*
 ===============================================================================
 
@@ -37,9 +38,10 @@ If you have questions concerning this license or the applicable additional terms
 ===============================================================================
 */
 
-#define idStack( type, next )		idStackTemplate<type, (int)&(((type*)NULL)->next)>
+// #define idStack( type, next )		idStackTemplate<type, (int)&(((type*)NULL)->next)>
+#define idStack( type, next )		idStackTemplate<type, offsetof( type, next )>
 
-template< class type, int nextOffset >
+template< class type, size_t nextOffset /* int nextOffset */ >
 class idStackTemplate
 {
 public:
@@ -55,13 +57,13 @@ private:
 
 #define STACK_NEXT_PTR( element )		(*(type**)(((byte*)element)+nextOffset))
 
-template< class type, int nextOffset >
+template< class type, size_t nextOffset /* int nextOffset */ >
 idStackTemplate<type, nextOffset>::idStackTemplate()
 {
 	top = bottom = NULL;
 }
 
-template< class type, int nextOffset >
+template< class type, size_t nextOffset /* int nextOffset */ >
 void idStackTemplate<type, nextOffset>::Add( type* element )
 {
 	STACK_NEXT_PTR( element ) = top;
@@ -72,7 +74,7 @@ void idStackTemplate<type, nextOffset>::Add( type* element )
 	}
 }
 
-template< class type, int nextOffset >
+template< class type, size_t nextOffset /* int nextOffset */ >
 type* idStackTemplate<type, nextOffset>::Get()
 {
 	type* element;
