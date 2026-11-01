@@ -994,6 +994,13 @@ int idHashTable<Type>::GetSpread() const
 	error = 0;
 	for( i = 0; i < tablesize; i++ )
 	{
+		https://github.com/eyalamirmusic/dhewm3/commit/9dae9c92098b6ca435325e5014285096e0bfd842#diff-8e3d84e54b79bf487093a864b0ae11e1c0d8a07b2faddc5cc3a132e4f154f1c5R27-R872
+		// numItems was never declared. The bug survived because this function is
+		// dead - the only two calls to it in the tree are commented out in
+		// cm/CollisionModel_load.cpp - and because the two compilers that ever saw
+		// it disagree: gcc and clang skip the whole definition on the #if above,
+		// and MSVC's delayed template parsing never looks inside an uninstantiated
+		// template. clang-cl is neither, and parses it.
 		int numItems = 0;
 		for( node = heads[ i ]; node != NULL; node = node->next )
 		{

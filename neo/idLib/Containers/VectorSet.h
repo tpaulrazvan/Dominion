@@ -171,6 +171,10 @@ ID_INLINE int idVectorSet<type, dimension>::FindVector( const type& v, const flo
 
 	hash.Add( hashKey, idList<type>::Num() );
 
+#if 0
+	idList<type>::Append( v );
+#endif
+
 	// RB: compile fix for Fedora 17
 	this->Append( v );
 	// RB end
