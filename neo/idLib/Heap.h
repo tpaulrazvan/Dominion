@@ -41,7 +41,7 @@ If you have questions concerning this license or the applicable additional terms
 enum memTag_e
 {
 #define MEM_TAG( x )	TAG_##x,
-#include "Sys/sys_alloc_tags.h"
+#include "Memory/MemoryTags.h"
 	TAG_NUM_TAGS,
 };
 

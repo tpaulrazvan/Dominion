@@ -13,6 +13,8 @@ file(GLOB ID_HASHING_INCLUDES Hashing/*.h)
 file(GLOB ID_HASHING_SOURCES Hashing/*.cpp)
 file(GLOB ID_MATH_INCLUDES Math/*.h)
 file(GLOB ID_MATH_SOURCES Math/*.cpp)
+file(GLOB ID_MEMORY_INCLUDES Memory/*.h)
+file(GLOB ID_MEMORY_SOURCES Memory/*.cpp)
 file(GLOB ID_SYS_INCLUDES Sys/*.h)
 file(GLOB ID_SYS_SOURCES Sys/*.cpp)
 
@@ -31,6 +33,7 @@ set(ID_INCLUDES_ALL
 		${ID_GEOMETRY_INCLUDES}
 		${ID_HASHING_INCLUDES}
 		${ID_MATH_INCLUDES}
+		${ID_MEMORY_INCLUDES}
 		${ID_SYS_INCLUDES}
 		)
 			
@@ -41,6 +44,7 @@ set(ID_SOURCES_ALL
 		${ID_GEOMETRY_SOURCES}
 		${ID_HASHING_SOURCES}
 		${ID_MATH_SOURCES}
+		${ID_MEMORY_SOURCES}
 		${ID_SYS_SOURCES}
 		)
 			
@@ -64,6 +68,8 @@ source_group("Hashing" FILES ${ID_HASHING_INCLUDES})
 source_group("Hashing" FILES ${ID_HASHING_SOURCES})
 source_group("Math" FILES ${ID_MATH_INCLUDES})
 source_group("Math" FILES ${ID_MATH_SOURCES})
+source_group("Memory" FILES ${ID_MEMORY_INCLUDES})
+source_group("Memory" FILES ${ID_MEMORY_SOURCES})
 source_group("Sys" FILES ${ID_SYS_INCLUDES})
 source_group("Sys" FILES ${ID_SYS_SOURCES})
 
