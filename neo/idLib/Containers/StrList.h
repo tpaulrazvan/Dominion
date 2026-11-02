@@ -49,7 +49,7 @@ typedef idStr* idStrPtr;
 //================
 //*/
 //template<>
-//ID_INLINE int idListSortCompare<idStrPtr, memTag_t _tag_ >( const idStrPtr *a, const idStrPtr *b ) {
+//ID_INLINE int idListSortCompare<idStrPtr, memTag_e _tag_ >( const idStrPtr *a, const idStrPtr *b ) {
 //	return ( *a )->Icmp( **b );
 //}
 

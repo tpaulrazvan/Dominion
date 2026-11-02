@@ -45,7 +45,7 @@ Mem_Alloc16
 ==================
 */
 // RB: 64 bit fixes, changed int to size_t
-void* Mem_Alloc16( const size_t size, const memTag_t tag )
+void* Mem_Alloc16( const size_t size, const memTag_e tag )
 // RB end
 {
 	if( !size )
@@ -91,7 +91,7 @@ void Mem_Free16( void* ptr )
 Mem_ClearedAlloc
 ==================
 */
-void* Mem_ClearedAlloc( const size_t size, const memTag_t tag )
+void* Mem_ClearedAlloc( const size_t size, const memTag_e tag )
 {
 	void* mem = Mem_Alloc( size, tag );
 	SIMDProcessor->Memset( mem, 0, size );

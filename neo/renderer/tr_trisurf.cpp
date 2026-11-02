@@ -51,7 +51,7 @@ FONT-END STATIC MEMORY ALLOCATION
 R_StaticAlloc
 =================
 */
-void* R_StaticAlloc( int bytes, const memTag_t tag )
+void* R_StaticAlloc( int bytes, const memTag_e tag )
 {
 	//tr.pc.c_alloc++;
 

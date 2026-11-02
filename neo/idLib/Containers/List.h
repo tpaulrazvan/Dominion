@@ -48,7 +48,7 @@ If you have questions concerning this license or the applicable additional terms
 idListArrayNew
 ========================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE void* idListArrayNew( int num, bool zeroBuffer )
 {
 	_type_ * ptr = NULL;
@@ -88,7 +88,7 @@ ID_INLINE void idListArrayDelete( void* ptr, int num )
 idListArrayResize
 ========================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE void* idListArrayResize( void* voldptr, int oldNum, int newNum, bool zeroBuffer )
 {
 	_type_ * oldptr = ( _type_* )voldptr;
@@ -118,7 +118,7 @@ ID_INLINE type* idListNewElement()
 	return new type;
 }
 
-template< typename _type_, memTag_t _tag_ = TAG_IDLIB_LIST >
+template< typename _type_, memTag_e _tag_ = TAG_IDLIB_LIST >
 class idList
 {
 public:
@@ -180,13 +180,13 @@ public:
 	// auto-cast to other idList types with a different memory tag
 	//------------------------
 
-	template< memTag_t _t_ >
+	template< memTag_e _t_ >
 	operator idList<_type_, _t_>& ()
 	{
 		return *reinterpret_cast<idList<_type_, _t_> *>( this );
 	}
 
-	template< memTag_t _t_>
+	template< memTag_e _t_>
 	operator const idList<_type_, _t_>& () const
 	{
 		return *reinterpret_cast<const idList<_type_, _t_> *>( this );
@@ -198,11 +198,11 @@ public:
 	// Changing the memTag when the list has an allocated buffer will
 	// result in corruption of the memory statistics.
 	//------------------------
-	memTag_t		GetMemTag() const
+	memTag_e		GetMemTag() const
 	{
-		return ( memTag_t )memTag;
+		return ( memTag_e )memTag;
 	};
-	void			SetMemTag( memTag_t tag_ )
+	void			SetMemTag( memTag_e tag_ )
 	{
 		memTag = ( byte )tag_;
 	};
@@ -296,7 +296,7 @@ private:
 idList<_type_,_tag_>::idList( int )
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE idList<_type_, _tag_>::idList( int newgranularity )
 {
 	assert( newgranularity > 0 );
@@ -312,7 +312,7 @@ ID_INLINE idList<_type_, _tag_>::idList( int newgranularity )
 idList<_type_,_tag_>::idList( idList< _type_, _tag_ >&& other )
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE idList<_type_, _tag_>::idList( idList&& other )
 {
 	list = NULL;
@@ -324,14 +324,14 @@ ID_INLINE idList<_type_, _tag_>::idList( idList&& other )
 idList<_type_,_tag_>::idList( const idList< _type_, _tag_ > &other )
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE idList<_type_, _tag_>::idList( const idList& other )
 {
 	list = NULL;
 	*this = other;
 }
 
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE idList<_type_, _tag_>::idList( std::initializer_list<_type_> initializerList )
 	: idList( 16 )
 {
@@ -344,7 +344,7 @@ ID_INLINE idList<_type_, _tag_>::idList( std::initializer_list<_type_> initializ
 idList<_type_,_tag_>::~idList< _type_, _tag_ >
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE idList<_type_, _tag_>::~idList()
 {
 	Clear();
@@ -357,7 +357,7 @@ idList<_type_,_tag_>::Clear
 Frees up the memory allocated by the list.  Assumes that _type_ automatically handles freeing up memory.
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE void idList<_type_, _tag_>::Clear()
 {
 	if( list )
@@ -382,7 +382,7 @@ the pointers are still valid when this function is called.  Function will set al
 list to NULL.
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE void idList<_type_, _tag_>::DeleteContents( bool clear )
 {
 	int i;
@@ -413,7 +413,7 @@ idList<_type_,_tag_>::Allocated
 return total memory allocated for the list in bytes, but doesn't take into account additional memory allocated by _type_
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE size_t idList<_type_, _tag_>::Allocated() const
 {
 	return size * sizeof( _type_ );
@@ -426,7 +426,7 @@ idList<_type_,_tag_>::Size
 return total size of list in bytes, but doesn't take into account additional memory allocated by _type_
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE size_t idList<_type_, _tag_>::Size() const
 {
 	return sizeof( idList< _type_, _tag_ > ) + Allocated();
@@ -437,7 +437,7 @@ ID_INLINE size_t idList<_type_, _tag_>::Size() const
 idList<_type_,_tag_>::MemoryUsed
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE size_t idList<_type_, _tag_>::MemoryUsed() const
 {
 	return num * sizeof( *list );
@@ -451,7 +451,7 @@ Returns the number of elements currently contained in the list.
 Note that this is NOT an indication of the memory allocated.
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE int idList<_type_, _tag_>::Num() const
 {
 	return num;
@@ -464,7 +464,7 @@ idList<_type_,_tag_>::NumAllocated
 Returns the number of elements currently allocated for.
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE int idList<_type_, _tag_>::NumAllocated() const
 {
 	return size;
@@ -475,7 +475,7 @@ ID_INLINE int idList<_type_, _tag_>::NumAllocated() const
 idList<_type_,_tag_>::SetNum
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE void idList<_type_, _tag_>::SetNum( int newnum )
 {
 	assert( newnum >= 0 );
@@ -493,7 +493,7 @@ idList<_type_,_tag_>::SetGranularity
 Sets the base size of the array and resizes the array to match.
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE void idList<_type_, _tag_>::SetGranularity( int newgranularity )
 {
 	int newsize;
@@ -520,7 +520,7 @@ idList<_type_,_tag_>::GetGranularity
 Get the current granularity.
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE int idList<_type_, _tag_>::GetGranularity() const
 {
 	return granularity;
@@ -533,7 +533,7 @@ idList<_type_,_tag_>::Condense
 Resizes the array to exactly the number of elements it contains or frees up memory if empty.
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE void idList<_type_, _tag_>::Condense()
 {
 	if( list )
@@ -557,7 +557,7 @@ Allocates memory for the amount of elements requested while keeping the contents
 Contents are copied using their = operator so that data is correnctly instantiated.
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE void idList<_type_, _tag_>::Resize( int newsize )
 {
 	assert( newsize >= 0 );
@@ -591,7 +591,7 @@ Allocates memory for the amount of elements requested while keeping the contents
 Contents are copied using their = operator so that data is correnctly instantiated.
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE void idList<_type_, _tag_>::Resize( int newsize, int newgranularity )
 {
 	assert( newsize >= 0 );
@@ -621,7 +621,7 @@ idList<_type_,_tag_>::AssureSize
 Makes sure the list has at least the given number of elements.
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE void idList<_type_, _tag_>::AssureSize( int newSize )
 {
 	int newNum = newSize;
@@ -648,7 +648,7 @@ idList<_type_,_tag_>::AssureSize
 Makes sure the list has at least the given number of elements and initialize any elements not yet initialized.
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE void idList<_type_, _tag_>::AssureSize( int newSize, const _type_ &initValue )
 {
 	int newNum = newSize;
@@ -685,7 +685,7 @@ NOTE: This function can only be called on lists containing pointers. Calling it
 on non-pointer lists will cause a compiler error.
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE void idList<_type_, _tag_>::AssureSizeAlloc( int newSize, new_t* allocator )
 {
 	int newNum = newSize;
@@ -719,7 +719,7 @@ idList<_type_,_tag_>::operator=
 Moves the contents and size attributes of another list, effectively emptying the other list.
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE idList<_type_, _tag_>& idList<_type_, _tag_>::operator=( idList<_type_, _tag_>&& other )
 {
 	Clear();
@@ -743,7 +743,7 @@ idList<_type_,_tag_>::operator=
 Copies the contents and size attributes of another list.
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE idList<_type_, _tag_>& idList<_type_, _tag_>::operator=( const idList<_type_, _tag_>& other )
 {
 	int	i;
@@ -775,7 +775,7 @@ Access operator.  Index must be within range or an assert will be issued in debu
 Release builds do no range checking.
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE const _type_& idList<_type_, _tag_>::operator[]( int index ) const
 {
 	assert( index >= 0 );
@@ -792,7 +792,7 @@ Access operator.  Index must be within range or an assert will be issued in debu
 Release builds do no range checking.
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE _type_& idList<_type_, _tag_>::operator[]( int index )
 {
 	assert( index >= 0 );
@@ -812,7 +812,7 @@ Note: may return NULL if the list is empty.
 FIXME: Create an iterator template for this kind of thing.
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE _type_* idList<_type_, _tag_>::Ptr()
 {
 	return list;
@@ -829,7 +829,7 @@ Note: may return NULL if the list is empty.
 FIXME: Create an iterator template for this kind of thing.
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 const ID_INLINE _type_* idList<_type_, _tag_>::Ptr() const
 {
 	return list;
@@ -842,7 +842,7 @@ idList<_type_,_tag_>::Alloc
 Returns a reference to a new data element at the end of the list.
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE _type_& idList<_type_, _tag_>::Alloc()
 {
 	if( !list )
@@ -867,7 +867,7 @@ Increases the size of the list by one element and copies the supplied data into 
 Returns the index of the new element.
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE int idList<_type_, _tag_>::Append( _type_ const& obj )
 {
 	if( !list )
@@ -904,7 +904,7 @@ and inserts the supplied data into it.
 Returns the index of the new element.
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE int idList<_type_, _tag_>::Insert( _type_ const& obj, int index )
 {
 	if( !list )
@@ -950,7 +950,7 @@ adds the other list to this one
 Returns the size of the new combined list
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE int idList<_type_, _tag_>::Append( const idList< _type_, _tag_ >& other )
 {
 	if( !list )
@@ -978,7 +978,7 @@ idList<_type_,_tag_>::AddUnique
 Adds the data to the list if it doesn't already exist.  Returns the index of the data in the list.
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE int idList<_type_, _tag_>::AddUnique( _type_ const& obj )
 {
 	int index;
@@ -999,7 +999,7 @@ idList<_type_,_tag_>::FindIndex
 Searches for the specified data in the list and returns it's index.  Returns -1 if the data is not found.
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE int idList<_type_, _tag_>::FindIndex( _type_ const& obj ) const
 {
 	int i;
@@ -1023,7 +1023,7 @@ idList<_type_,_tag_>::Find
 Searches for the specified data in the list and returns it's address. Returns NULL if the data is not found.
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE _type_* idList<_type_, _tag_>::Find( _type_ const& obj ) const
 {
 	int i;
@@ -1047,7 +1047,7 @@ NOTE: This function can only be called on lists containing pointers. Calling it
 on non-pointer lists will cause a compiler error.
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE int idList<_type_, _tag_>::FindNull() const
 {
 	int i;
@@ -1074,7 +1074,7 @@ Function will assert in debug builds if pointer is outside the bounds of the lis
 but remains silent in release builds.
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE int idList<_type_, _tag_>::IndexOf( _type_ const* objptr ) const
 {
 	int index;
@@ -1096,7 +1096,7 @@ The number of elements in the list is reduced by one.  Returns false if the inde
 Note that the element is not destroyed, so any memory used by it may not be freed until the destruction of the list.
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE bool idList<_type_, _tag_>::RemoveIndex( int index )
 {
 	int i;
@@ -1133,7 +1133,7 @@ NOTE:	The element is not destroyed, so any memory used by it may not be freed un
 		destruction of the list.
 ========================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE bool idList<_type_, _tag_>::RemoveIndexFast( int index )
 {
 
@@ -1160,7 +1160,7 @@ The number of elements in the list is reduced by one.  Returns false if the data
 the element is not destroyed, so any memory used by it may not be freed until the destruction of the list.
 ================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE bool idList<_type_, _tag_>::Remove( _type_ const& obj )
 {
 	int index;
@@ -1182,7 +1182,7 @@ ID_INLINE bool idList<_type_, _tag_>::Remove( _type_ const& obj )
 //list, so any pointers to data within the list may no longer be valid.
 //================
 //*/
-//template< typename _type_, memTag_t _tag_ >
+//template< typename _type_, memTag_e _tag_ >
 //ID_INLINE void idList<_type_,_tag_>::Sort( cmp_t *compare ) {
 //	if ( !list ) {
 //		return;
@@ -1203,7 +1203,7 @@ Note:	The data is merely moved around the list, so any pointers to data within t
 		no longer be valid.
 ========================
 */
-template< typename _type_, memTag_t _tag_ >
+template< typename _type_, memTag_e _tag_ >
 ID_INLINE void idList<_type_, _tag_>::SortWithTemplate( const idSort<_type_>& sort )
 {
 	if( list == NULL )
@@ -1220,7 +1220,7 @@ ID_INLINE void idList<_type_, _tag_>::SortWithTemplate( const idSort<_type_>& so
 //Sorts a subsection of the list.
 //================
 //*/
-//template< typename _type_, memTag_t _tag_ >
+//template< typename _type_, memTag_e _tag_ >
 //ID_INLINE void idList<_type_,_tag_>::SortSubSection( int startIndex, int endIndex, cmp_t *compare ) {
 //	if ( !list ) {
 //		return;
@@ -1248,7 +1248,7 @@ Finds an item in a list based on any another datatype.  Your _type_ must overloa
 If your _type_ is a ptr, use the FindFromGenericPtr function instead.
 ========================
 */
-template< typename _type_, memTag_t _tag_, typename _compare_type_ >
+template< typename _type_, memTag_e _tag_, typename _compare_type_ >
 _type_* FindFromGeneric( idList<_type_, _tag_>& list, const _compare_type_ & other )
 {
 	for( int i = 0; i < list.Num(); i++ )
@@ -1266,7 +1266,7 @@ _type_* FindFromGeneric( idList<_type_, _tag_>& list, const _compare_type_ & oth
 FindFromGenericPtr
 ========================
 */
-template< typename _type_, memTag_t _tag_, typename _compare_type_ >
+template< typename _type_, memTag_e _tag_, typename _compare_type_ >
 _type_* FindFromGenericPtr( idList<_type_, _tag_>& list, const _compare_type_ & other )
 {
 	for( int i = 0; i < list.Num(); i++ )
