@@ -26,8 +26,8 @@ If you have questions concerning this license or the applicable additional terms
 ===========================================================================
 */
 #ifdef __INTELLISENSE__
-// fuck intellisense
-    #pragma diag_suppress 77    // E077: This declaration has no storage class or type specifier
+	// fuck intellisense
+	#pragma diag_suppress 77    // E077: This declaration has no storage class or type specifier
 #endif
 
 MEM_TAG( UNSET )		// This should never be used
@@ -156,5 +156,5 @@ MEM_TAG( TOOLS )
 #undef MEM_TAG
 
 #ifdef __INTELLISENSE__
-    #pragma diag_default 77
+	#pragma diag_default 77
 #endif

@@ -101,7 +101,7 @@ void main( VS_IN vertex, out VS_OUT result )
 	{
 		vPos -= pc.rpLocalLightOrigin;
 	}
-	
+
 	result.position.x = dot4( vPos, pc.rpMVPmatrixX );
 	result.position.y = dot4( vPos, pc.rpMVPmatrixY );
 	result.position.z = dot4( vPos, pc.rpMVPmatrixZ );
