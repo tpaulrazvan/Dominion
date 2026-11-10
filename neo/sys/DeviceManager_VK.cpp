@@ -127,6 +127,11 @@ protected:
 
 	void ResizeSwapChain() override
 	{
+#if defined( DOMINION )	// Semaphore fix
+		// resizing the window or changing VSync rebuilds the swapchain.
+		// clearing this prevents another unnecessary rebuild on the next frame
+		m_SwapChainRecreatePending = false;
+#endif
 		if( m_VulkanDevice )
 		{
 			destroySwapChain();
@@ -325,6 +330,12 @@ private:
 	//nvrhi::CommandListHandle m_BarrierCommandList;		// SRS - no longer needed
 	std::queue<vk::Semaphore> m_AcquireSemaphores;
 	std::vector<vk::Semaphore> m_PresentSemaphores;
+
+#if defined( DOMINION ) // Semaphore fix
+	// this records if the Vulkan swapchain needs rebuilding
+	// it lets the current acquired frame finish safely before rebuilding at the start of the next frame, avoiding premature semaphore reuse
+	bool m_SwapChainRecreatePending = false;
+#endif
 
 	nvrhi::EventQueryHandle m_FrameWaitQuery;
 
@@ -1565,6 +1576,16 @@ void DeviceManager_VK::BeginFrame()
 	}
 	commonLocal.SetRendererGpuMemoryMB( gpuMemoryAllocated / 1024 / 1024 );
 
+#if defined( DOMINION ) // Semaphore fix
+	// finish the previous suboptimal frame normally, then rebuild before acquiring another image
+	if( m_SwapChainRecreatePending )
+	{
+		BackBufferResizing();
+		ResizeSwapChain();
+		BackBufferResized();
+	}
+#endif
+
 	vk::Result res = vk::Result::eSuccess;
 	for( int attempt = 0; attempt < 2; attempt++ )
 	{
@@ -1574,7 +1595,13 @@ void DeviceManager_VK::BeginFrame()
 				vk::Fence(),
 				&m_SwapChainIndex );
 
+#if defined( DOMINION ) // Semaphore fix
+		// SUBOPTIMAL still gives us an image, so finish this frame before rebuilding.
+		// OUT_OF_DATE gives us no image, so we can rebuild and try again immediately.
+		if( res != vk::Result::eErrorOutOfDateKHR || attempt == 1 )
+#else
 		if( res != vk::Result::eErrorOutOfDateKHR && res != vk::Result::eSuboptimalKHR )
+#endif
 		{
 			break;
 		}
@@ -1590,7 +1617,20 @@ void DeviceManager_VK::BeginFrame()
 		BackBufferResized();
 	}
 
+#if defined( DOMINION )
+	// release builds must never submit a wait after failed acquisition
+	if( res == vk::Result::eSuboptimalKHR )
+	{
+		m_SwapChainRecreatePending = true;
+	}
+	else if( res != vk::Result::eSuccess )
+	{
+		common->FatalError( "vkAcquireNextImageKHR failed: %s", nvrhi::vulkan::resultToString( static_cast<VkResult>( res ) ) );
+		return;
+	}
+#else
 	assert( res == vk::Result::eSuccess || res == vk::Result::eSuboptimalKHR );
+#endif
 
 	m_NvrhiDevice->queueWaitForSemaphore( nvrhi::CommandQueue::Graphics, m_AcquireSemaphores.front(), 0 );
 
@@ -1648,7 +1688,20 @@ void DeviceManager_VK::Present()
 							  .setPNext( pNext );
 
 	const vk::Result res = m_PresentQueue.presentKHR( &info );
+#if defined( DOMINION ) // Semaphore Fix
+	// presentation can discover a changed surface too so rebuild at the next acquisition
+	if( res == vk::Result::eErrorOutOfDateKHR || res == vk::Result::eSuboptimalKHR )
+	{
+		m_SwapChainRecreatePending = true;
+	}
+	else if( res != vk::Result::eSuccess )
+	{
+		common->FatalError( "vkQueuePresentKHR failed: %s", nvrhi::vulkan::resultToString( static_cast<VkResult>( res ) ) );
+		return;
+	}
+#else
 	assert( res == vk::Result::eSuccess || res == vk::Result::eErrorOutOfDateKHR || res == vk::Result::eSuboptimalKHR );
+#endif
 
 	// SRS - The following event queries provide explicit CPU/GPU synchronization (supports validation layer if enabled)
 	if constexpr( NUM_FRAME_DATA > 2 )
