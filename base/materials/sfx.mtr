@@ -3055,8 +3055,8 @@ textures/sfx/blueglass
 	
 	{
 	 	 blend	diffuseMap
-		//map textures/sfx/blueglass
-		map textures/glass/daddyitburns
+		map textures/sfx/blueglass
+		// map textures/glass/daddyitburns
 		//scale	 16 , 16
 	}
 
