@@ -827,7 +827,7 @@ bool DeviceManager::CreateWindowDeviceAndSwapChain( const glimpParms_t& parms, c
 
 void DeviceManager::UpdateWindowSize( const glimpParms_t& parms )
 {
-	// TODO: Minimize/restore does not work properly on Vulkan. 
+	// TODO: Minimize/restore does not work properly on Vulkan.
 	// m_windowVisible and retained glConfig dimensions let recreation continue while the native surface
 	// extent is 0x0, causing imageExtent-01689 in DeviceManager_VK::createSwapChain().
 	// A proper fix must suspend acquisition/drawing/presentation together, then recreate after restoration.
