@@ -848,7 +848,7 @@ void idBinaryImage::LoadCubeFromMemory( int width, const byte* pics[6], int numL
 
 			img.level = level;
 			img.destZ = side;
-#if defined( DOMINIOn ) // BLUE TEXTURES FIX
+#if defined( DOMINION ) // BLUE TEXTURES FIX
 			img.width = scaledWidth;
 			img.height = scaledWidth;
 #else
