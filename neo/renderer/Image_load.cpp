@@ -36,6 +36,11 @@ If you have questions concerning this license or the applicable additional terms
 #include "../framework/Common_local.h"
 #include "RenderCommon.h"
 
+#if defined( DOMINION ) // blue textures
+	#include "sys/DeviceManager.h"
+	extern DeviceManager* deviceManager;
+#endif
+
 /*
 ================
 BitsForFormat
@@ -226,6 +231,66 @@ void idImage::GenerateMissingImage( nvrhi::ICommandList* commandList )
 }
 #endif
 
+#if defined( DOMINION ) // blue textures fix
+/*
+========================
+idImage::PrepareBinaryImageForUpload
+Keep BC data native when the backend supports the logical base dimensions; otherwise decode all
+BC1/BC3 mips in memory. Call after writing any generated bimage so disk caches remain compressed.
+========================
+*/
+void idImage::PrepareBinaryImageForUpload( idBinaryImage& image )
+{
+#if defined( USE_NVRHI ) && !defined( DMAP )
+	if( !IsCompressed() || ( ( opts.width & 3 ) == 0 && ( opts.height & 3 ) == 0 ) )
+	{
+		return;
+	}
+
+	const bool unalignedSupported = deviceManager->GetGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN || deviceManager->m_DeviceParams.supportsUnalignedBlockTextures;
+	nvrhi::Format nativeFormat = nvrhi::Format::UNKNOWN;
+	switch( opts.format )
+	{
+		case FMT_DXT1:
+			nativeFormat = nvrhi::Format::BC1_UNORM;
+			break;
+		case FMT_DXT5:
+			nativeFormat = nvrhi::Format::BC3_UNORM;
+			break;
+		case FMT_BC6H:
+			nativeFormat = nvrhi::Format::BC6H_UFLOAT;
+			break;
+		case FMT_BC7:
+			nativeFormat = nvrhi::Format::BC7_UNORM;
+			break;
+		default:
+			break;
+	}
+
+	const nvrhi::FormatSupport required = nvrhi::FormatSupport::Texture | nvrhi::FormatSupport::ShaderSample;
+	const bool nativeSupported = unalignedSupported && ( deviceManager->GetDevice()->queryFormatSupport( nativeFormat ) & required ) == required;
+#if 1
+	common->Printf( S_COLOR_BLUE "unaligned BC %dx%d, %s: %s\n", opts.width, opts.height, nativeSupported ? "native compressed upload" : "RGBA fallback", GetName() );
+#endif
+
+	if( nativeSupported )
+	{
+		return;
+	}
+
+	if( image.ConvertNonBlockAlignedDXT() )
+	{
+		uploadSourceFormat = opts.format;
+		opts.format = FMT_RGBA8;
+	}
+	else
+	{
+		// BC6H needs an HDR-preserving decoder; never silently round its extent or truncate it to RGBA8.
+		common->Error( "Unsupported unaligned BC format %d for %s (%dx%d)", opts.format, GetName(), opts.width, opts.height );
+	}
+#endif
+}
+#endif
 
 /*
 ========================
@@ -472,6 +537,10 @@ void idImage::GenerateImage( const byte* pic, int width, int height, textureFilt
 		// don't show binarize info for generated images
 		common->LoadPacifierBinarizeEnd();
 
+#if defined( DOMINION ) // blue textures fix
+		PrepareBinaryImageForUpload( im );
+#endif
+
 		AllocImage();
 
 #if defined( USE_NVRHI ) && !defined( DMAP )
@@ -549,6 +618,10 @@ void idImage::GenerateCubeImage( const byte* pic[6], int size, textureFilter_t f
 
 	// don't show binarize info for generated images
 	common->LoadPacifierBinarizeEnd();
+
+#if defined( DOMINION ) // blue textures fix
+	PrepareBinaryImageForUpload( im );
+#endif
 
 	AllocImage();
 
@@ -785,7 +858,7 @@ void idImage::ActuallyLoadImage( bool fromBackEnd, nvrhi::ICommandList* commandL
 		opts.numLevels = header.numLevels;
 		opts.colorFormat = ( textureColor_t )header.colorFormat;
 		opts.format = ( textureFormat_t )header.format;
-		opts.format = ( textureFormat_t )header.format;
+		//	opts.format = ( textureFormat_t )header.format;
 		opts.textureType = ( textureType_t )header.textureType;
 
 		if( cvarSystem->GetCVarBool( "fs_buildresources" ) )
@@ -982,6 +1055,10 @@ void idImage::ActuallyLoadImage( bool fromBackEnd, nvrhi::ICommandList* commandL
 	{
 		return;
 	}
+#endif
+
+#if defined( DOMINION ) // blue textures fix
+	PrepareBinaryImageForUpload( im );
 #endif
 
 	AllocImage();

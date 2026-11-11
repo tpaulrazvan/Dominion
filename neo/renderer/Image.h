@@ -209,6 +209,8 @@ No texture is ever used that does not have a corresponding idImage.
 ====================================================================
 */
 
+class idBinaryImage; // DOMINION - blue textures fix
+
 static const int	MAX_TEXTURE_LEVELS = 14;
 
 // How is this texture used?  Determines the storage and color format
@@ -478,6 +480,9 @@ private:
 
 	void				DeriveOpts();
 
+#if defined( DOMINION ) // Blue textures fix
+	void				PrepareBinaryImageForUpload( idBinaryImage& image );
+#endif
 #if defined( DOMINION ) // nearest fix
 	void				RestoreSourceFormat();
 	textureFormat_t		uploadSourceFormat = FMT_NONE;

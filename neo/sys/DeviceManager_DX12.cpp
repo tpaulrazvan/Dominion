@@ -366,6 +366,12 @@ bool DeviceManager_DX12::CreateDeviceAndSwapChain()
 	// SRS - calculate and print out the DXGI device name and driver version string
 	idStr version_string;
 
+#if defined( DOMINION ) // blue textures fix
+	D3D12_FEATURE_DATA_D3D12_OPTIONS8 blockOptions = {};
+	m_DeviceParams.supportsUnalignedBlockTextures = SUCCEEDED( m_Device12->CheckFeatureSupport( D3D12_FEATURE_D3D12_OPTIONS8, &blockOptions, sizeof( blockOptions ) ) ) && blockOptions.UnalignedBlockTexturesSupported;
+	common->Printf( "D3D12 unaligned BC textures %s\n", m_DeviceParams.supportsUnalignedBlockTextures ? "supported" : "unsupported (BC1/BC3 RGBA fallback)" );
+#endif
+
 	// SRS - check the adaptor interface which returns the User Mode Driver version
 	LARGE_INTEGER UMDVersion;
 	if(	SUCCEEDED( targetAdapter->CheckInterfaceSupport( __uuidof( IDXGIDevice ), &UMDVersion ) ) )

@@ -48,6 +48,98 @@ If you have questions concerning this license or the applicable additional terms
 
 idCVar image_highQualityCompression( "image_highQualityCompression", "0", CVAR_BOOL, "Use high quality (slow) compression" );
 
+#if defined( DOMINION ) // BLUE TEXTURES FIX
+/*
+========================
+PadCompressedImage
+
+Replicate the nearest valid texel into complete compression blocks, keeping padding out of the image extent.
+========================
+*/
+static void PadCompressedImage( const byte* source, const int width, const int height, byte* destination, const int paddedWidth, const int paddedHeight )
+{
+	for( int y = 0; y < paddedHeight; ++y )
+	{
+		const byte* sourceRow = source + Min( y, height - 1 ) * width * 4;
+		byte* destinationRow = destination + y * paddedWidth * 4;
+		memcpy( destinationRow, sourceRow, width * 4 );
+		for( int x = width; x < paddedWidth; ++x )
+		{
+			memcpy( destinationRow + x * 4, sourceRow + ( width - 1 ) * 4, 4 );
+		}
+	}
+}
+
+/*
+========================
+idBinaryImage::ConvertNonBlockAlignedDXT
+
+Decode every mip when the backend cannot create this BC base size. Crop block padding and retain
+YCoCg/normal-map channel encoding.
+
+NOTE: Did not add BC6H / BC7 support here because BFG .bimages were not encoded with those.
+========================
+*/
+bool idBinaryImage::ConvertNonBlockAlignedDXT()
+{
+	if( ( fileData.format != FMT_DXT1 && fileData.format != FMT_DXT5 ) ||
+			( ( fileData.width & 3 ) == 0 && ( fileData.height & 3 ) == 0 ) )
+	{
+		return false;
+	}
+
+	const int blockBytes = fileData.format == FMT_DXT1 ? 8 : 16;
+	for( int i = 0; i < images.Num(); ++i )
+	{
+		const idBinaryImageData& img = images[i];
+		if( img.level < 0 || img.level >= fileData.numLevels || img.level >= 31 || fileData.width < 1 || fileData.height < 1 )
+		{
+			idLib::Error( "Invalid BC mip header in %s", GetName() );
+			return false;
+		}
+		const int width = Max( 1, fileData.width >> img.level );
+		const int height = Max( 1, fileData.height >> img.level );
+		const int64 storageBytes = ( ( int64( width ) + 3 ) / 4 ) * ( ( int64( height ) + 3 ) / 4 ) * blockBytes;
+		const int64 decodedBytes = ( ( int64( width ) + 3 ) & ~int64( 3 ) ) * ( ( int64( height ) + 3 ) & ~int64( 3 ) ) * 4;
+		if( storageBytes != img.dataSize || decodedBytes > INT_MAX || img.data == NULL ||
+				( img.width != width && !( fileData.textureType == DTT_CUBIC && width < 4 && img.width == 4 ) ) ||
+				( img.height != height && !( fileData.textureType == DTT_CUBIC && height < 4 && img.height == 4 ) ) )
+		{
+			idLib::Error( "Invalid BC mip payload in %s (level %d)", GetName(), img.level );
+			return false;
+		}
+	}
+
+	idDxtDecoder decoder;
+	for( int i = 0; i < images.Num(); ++i )
+	{
+		idBinaryImageData& img = images[i];
+		const int width = Max( 1, fileData.width >> img.level );
+		const int height = Max( 1, fileData.height >> img.level );
+		const int paddedWidth = ( width + 3 ) & ~3;
+		const int paddedHeight = ( height + 3 ) & ~3;
+		idTempArray<byte> decoded( paddedWidth * paddedHeight * 4 );
+		if( fileData.format == FMT_DXT1 )
+		{
+			decoder.DecompressImageDXT1( img.data, decoded.Ptr(), paddedWidth, paddedHeight );
+		}
+		else
+		{
+			decoder.DecompressImageDXT5( img.data, decoded.Ptr(), paddedWidth, paddedHeight );
+		}
+		img.Alloc( width * height * 4 );
+		img.width = width;
+		img.height = height;
+		for( int y = 0; y < height; ++y )
+		{
+			memcpy( img.data + y * width * 4, decoded.Ptr() + y * paddedWidth * 4, width * 4 );
+		}
+	}
+	fileData.format = FMT_RGBA8;
+	return true;
+}
+#endif
+
 /*
 ========================
 idBinaryImage::Load2DFromMemory
@@ -116,11 +208,16 @@ void idBinaryImage::Load2DFromMemory( int width, int height, const byte* pic_con
 			{
 				dxtWidth = ( scaledWidth + 3 ) & ~3;
 				dxtHeight = ( scaledHeight + 3 ) & ~3;
+#if defined( DOMINION ) // BLUE TEXTURES FIX
+				dxtPic = ( byte* )Mem_Alloc( dxtWidth * dxtHeight * 4, TAG_IMAGE );
+				PadCompressedImage( pic, scaledWidth, scaledHeight, dxtPic, dxtWidth, dxtHeight );
+#else
 				dxtPic = ( byte* )Mem_ClearedAlloc( dxtWidth * 4 * dxtHeight, TAG_IMAGE );
 				for( int i = 0; i < scaledHeight; i++ )
 				{
 					memcpy( dxtPic + i * dxtWidth * 4, pic + i * scaledWidth * 4, scaledWidth * 4 );
 				}
+#endif
 			}
 			else
 			{
@@ -462,11 +559,16 @@ void idBinaryImage::Load2DAtlasMipchainFromMemory( int width, int height, const 
 			{
 				dxtWidth = ( scaledWidth + 3 ) & ~3;
 				dxtHeight = ( scaledHeight + 3 ) & ~3;
+#if defined( DOMINION ) // BLUE TEXTURES FIX
+				dxtPic = ( byte* )Mem_Alloc( dxtWidth * dxtHeight * 4, TAG_IMAGE );
+				PadCompressedImage( pic, scaledWidth, scaledHeight, dxtPic, dxtWidth, dxtHeight );
+#else
 				dxtPic = ( byte* )Mem_ClearedAlloc( dxtWidth * 4 * dxtHeight, TAG_IMAGE );
 				for( int i = 0; i < scaledHeight; i++ )
 				{
 					memcpy( dxtPic + i * dxtWidth * 4, pic + i * scaledWidth * 4, scaledWidth * 4 );
 				}
+#endif
 			}
 			else
 			{
@@ -713,6 +815,19 @@ void idBinaryImage::LoadCubeFromMemory( int width, const byte* pics[6], int numL
 
 			common->LoadPacifierBinarizeMiplevel( level, fileData.numLevels );
 
+#if defined( DOMINION ) // BLUE TEXTURES FIX
+			// pad any partial cube-face block, including odd-sized faces, with nearest-edge texels.
+			const bool compressed = textureFormat == FMT_DXT1 || textureFormat == FMT_DXT5 || textureFormat == FMT_BC6H || textureFormat == FMT_BC7;
+			const int padSize = compressed ? ( scaledWidth + 3 ) & ~3 : scaledWidth;
+			byte* paddedCube = NULL;
+			const byte* padSrc = pic;
+			if( padSize != scaledWidth )
+			{
+				paddedCube = ( byte* )Mem_Alloc( padSize * padSize * 4, TAG_IMAGE );
+				PadCompressedImage( pic, scaledWidth, scaledWidth, paddedCube, padSize, padSize );
+				padSrc = paddedCube;
+			}
+#else
 			// handle padding blocks less than 4x4 for the DXT compressors
 			ALIGN16( byte padBlock[64] );
 			int		padSize;
@@ -729,11 +844,17 @@ void idBinaryImage::LoadCubeFromMemory( int width, const byte* pics[6], int numL
 				padSize = scaledWidth;
 				padSrc = pic;
 			}
+#endif
 
 			img.level = level;
 			img.destZ = side;
+#if defined( DOMINIOn ) // BLUE TEXTURES FIX
+			img.width = scaledWidth;
+			img.height = scaledWidth;
+#else
 			img.width = padSize;
 			img.height = padSize;
+#endif
 
 			if( textureFormat == FMT_DXT1 )
 			{
@@ -777,7 +898,8 @@ void idBinaryImage::LoadCubeFromMemory( int width, const byte* pics[6], int numL
 
 				// RB: store as R11G11B10 because the generic fallback is too slow
 				fileData.format = textureFormat = FMT_R11G11B10F;
-				img.Alloc( padSize * padSize * 4 );
+				img.Alloc( scaledWidth * scaledWidth * 4 ); // DOMINION - blue Textures fix
+				//	img.Alloc( padSize * padSize * 4 );	// commented out because of the above
 				for( int i = 0; i < img.dataSize; i++ )
 				{
 					img.data[ i ] = pic[ i ];
@@ -812,9 +934,18 @@ void idBinaryImage::LoadCubeFromMemory( int width, const byte* pics[6], int numL
 			else
 			{
 				fileData.format = textureFormat = FMT_RGBA8;
-				img.Alloc( padSize * padSize * 4 );
+				img.Alloc( scaledWidth * scaledWidth * 4 );	// DOMINION - blue Textures fix
+				// img.Alloc( padSize * padSize * 4 ); // commented out because of the above
 				memcpy( img.data, pic, img.dataSize );
 			}
+
+#if defined( DOMINION ) // blue textures fix
+			// the temporary padded face is no longer needed after compression
+			if( paddedCube != NULL )
+			{
+				Mem_Free( paddedCube );
+			}
+#endif
 
 			// downsample for the next level
 			byte* shrunk = NULL;
@@ -922,7 +1053,11 @@ Load the preprocessed image from the generated folder.
 */
 bool idBinaryImage::LoadFromGeneratedFile( idFile* bFile, ID_TIME_T sourceTimeStamp )
 {
+#if defined( DOMINION ) // Blue Textures Fix
+	if( bFile->Read( &fileData, sizeof( fileData ) ) != sizeof( fileData ) )
+#else
 	if( bFile->Read( &fileData, sizeof( fileData ) ) <= 0 )
+#endif
 	{
 		return false;
 	}
@@ -940,6 +1075,32 @@ bool idBinaryImage::LoadFromGeneratedFile( idFile* bFile, ID_TIME_T sourceTimeSt
 	{
 		return false;
 	}
+
+#if defined( DOMINION ) // Blue Textures Fix
+	// Validate the cache's allocation-driving fields in release builds too. A mip chain cannot
+	// contain more levels than its base dimensions allow; current bimages store 2D images or cubes.
+	if( ( fileData.textureType != DTT_2D && fileData.textureType != DTT_CUBIC ) || fileData.format <= FMT_NONE || fileData.format > FMT_RGBA16S ||
+			fileData.colorFormat < CFM_DEFAULT || fileData.colorFormat > CFM_GREEN_ALPHA || fileData.width < 1 || fileData.height < 1 || fileData.numLevels < 1 || fileData.numLevels > 31 ||
+			( fileData.textureType == DTT_CUBIC && fileData.width != fileData.height ) )
+	{
+		return false;
+	}
+
+	int maxLevels = 1;
+	for( int dimension = Max( fileData.width, fileData.height ); dimension > 1; dimension >>= 1 )
+	{
+		++maxLevels;
+	}
+	const int faces = fileData.textureType == DTT_CUBIC ? 6 : 1;
+	const int64 remainingBytes = int64( bFile->Length() ) - bFile->Tell();
+	if( fileData.numLevels > maxLevels || remainingBytes < int64( faces ) * fileData.numLevels * ( int64( sizeof( bimageImage_t ) ) + 1 ) )
+	{
+		return false;
+	}
+	const bool blockCompressed = fileData.format == FMT_DXT1 || fileData.format == FMT_DXT5 || fileData.format == FMT_BC6H || fileData.format == FMT_BC7 || fileData.format == FMT_ETC1_RGB8_OES;
+	const int bitsPerPixel = BitsForFormat( static_cast<textureFormat_t>( fileData.format ) );
+	uint32 seenLevels[6] = {};
+#endif
 
 	// RB: source might be from .resources, so we ignore the time stamp and assume a release build
 	if( !fileSystem->InProductionMode() && ( sourceTimeStamp != FILE_NOT_FOUND_TIMESTAMP ) && ( sourceTimeStamp != 0 ) && ( sourceTimeStamp != fileData.sourceFileTime ) )
@@ -961,7 +1122,11 @@ bool idBinaryImage::LoadFromGeneratedFile( idFile* bFile, ID_TIME_T sourceTimeSt
 	for( int i = 0; i < numImages; i++ )
 	{
 		idBinaryImageData& img = images[ i ];
+#if defined( DOMINION ) // Blue Textures Fix
+		if( bFile->Read( &img, sizeof( bimageImage_t ) ) != sizeof( bimageImage_t ) )
+#else
 		if( bFile->Read( &img, sizeof( bimageImage_t ) ) <= 0 )
+#endif
 		{
 			return false;
 		}
@@ -971,6 +1136,39 @@ bool idBinaryImage::LoadFromGeneratedFile( idFile* bFile, ID_TIME_T sourceTimeSt
 		swap.Big( img.width );
 		swap.Big( img.height );
 		swap.Big( img.dataSize );
+
+#if defined( DOMINION ) // Blue Textures Fix
+		// Each face/level must occur exactly once. Validate logical extents, legacy tiny cube
+		// headers, exact payload size and available bytes before allocating or uploading anything.
+		if( img.level < 0 || img.level >= fileData.numLevels || img.destZ < 0 || img.destZ >= faces || img.width < 1 || img.height < 1 || img.dataSize < 1 )
+		{
+			return false;
+		}
+		const int logicalWidth = Max( 1, fileData.width >> img.level );
+		const int logicalHeight = Max( 1, fileData.height >> img.level );
+		const bool legacyCube = blockCompressed && fileData.textureType == DTT_CUBIC;
+		// Bound multiplication before calculating byte counts, including malicious large float images.
+		if( !blockCompressed && int64( logicalWidth ) * logicalHeight > INT_MAX / Max( 1, bitsPerPixel / 8 ) )
+		{
+			return false;
+		}
+		// Bound the complete payload before multiplying rows, including large uncompressed formats.
+		// Even a 64-bit product can overflow when both dimensions come from a malformed header.
+		const int64 rowBytes = blockCompressed ? ( ( int64( logicalWidth ) + 3 ) / 4 ) * ( bitsPerPixel * 2 ) : int64( logicalWidth ) * ( bitsPerPixel / 8 );
+		const int64 rows = blockCompressed ? ( int64( logicalHeight ) + 3 ) / 4 : logicalHeight;
+		if( rowBytes < 1 || rowBytes > INT_MAX / rows )
+		{
+			return false;
+		}
+		const int64 expectedBytes = rowBytes * rows;
+		const int64 allocationBytes = fileData.format == FMT_RGB565 ? expectedBytes * 2 : expectedBytes;
+		if( ( img.width != logicalWidth && !( legacyCube && logicalWidth < 4 && img.width == 4 ) ) || ( img.height != logicalHeight && !( legacyCube && logicalHeight < 4 && img.height == 4 ) ) ||
+				expectedBytes != img.dataSize || allocationBytes > INT_MAX || expectedBytes > int64( bFile->Length() ) - bFile->Tell() || ( seenLevels[img.destZ] & ( 1u << img.level ) ) != 0 )
+		{
+			return false;
+		}
+		seenLevels[img.destZ] |= 1u << img.level;
+#else
 		assert( img.level >= 0 && img.level < fileData.numLevels );
 		assert( img.destZ == 0 || fileData.textureType == DTT_CUBIC );
 		assert( img.dataSize > 0 );
@@ -979,6 +1177,7 @@ bool idBinaryImage::LoadFromGeneratedFile( idFile* bFile, ID_TIME_T sourceTimeSt
 		// sizes are still retained, so the stored data size may be larger than
 		// just the multiplication of dimensions
 		assert( img.dataSize >= img.width * img.height * BitsForFormat( ( textureFormat_t )fileData.format ) / 8 );
+#endif
 
 #if ( defined( __APPLE__ ) && defined( USE_VULKAN ) ) || defined( USE_NVRHI )
 		int imgfile_dataSize = img.dataSize;
@@ -991,9 +1190,21 @@ bool idBinaryImage::LoadFromGeneratedFile( idFile* bFile, ID_TIME_T sourceTimeSt
 		// SRS - For compressed formats, match allocation to what NVRHI expects for the texture's mip variants
 		else if( ( textureFormat_t )fileData.format == FMT_DXT1 || ( textureFormat_t )fileData.format == FMT_DXT5 || ( textureFormat_t )fileData.format == FMT_BC6H || ( textureFormat_t )fileData.format == FMT_BC7 )
 		{
+#if defined( DOMINION ) // Blue Textures Fix
+			// The old allocation workaround enlarged dataSize for rounded GPU mips but left the extra bytes unread.
+			// Logical GPU extents now match the file, so preserve and validate the actual compressed payload size.
+			const int blockBytes = fileData.format == FMT_DXT1 ? 8 : 16;
+			const int64 expectedBytes = ( ( int64( img.width ) + 3 ) / 4 ) * ( ( int64( img.height ) + 3 ) / 4 ) * blockBytes;
+			if( img.width < 1 || img.height < 1 || expectedBytes != imgfile_dataSize )
+			{
+				return false;
+			}
+			img.Alloc( imgfile_dataSize );
+#else
 			int rowPitch = GetRowPitch( ( textureFormat_t )fileData.format, img.width );
 			int mipRows = ( ( ( ( fileData.height + 3 ) & ~3 ) >> img.level ) + 3 ) / 4;
 			img.Alloc( Max( img.dataSize, rowPitch * mipRows ) );
+#endif
 		}
 		else
 		{
@@ -1006,7 +1217,11 @@ bool idBinaryImage::LoadFromGeneratedFile( idFile* bFile, ID_TIME_T sourceTimeSt
 		}
 
 		// SRS - Read image data using actual on-disk data size
+#if defined( DOMINION ) // Blue Textures Fix
+		if( bFile->Read( img.data, imgfile_dataSize ) != imgfile_dataSize )
+#else
 		if( bFile->Read( img.data, imgfile_dataSize ) <= 0 )
+#endif
 		{
 			return false;
 		}

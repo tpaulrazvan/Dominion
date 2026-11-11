@@ -112,6 +112,11 @@ struct DeviceCreationParameters
 
 	// SRS - Used by RenderProgs to determine maximum push constant size (default = off, override during device init)
 	uint32_t maxPushConstantSize = 0;
+
+#if defined( DOMINION ) // blue textures
+	// D3D12 requires aligned BC base dimensions unless its active runtime reports otherwise
+	bool supportsUnalignedBlockTextures = false;
+#endif
 };
 
 struct DefaultMessageCallback : public nvrhi::IMessageCallback

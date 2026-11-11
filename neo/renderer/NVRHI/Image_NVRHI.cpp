@@ -487,11 +487,20 @@ void idImage::AllocImage()
 	uint originalWidth = opts.width;
 	uint originalHeight = opts.height;
 
+#if defined( DOMINION ) // blue textures fix
+	if( IsCompressed() && ( ( opts.width & 3 ) != 0 || ( opts.height & 3 ) != 0 ) &&
+			deviceManager->GetGraphicsAPI() == nvrhi::GraphicsAPI::D3D12 && !deviceManager->m_DeviceParams.supportsUnalignedBlockTextures )
+	{
+		common->Error( "Unaligned BC texture was not prepared: %s (%dx%d)", GetName(), opts.width, opts.height );
+		return;
+	}
+#else
 	if( IsCompressed() )
 	{
 		originalWidth = ( originalWidth + 3 ) & ~3;
 		originalHeight = ( originalHeight + 3 ) & ~3;
 	}
+#endif
 
 	uint scaledWidth = originalWidth;
 	uint scaledHeight = originalHeight;

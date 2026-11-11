@@ -60,6 +60,10 @@ public:
 	ID_TIME_T			LoadFromGeneratedFile( ID_TIME_T sourceFileTime );
 	ID_TIME_T			WriteGeneratedFile( ID_TIME_T sourceFileTime );
 
+#if defined( DOMINION ) // BLUE TEXTURES FIX
+	bool				ConvertNonBlockAlignedDXT();
+#endif
+
 	const bimageFile_t& GetFileHeader()
 	{
 		return fileData;
