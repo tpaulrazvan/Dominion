@@ -221,14 +221,21 @@ void idBinaryImage::Load2DFromMemory( int width, int height, const byte* pic_con
 
 			if( image_highQualityCompression.GetBool() )
 			{
+#if defined( DOMINION ) // BC6H Dimensions Fix
+				common->LoadPacifierBinarizeInfo( va( "(%d x %d) - BC6HQ", width, height ) );
+				dxt.CompressImageR11G11B10_BC6HQ( dxtPic, img.data, dxtWidth, dxtHeight );
+#else
 				common->LoadPacifierBinarizeInfo( va( "(%d x %d) - BC6HQ", width, width ) );
-
 				dxt.CompressImageR11G11B10_BC6HQ( dxtPic, img.data, dxtWidth, dxtWidth );
+#endif
 			}
 			else
 			{
+#if defined( DOMINION ) // BC6H Dimensions Fix
+				common->LoadPacifierBinarizeInfo( va( "(%d x %d) - BC6Fast", width, height ) );
+#else
 				common->LoadPacifierBinarizeInfo( va( "(%d x %d) - BC6Fast", width, width ) );
-
+#endif
 				dxt.CompressImageR11G11B10_BC6Fast( dxtPic, img.data, dxtWidth, dxtHeight );
 			}
 #endif
@@ -546,7 +553,6 @@ void idBinaryImage::Load2DAtlasMipchainFromMemory( int width, int height, const 
 		else if( textureFormat == FMT_BC6H )
 		{
 #if !defined(USE_INTRINSICS_SSE) && !defined(USE_INTRINSICS_NEON)
-
 			// RB: store as R11G11B10 because the generic fallback is too slow
 			fileData.format = textureFormat = FMT_R11G11B10F;
 			img.Alloc( scaledWidth * scaledHeight * 4 );
@@ -560,14 +566,20 @@ void idBinaryImage::Load2DAtlasMipchainFromMemory( int width, int height, const 
 
 			if( image_highQualityCompression.GetBool() )
 			{
+#if defined( DOMINION ) // BC6H Dimensions Fix
+				common->LoadPacifierBinarizeInfo( va( "(%d x %d) - BC6HQ", width, height ) );
+#else
 				common->LoadPacifierBinarizeInfo( va( "(%d x %d) - BC6HQ", width, width ) );
-
+#endif
 				dxt.CompressImageR11G11B10_BC6HQ( dxtPic, img.data, dxtWidth, dxtHeight );
 			}
 			else
 			{
+#if defined( DOMINION ) // BC6H DImensions Fix
+				common->LoadPacifierBinarizeInfo( va( "(%d x %d) - BC6Fast", width, height ) );
+#else
 				common->LoadPacifierBinarizeInfo( va( "(%d x %d) - BC6Fast", width, width ) );
-
+#endif
 				dxt.CompressImageR11G11B10_BC6Fast( dxtPic, img.data, dxtWidth, dxtHeight );
 			}
 #endif
