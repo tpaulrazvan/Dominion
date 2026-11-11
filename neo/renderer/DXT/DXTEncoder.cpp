@@ -6004,7 +6004,26 @@ void idDxtEncoder::CompressImageR11G11B10_BC6Fast_SIMD( const byte* inBuf, byte*
 
 void idDxtEncoder::CompressImageR11G11B10_BC6HQ( const byte* inBuf, byte* outBuf, int width, int height )
 {
+#if defined( DOMINION ) // this was not implemented
+//	assert( width >= 4 && height >= 4 && ( width & 3 ) == 0 && ( height & 3 ) == 0 );
+	if( width < 4 || height < 4 || ( width & 3 ) != 0 || ( height & 3 ) != 0 )
+	{
+		idLib::FatalError( "Invalid dimensions for BC6H HQ compression: %dx%d", width, height );
+		return;
+	}
+	idTempArray<halfFloat_t> fp16Pixels( width * height * 4 );
+	ConvertR11G11B10ImageToFP16( inBuf, width, height, fp16Pixels.Ptr() );
+	bc6h_enc_settings settings;
+	GetProfile_bc6h_slow( &settings );
+	rgba_surface surface;
+	surface.ptr = reinterpret_cast<unsigned char*>( fp16Pixels.Ptr() );
+	surface.width = width;
+	surface.height = height;
+	surface.stride = width * 4 * sizeof( halfFloat_t );
+	CompressBlocksBC6H( &surface, outBuf, &settings );
+#else
 	// TODO
 	idLib::FatalError( "idDxtEncoder::CompressImageR11G11B10_BC6HQ not implemented" );
+#endif
 }
 // RB end
