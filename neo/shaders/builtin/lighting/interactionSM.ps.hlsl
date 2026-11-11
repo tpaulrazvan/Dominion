@@ -51,7 +51,7 @@ SamplerState			s_Material : register( s0 VK_DESCRIPTOR_SET( 3 ) ); // for the no
 SamplerState 			s_Lighting : register( s1 VK_DESCRIPTOR_SET( 3 ) ); // for sampling the jitter
 SamplerComparisonState  s_Shadow   : register( s2 VK_DESCRIPTOR_SET( 3 ) ); // for the depth shadow map sampler with a compare function
 SamplerState 			s_Jitter   : register( s3 VK_DESCRIPTOR_SET( 3 ) ); // for sampling the jitter
-
+SamplerState			s_Diffuse : register( s4 VK_DESCRIPTOR_SET( 3 ) ); // diffuse filtering uses its own sampler // #if defined( DOMINION ) // nearest fix
 struct PS_IN
 {
 	float4 position		: SV_Position;
@@ -118,7 +118,8 @@ void main( PS_IN fragment, out PS_OUT result )
 	float4 bumpMap =		t_Normal.Sample( s_Material, bumpUV );
 	float4 lightFalloff =	idtex2Dproj( s_Lighting, t_LightFalloff, fragment.texcoord2 );
 	float4 lightProj =		idtex2Dproj( s_Lighting, t_LightProjection, fragment.texcoord3 );
-	float4 YCoCG =			t_BaseColor.Sample( s_Material, baseUV );
+//	float4 YCoCG =			t_BaseColor.Sample( s_Material, baseUV );
+	float4 YCoCG =			t_BaseColor.Sample( s_Diffuse, baseUV );
 	float4 specMapSRGB =	t_Specular.Sample( s_Material, specUV );
 	float4 specMap =		sRGBAToLinearRGBA( specMapSRGB );
 

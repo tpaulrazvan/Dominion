@@ -309,6 +309,22 @@ idImage::GetSampler
 */
 void* idImage::GetSampler( SamplerCache& samplerCache )
 {
+#if defined( DOMINION ) // nearest fix
+	// Reuse the existing pixel-look for both ordinary image draws and material 'nearest' keyword.
+	// The old path modified a temporary descriptor but cached the unmodified one,
+	// and an already cached handle never changed when pixel look was toggled.
+	const bool pixelLook = R_UsePixelatedLook();
+	if( !sampler || samplerUsesPixelLook != pixelLook )
+	{
+		nvrhi::SamplerDesc effectiveDesc = samplerDesc;
+		if( pixelLook )
+		{
+			effectiveDesc.setAllFilters( false ).setMaxAnisotropy( 1.0f );
+		}
+		sampler = samplerCache.GetOrCreateSampler( effectiveDesc );
+		samplerUsesPixelLook = pixelLook;
+	}
+#else
 	if( R_UsePixelatedLook() )
 	{
 		if( !sampler )
@@ -328,6 +344,7 @@ void* idImage::GetSampler( SamplerCache& samplerCache )
 			sampler = samplerCache.GetOrCreateSampler( samplerDesc );
 		}
 	}
+#endif
 
 	return ( void* )sampler.Get();
 }

@@ -387,6 +387,20 @@ public:
 		return usage;
 	}
 
+#if defined( DOMINION ) // nearest fix
+	// 'nearest' keyword used the default image filtering and was not working
+	textureFilter_t GetFilter() const
+	{
+		return filter;
+	}
+	// lighting previously replaced every image sampler with its shared anisotropic sampler.
+	// expose the actual upload filter so lighting can honour 'nearest' keyword
+	bool UsesNearestSampling() const
+	{
+		return !samplerDesc.minFilter && !samplerDesc.magFilter;
+	}
+#endif
+
 	bool				IsLoaded() const;
 
 	// Creates a sampler for this texture to use in the shader.
@@ -463,6 +477,13 @@ private:
 	friend class idImageManager;
 
 	void				DeriveOpts();
+
+#if defined( DOMINION ) // nearest fix
+	void				RestoreSourceFormat();
+	textureFormat_t		uploadSourceFormat = FMT_NONE;
+	void				GenerateMissingImage( nvrhi::ICommandList* commandList );
+#endif
+
 	void				AllocImage();
 	void				SetSamplerState( textureFilter_t tf, textureRepeat_t tr );
 
@@ -492,6 +513,10 @@ private:
 	nvrhi::TextureHandle	texture;
 	nvrhi::SamplerHandle	sampler;
 	nvrhi::SamplerDesc		samplerDesc;
+
+#if defined( DOMINION ) // nearest fix
+	bool samplerUsesPixelLook = false;
+#endif
 
 #if defined( USE_AMD_ALLOCATOR )
 	VkImage					image;

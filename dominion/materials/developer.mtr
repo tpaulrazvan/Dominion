@@ -1,0 +1,13 @@
+textures/developer/debug/missing
+{
+	qer_editorimage			textures/developer/debug/DebugTexture.png
+	
+	diffuseMap				textures/developer/debug/DebugTexture.png
+/*
+	{
+		blend diffusemap
+		nearest
+		map					textures/developer/debug/DebugTexture.png
+	}
+*/
+}

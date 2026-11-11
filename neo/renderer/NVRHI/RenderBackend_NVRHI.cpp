@@ -1980,6 +1980,29 @@ void idRenderBackend::GetCurrentBindingLayout( int type )
 	{
 		common->FatalError( "Invalid binding set %d\n", renderProgManager.BindingLayoutType() );
 	}
+
+#if defined( DOMINION ) // nearest fix
+	// choose how the diffuse colour texture is sampled for the current lighting draw.
+	if( type == BINDING_LAYOUT_AMBIENT_LIGHTING_IBL || type == BINDING_LAYOUT_AMBIENT_LIGHTING_IBL_SKINNED || type == BINDING_LAYOUT_DRAW_INTERACTION || type == BINDING_LAYOUT_DRAW_INTERACTION_SKINNED || type == BINDING_LAYOUT_DRAW_INTERACTION_SM || type == BINDING_LAYOUT_DRAW_INTERACTION_SM_SKINNED )
+	{
+		idImage* const diffuseImage = GetImageAt( 2 );
+		nvrhi::ISampler* diffuseSampler = static_cast<nvrhi::ISampler*>( desc[3].bindings[0].resourceHandle );
+
+		if( diffuseImage != NULL && ( diffuseImage->UsesNearestSampling() || diffuseSampler == commonPasses.m_PointWrapSampler.Get() ) )
+		{
+			diffuseSampler = static_cast<nvrhi::ISampler*>( diffuseImage->GetSampler( samplerCache ) );
+		}
+		const size_t originalSamplers = type == BINDING_LAYOUT_DRAW_INTERACTION_SM || type == BINDING_LAYOUT_DRAW_INTERACTION_SM_SKINNED ? 4 : 2;
+		if( desc[3].bindings.size() == originalSamplers )
+		{
+			desc[3].bindings.push_back( nvrhi::BindingSetItem::Sampler( 4, diffuseSampler ) );
+		}
+		else
+		{
+			desc[3].bindings[originalSamplers].resourceHandle = diffuseSampler;
+		}
+	}
+#endif
 }
 
 /*
@@ -2336,6 +2359,16 @@ void idRenderBackend::CheckCVars()
 	}
 
 	// retro rendering
+#if defined( DOMINION ) // nearest fix
+	if( r_renderMode.IsModified() || image_pixelLook.IsModified() )
+	{
+		r_renderMode.ClearModified();
+		image_pixelLook.ClearModified();
+
+		// clear caches because PSX rendering will use nearest texture filtering instead of linear
+		ClearCaches();
+	}
+#else
 	if( r_renderMode.IsModified() )
 	{
 		r_renderMode.ClearModified();
@@ -2343,6 +2376,7 @@ void idRenderBackend::CheckCVars()
 		// clear caches because PSX rendering will use nearest texture filtering instead of linear
 		ClearCaches();
 	}
+#endif
 }
 
 /*

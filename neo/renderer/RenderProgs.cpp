@@ -489,13 +489,21 @@ void idRenderProgManager::Init( nvrhi::IDevice* device )
 									   .addItem( nvrhi::BindingLayoutItem::Sampler( 1 ) );	// (Clamp) Linear sampler: brdf lut sampler & ssao sampler
 	auto samplerTwoBindingLayout = device->createBindingLayout( samplerTwoBindingLayoutDesc );
 
+#if defined( DOMINION ) // nearest fix
+	// Fog/postprocessing also use the two-sampler layout.
+	// Extend a lighting-only copy so those unrelated passes do not require or accidentally inherit a diffuse sampler binding.
+	auto lightingSamplerLayoutDesc = samplerTwoBindingLayoutDesc;
+	lightingSamplerLayoutDesc.addItem( nvrhi::BindingLayoutItem::Sampler( 4 ) );
+	auto lightingSamplerLayout = device->createBindingLayout( lightingSamplerLayoutDesc );
+#endif
+
 	bindingLayouts[BINDING_LAYOUT_AMBIENT_LIGHTING_IBL] =
 	{
-		uniformsLayout( BINDING_LAYOUT_AMBIENT_LIGHTING_IBL, false ), defaultMaterialLayout, ambientIblLayout, samplerTwoBindingLayout
+		uniformsLayout( BINDING_LAYOUT_AMBIENT_LIGHTING_IBL, false ), defaultMaterialLayout, ambientIblLayout, lightingSamplerLayout /* DOMINION - nearest fix - was samplerTwoBindingLayout */
 	};
 	bindingLayouts[BINDING_LAYOUT_AMBIENT_LIGHTING_IBL_SKINNED] =
 	{
-		uniformsLayout( BINDING_LAYOUT_AMBIENT_LIGHTING_IBL_SKINNED, true ), defaultMaterialLayout, ambientIblLayout, samplerTwoBindingLayout
+		uniformsLayout( BINDING_LAYOUT_AMBIENT_LIGHTING_IBL_SKINNED, true ), defaultMaterialLayout, ambientIblLayout, lightingSamplerLayout /* DOMINION - nearest fix - was samplerTwoBindingLayout */
 	};
 
 	auto blitLayoutDesc = nvrhi::BindingLayoutDesc()
@@ -536,11 +544,11 @@ void idRenderProgManager::Init( nvrhi::IDevice* device )
 
 	bindingLayouts[BINDING_LAYOUT_DRAW_INTERACTION] =
 	{
-		uniformsLayout( BINDING_LAYOUT_DRAW_INTERACTION, false ), defaultMaterialLayout, interactionBindingLayout, samplerTwoBindingLayout
+		uniformsLayout( BINDING_LAYOUT_DRAW_INTERACTION, false ), defaultMaterialLayout, interactionBindingLayout, lightingSamplerLayout /* DOMINION - nearest fix - was samplerTwoBindingLayout */
 	};
 	bindingLayouts[BINDING_LAYOUT_DRAW_INTERACTION_SKINNED] =
 	{
-		uniformsLayout( BINDING_LAYOUT_DRAW_INTERACTION_SKINNED, true ), defaultMaterialLayout, interactionBindingLayout, samplerTwoBindingLayout
+		uniformsLayout( BINDING_LAYOUT_DRAW_INTERACTION_SKINNED, true ), defaultMaterialLayout, interactionBindingLayout, lightingSamplerLayout /* DOMINION - nearest fix - was samplerTwoBindingLayout */
 	};
 
 	auto interactionSmBindingLayoutDesc = nvrhi::BindingLayoutDesc()
@@ -558,6 +566,10 @@ void idRenderProgManager::Init( nvrhi::IDevice* device )
 										.addItem( nvrhi::BindingLayoutItem::Sampler( 1 ) )	 // lighting
 										.addItem( nvrhi::BindingLayoutItem::Sampler( 2 ) )	 // shadow compare
 										.addItem( nvrhi::BindingLayoutItem::Sampler( 3 ) );	 // blue noise for shadow jitter
+#if defined( DOMINION ) // nearest fix
+	samplerFourBindingLayoutDesc.addItem( nvrhi::BindingLayoutItem::Sampler( 4 ) );	// shadows reserve samplers 0..3; slot 4 samples diffuse colour
+
+#endif
 	auto samplerFourBindingLayout = device->createBindingLayout( samplerFourBindingLayoutDesc );
 
 	bindingLayouts[BINDING_LAYOUT_DRAW_INTERACTION_SM] =

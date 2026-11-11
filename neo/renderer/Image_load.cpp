@@ -142,6 +142,91 @@ int GetRowPitch( const textureFormat_t& format, int width )
 	return width * ( bpe / 8 );
 }
 
+#if defined( DOMINION ) // nearest fix
+void idImage::RestoreSourceFormat()
+{
+	if( uploadSourceFormat != FMT_NONE )
+	{
+		opts.format = uploadSourceFormat;
+		uploadSourceFormat = FMT_NONE;
+	}
+}
+
+/*
+========================
+idImage::GenerateMissingImage
+========================
+*/
+void idImage::GenerateMissingImage( nvrhi::ICommandList* commandList )
+{
+	byte* debugPixels = NULL;
+	int width = 0;
+	int height = 0;
+	textureFilter_t debugFilter = filter;
+
+	if( usage == TD_DIFFUSE )
+	{
+		const idMaterial* debugMaterial = declManager->FindMaterial( "textures/developer/debug/missing", false );
+		if( debugMaterial != NULL && debugMaterial->GetState() != DS_DEFAULTED )
+		{
+			for( int i = 0; i < debugMaterial->GetNumStages(); ++i )
+			{
+				const shaderStage_t* stage = debugMaterial->GetStage( i );
+				if( stage->lighting == SL_DIFFUSE && stage->texture.image != NULL && stage->texture.image != this )
+				{
+					debugFilter = stage->texture.image->GetFilter();
+					ID_TIME_T debugTime = FILE_NOT_FOUND_TIMESTAMP;
+					textureUsage_t debugUsage = TD_DIFFUSE;
+					R_LoadImageProgram( stage->texture.image->GetName(), &debugPixels, &width, &height, &debugTime, &debugUsage );
+					break;
+				}
+			}
+		}
+	}
+
+	if( debugPixels != NULL )
+	{
+		const textureFormat_t sourceFormat = opts.format;
+		opts.format = FMT_RGBA8;
+		const textureFilter_t sourceFilter = filter;
+		GenerateImage( debugPixels, width, height, debugFilter, repeat, usage, commandList );
+		filter = sourceFilter;
+
+		uploadSourceFormat = sourceFormat;
+		Mem_Free( debugPixels );
+	}
+	else
+	{
+		// Zero is not black in YCoCg
+		// Store exact encoded black for the missing diffuse image
+		opts.width = 8;
+		opts.height = 8;
+		opts.numLevels = 1;
+		uploadSourceFormat = opts.format;
+		opts.format = FMT_RGBA8;
+		AllocImage();
+		byte pixels[8 * 8 * 4] = {};
+		for( int i = 0; i < 8 * 8; ++i )
+		{
+			if( opts.colorFormat == CFM_YCOCG_DXT5 )
+			{
+				pixels[i * 4 + 0] = 128;
+				pixels[i * 4 + 1] = 128;
+			}
+		}
+#if defined( USE_NVRHI ) && !defined( DMAP )
+		commandList->beginTrackingTextureState( texture, nvrhi::AllSubresources, nvrhi::ResourceStates::Common );
+		commandList->writeTexture( texture, 0, 0, pixels, 8 * 4 );
+		commandList->setPermanentTextureState( texture, nvrhi::ResourceStates::ShaderResource );
+		commandList->commitBarriers();
+#endif
+		isLoaded = true;
+	}
+	defaulted = true;
+}
+#endif
+
+
 /*
 ========================
 idImage::DeriveOpts
@@ -339,6 +424,10 @@ GenerateImage
 */
 void idImage::GenerateImage( const byte* pic, int width, int height, textureFilter_t filterParm, textureRepeat_t repeatParm, textureUsage_t usageParm, nvrhi::ICommandList* commandList, bool isRenderTarget, bool isUAV, uint sampleCount, cubeFiles_t _cubeFiles )
 {
+#if defined( DOMINION )
+	RestoreSourceFormat();
+#endif
+
 	PurgeImage();
 
 	filter = filterParm;
@@ -427,6 +516,10 @@ Non-square cube sides are not allowed
 */
 void idImage::GenerateCubeImage( const byte* pic[6], int size, textureFilter_t filterParm, textureUsage_t usageParm, nvrhi::ICommandList* commandList )
 {
+#if defined( DOMINION )
+	RestoreSourceFormat();
+#endif
+
 	PurgeImage();
 
 	filter = filterParm;
@@ -555,6 +648,10 @@ void idImage::ActuallyLoadImage( bool fromBackEnd, nvrhi::ICommandList* commandL
 	{
 		return;
 	}
+
+#if defined( DOMINION ) // nearest fix
+	RestoreSourceFormat();
+#endif
 
 	// if we don't have a rendering context yet, just return
 	//if( !tr.IsInitialized() )
@@ -780,6 +877,14 @@ void idImage::ActuallyLoadImage( bool fromBackEnd, nvrhi::ICommandList* commandL
 			{
 				idLib::Warning( "Couldn't load image: %s : %s", GetName(), generatedName.c_str() );
 
+#if defined( DOMINION ) // nearest fix
+				// only diffuse images use this replacement
+				if( commandList != NULL && usage == TD_DIFFUSE )
+				{
+					GenerateMissingImage( commandList );
+					return;
+				}
+#endif
 				// create a default so it doesn't get continuously reloaded
 				opts.width = 8;
 				opts.height = 8;
