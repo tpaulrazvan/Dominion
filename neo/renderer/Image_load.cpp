@@ -470,7 +470,11 @@ void idImage::GenerateCubeImage( const byte* pic[6], int size, textureFilter_t f
 		const bimageImage_t& img = im.GetImageHeader( i );
 		const byte* data = im.GetImageData( i );
 
+#if defined( DOMINION ) // correct cubemap upload
+		commandList->writeTexture( texture, img.destZ, img.level, data, GetRowPitch( opts.format, img.width ) );
+#else
 		commandList->writeTexture( texture, 0, img.level, data, GetRowPitch( opts.format, img.width ) );
+#endif
 	}
 
 	commandList->setPermanentTextureState( texture, nvrhi::ResourceStates::ShaderResource );
