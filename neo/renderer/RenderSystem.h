@@ -280,7 +280,11 @@ public:
 	// registered before rendering any frames to prevent disk hits,
 	// but they can still be registered at a later time
 	// if necessary.
+#if defined( DOMINION ) // Original map reload - retain source assets
+	virtual void			BeginLevelLoad( bool reuseAssets = false ) = 0;
+#else
 	virtual void			BeginLevelLoad() = 0;
+#endif
 	virtual void			EndLevelLoad() = 0;
 	virtual void			Preload( const idPreloadManifest& manifest, const char* mapName ) = 0;
 	virtual void			LoadLevelImages() = 0;
@@ -377,6 +381,10 @@ public:
 	virtual void			CropRenderSize( int width, int height ) = 0;
 	virtual void            CropRenderSize( int x, int y, int width, int height, bool topLeftAncor ) = 0;
 	virtual void			CaptureRenderToImage( const char* imageName, bool clearColorAfterCopy = false ) = 0;
+#if defined( DOMINION ) // OLD GUIs - Objective picture TGA cache
+	// Queue writing an already captured image after GPU submission; safe from the game/draw thread.
+	virtual void WriteRenderImageToFile( const char *imageName, const char *fileName, const char *basePath = "fs_basepath" ) = 0;
+#endif
 	virtual void			UnCrop() = 0;
 
 	// the image has to be already loaded ( most straightforward way would be through a FindMaterial )

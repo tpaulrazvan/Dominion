@@ -30,6 +30,10 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "BinaryImageData.h"
 
+#if defined( DOMINION ) // Original assets - binary image cache
+extern idCVar binaryLoadImages;
+#endif
+
 /*
 ================================================
 idBinaryImage is used by the idImage class for constructing mipmapped
@@ -55,6 +59,10 @@ public:
 	void				Load2DFromMemory( int width, int height, const byte* pic_const, int numLevels, textureFormat_t& textureFormat, textureColor_t& colorFormat, bool gammaMips );
 	void				Load2DAtlasMipchainFromMemory( int width, int height, const byte* pic_const, int numLevels, textureFormat_t& textureFormat, textureColor_t& colorFormat );
 	void				LoadCubeFromMemory( int width, const byte* pics[6], int numLevels, textureFormat_t& textureFormat, bool gammaMips );
+
+#if defined( DOMINION ) && !defined( DMAP ) // Original assets - native DDS loading
+	bool LoadFromDDS( const char *imageProgram, const textureUsage_t usage, const ID_TIME_T sourceTime, const bool sourcePixels = false );
+#endif
 
 	bool				LoadFromGeneratedFile( idFile* f, ID_TIME_T sourceFileTime );
 	ID_TIME_T			LoadFromGeneratedFile( ID_TIME_T sourceFileTime );

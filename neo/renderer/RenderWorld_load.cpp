@@ -218,7 +218,11 @@ idRenderModel* idRenderWorldLocal::ParseShadowModel( idLexer* src, idFile* fileO
 
 	// NOTE: we do NOT do a model->FinishSurfaceces, because we don't need sil edges, planes, tangents, etc.
 
+#if defined( DOMINION ) // Original assets - binary cache policy
+	if( fileOut != NULL && model->SupportsBinaryModel() && fileSystem->UseBinaryAssets( binaryLoadRenderModels.GetBool() ) )
+#else
 	if( fileOut != NULL && model->SupportsBinaryModel() && binaryLoadRenderModels.GetBool() )
+#endif
 	{
 		model->WriteBinaryModel( fileOut, &mapTimeStamp );
 	}
@@ -390,7 +394,11 @@ idRenderModel* idRenderWorldLocal::ParseModel( idLexer* src, const char* mapName
 	// RB: FIXME add check for mikktspace
 	model->FinishSurfaces( false );
 
+#if defined( DOMINION ) // Original assets - binary cache policy
+	if( fileOut != NULL && model->SupportsBinaryModel() && fileSystem->UseBinaryAssets( binaryLoadRenderModels.GetBool() ) )
+#else
 	if( fileOut != NULL && model->SupportsBinaryModel() && binaryLoadRenderModels.GetBool() )
+#endif
 	{
 		model->WriteBinaryModel( fileOut, &mapTimeStamp );
 	}
@@ -758,6 +766,12 @@ void idRenderWorldLocal::FreeDefs()
 		R_StaticFree( interactionTable );
 		interactionTable = NULL;
 	}
+#if defined( DOMINION ) // OLD GUIs - Rebuilding 3D model previews
+	// A GUI can rebuild its empty world when switching models. Its table is freed
+	// above; stale dimensions would make ResizeInteractionTable copy from NULL.
+	interactionTableWidth = 0;
+	interactionTableHeight = 0;
+#endif
 
 	// free all lightDefs
 	for( int i = 0; i < lightDefs.Num(); i++ )
@@ -826,6 +840,10 @@ bool idRenderWorldLocal::InitFromMap( const char* name )
 		FreeWorld();
 		mapName.Clear();
 		ClearWorld();
+#if defined( DOMINION ) // OLD GUIs - Menu
+		// BFG lighting requires a table even without a map/GenerateAllInteractions.
+		ResizeInteractionTable();
+#endif
 		return true;
 	}
 
@@ -873,7 +891,11 @@ bool idRenderWorldLocal::InitFromMap( const char* name )
 	static const unsigned int BPROC_MAGIC = ( 'P' << 24 ) | ( 'R' << 16 ) | ( 'O' << 8 ) | BPROC_VERSION;
 #endif
 	bool loaded = false;
+#if defined( DOMINION ) // Original assets - binary world cache
+	idFileLocal file( fileSystem->UseBinaryAssets() ? fileSystem->OpenFileReadMemory( generatedFileName ) : NULL );
+#else
 	idFileLocal file( fileSystem->OpenFileReadMemory( generatedFileName ) );
+#endif
 	if( file != NULL )
 	{
 		int numEntries = 0;
@@ -964,7 +986,11 @@ bool idRenderWorldLocal::InitFromMap( const char* name )
 		}
 
 		int numEntries = 0;
+#if defined( DOMINION ) // Original assets - binary world cache
+		idFileLocal outputFile( fileSystem->UseBinaryAssets() ? fileSystem->OpenFileWrite( generatedFileName, "fs_basepath" ) : NULL );
+#else
 		idFileLocal outputFile( fileSystem->OpenFileWrite( generatedFileName, "fs_basepath" ) );
+#endif
 		if( outputFile != NULL )
 		{
 			int magic = BPROC_MAGIC;

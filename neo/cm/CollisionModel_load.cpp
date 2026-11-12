@@ -3687,6 +3687,12 @@ idCollisionModelManagerLocal::LoadBinaryModel
 */
 cm_model_t* idCollisionModelManagerLocal::LoadBinaryModel( const char* fileName, ID_TIME_T sourceTimeStamp )
 {
+#if defined( DOMINION ) // Original assets - binary collision cache
+	if( !fileSystem->UseBinaryAssets() )
+	{
+		return NULL;
+	}
+#endif
 	idFileLocal file( fileSystem->OpenFileReadMemory( fileName ) );
 	if( file == NULL )
 	{
@@ -3837,6 +3843,12 @@ idCollisionModelManagerLocal::WriteBinaryModel
 */
 void idCollisionModelManagerLocal::WriteBinaryModel( cm_model_t* model, const char* fileName, ID_TIME_T sourceTimeStamp )
 {
+#if defined( DOMINION ) // Original assets - binary collision cache
+	if( !fileSystem->UseBinaryAssets() )
+	{
+		return;
+	}
+#endif
 	idFileLocal file( fileSystem->OpenFileWrite( fileName, "fs_basepath" ) );
 	if( file == NULL )
 	{
@@ -3889,6 +3901,9 @@ cm_model_t* idCollisionModelManagerLocal::LoadRenderModel( const char* fileName 
 	{
 		return model;
 	}
+#if defined( DOMINION ) // Original assets - avoid reporting a disabled cache write
+	if( fileSystem->UseBinaryAssets() )
+#endif
 	idLib::Printf( "Writing %s\n", generatedFileName.c_str() );
 
 	model = AllocModel();

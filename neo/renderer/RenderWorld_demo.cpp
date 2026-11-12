@@ -211,6 +211,10 @@ bool		idRenderWorldLocal::ProcessDemoCommand( idDemoFile* readDemo, renderView_t
 			break;
 		}
 		case DC_RENDERVIEW:
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+		// Legacy views have no flags payload; extended views preserve portal-camera identity.
+		case DC_RENDERVIEW_FLAGS:
+#endif
 		{
 			readDemo->ReadInt( renderView->viewID );
 			readDemo->ReadFloat( renderView->fov_x );
@@ -235,10 +239,24 @@ bool		idRenderWorldLocal::ProcessDemoCommand( idDemoFile* readDemo, renderView_t
 				return false;
 			}
 
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+			// Reset for every view so a normal player view cannot inherit the portal's flags.
+			renderView->rdflags = 0;
+			if( dc == DC_RENDERVIEW_FLAGS && !readDemo->ReadInt( renderView->rdflags ) )
+			{
+				return false;
+			}
+#endif
+
 			if( r_showDemo.GetBool() )
 			{
 				// foresthale 2014-05-19: /analyze fix - was time, changed to time[0]
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+				// Expose the restored flags through the existing demo diagnostic switch.
+				common->Printf( "%s: %i flags=%d\n", dc == DC_RENDERVIEW_FLAGS ? "DC_RENDERVIEW_FLAGS" : "DC_RENDERVIEW", renderView->time[0], renderView->rdflags );
+#else
 				common->Printf( "DC_RENDERVIEW: %i\n", renderView->time[ 0 ] );
+#endif
 			}
 
 			// possibly change the time offset if this is from a new map
@@ -299,12 +317,24 @@ bool		idRenderWorldLocal::ProcessDemoCommand( idDemoFile* readDemo, renderView_t
 			break;
 		}
 		case DC_CAPTURE_RENDER:
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+		// Both commands carry the same image name; the new opcode restores the discard flag.
+		case DC_CAPTURE_RENDER_CLEAR:
+#endif
 		{
 			if( r_showDemo.GetBool() )
 			{
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+				common->Printf( "%s\n", dc == DC_CAPTURE_RENDER_CLEAR ? "DC_CAPTURE_RENDER_CLEAR" : "DC_CAPTURE_RENDER" );
+#else
 				common->Printf( "DC_CAPTURE_RENDER\n" );
+#endif
 			}
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+			renderSystem->CaptureRenderToImage( readDemo->ReadHashString(), dc == DC_CAPTURE_RENDER_CLEAR );
+#else
 			renderSystem->CaptureRenderToImage( readDemo->ReadHashString() );
+#endif
 			break;
 		}
 		case DC_CROP_RENDER:
@@ -602,7 +632,12 @@ void	idRenderWorldLocal::WriteRenderView( const renderView_t* renderView )
 
 	// write the actual view command
 	common->WriteDemo()->WriteInt( DS_RENDER );
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+	// The portal flag controls exposure/TAA isolation during playback as well as live rendering.
+	common->WriteDemo()->WriteInt( renderView->rdflags != 0 ? DC_RENDERVIEW_FLAGS : DC_RENDERVIEW );
+#else
 	common->WriteDemo()->WriteInt( DC_RENDERVIEW );
+#endif
 	common->WriteDemo()->WriteInt( renderView->viewID );
 	common->WriteDemo()->WriteFloat( renderView->fov_x );
 	common->WriteDemo()->WriteFloat( renderView->fov_y );
@@ -620,6 +655,13 @@ void	idRenderWorldLocal::WriteRenderView( const renderView_t* renderView )
 		common->WriteDemo()->WriteFloat( renderView->shaderParms[i] );
 	}
 	common->WriteDemo()->WriteInt( ( int& )renderView->globalMaterial );
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+	// Append only to the extended opcode; legacy version-3 view records stay readable.
+	if( renderView->rdflags != 0 )
+	{
+		common->WriteDemo()->WriteInt( renderView->rdflags );
+	}
+#endif
 
 	if( r_showDemo.GetBool() )
 	{

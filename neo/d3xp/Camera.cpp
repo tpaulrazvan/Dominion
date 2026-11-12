@@ -426,7 +426,11 @@ void idCameraAnim::LoadAnim()
 	ID_TIME_T sourceTimeStamp = currentTimeStamp;
 
 
+#if defined( DOMINION ) // Original assets - binary camera cache
+	if( fileSystem->UseBinaryAssets() && ( generatedTimeStamp != FILE_NOT_FOUND_TIMESTAMP ) && ( sourceTimeStamp != 0 ) && ( sourceTimeStamp < generatedTimeStamp ) )
+#else
 	if( ( generatedTimeStamp != FILE_NOT_FOUND_TIMESTAMP ) && ( sourceTimeStamp != 0 ) && ( sourceTimeStamp < generatedTimeStamp ) )
+#endif
 	{
 		idFileLocal file( fileSystem->OpenFileReadMemory( generatedFileName ) );
 		LoadBinaryCamAnim( file, currentTimeStamp );
@@ -512,8 +516,16 @@ void idCameraAnim::LoadAnim()
 			parser.ExpectTokenString( "}" );
 		}
 
+#if defined( DOMINION ) // Original assets - binary camera cache
+		if( fileSystem->UseBinaryAssets() )
+		{
+			idFileLocal file( fileSystem->OpenFileWrite( generatedFileName, "fs_basepath" ) );
+			WriteBinaryCamAnim( file );
+		}
+#else
 		idFileLocal file( fileSystem->OpenFileWrite( generatedFileName, "fs_basepath" ) );
 		WriteBinaryCamAnim( file );
+#endif
 	}
 }
 

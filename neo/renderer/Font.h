@@ -63,6 +63,21 @@ private:
 	int	GetGlyphIndex( uint32 idx ) const;
 
 	bool LoadFont();
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	struct originalFontInfo_t {
+		scaledGlyphInfo_t glyphs[3][256];
+		float glyphScale[3];
+		float maxWidth[3];
+		float maxHeight[3];
+	};
+	originalFontInfo_t* originalFont;
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	bool LoadOriginalFont( const char* fontDirectory = NULL );
+#else
+	bool LoadOriginalFont();
+#endif
+	int OriginalFontSize( float scale ) const;
+#endif
 
 	struct glyphInfo_t
 	{

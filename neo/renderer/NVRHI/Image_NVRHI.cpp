@@ -261,8 +261,91 @@ CopyFramebuffer
 */
 void idImage::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight )
 {
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+	// Legacy direct callers capture the ordinary final colour with native fullscreen UVs.
+	CopyFramebufferFrom( globalImages->ldrImage->GetTextureHandle(), x, y, imageWidth, imageHeight, false );
+#else
 	backEnd.pc.c_copyFrameBuffer++;
+#endif
 }
+
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+/*
+====================
+idImage::CopyFramebufferFrom
+Keep capture source, region and orientation explicit. Resolve MSAA before sampling;
+the blit handles cropping, scaling and compatible colour-format conversion.
+====================
+*/
+bool idImage::CopyFramebufferFrom( nvrhi::ITexture *source, int x, int y, int imageWidth, int imageHeight, bool flipY )
+{
+	if( source == NULL )
+	{
+		return false;
+	}
+	const nvrhi::TextureDesc &sourceDesc = source->getDesc();
+	if( imageWidth <= 0 || imageHeight <= 0 || x < 0 || y < 0 ||
+		x > int( sourceDesc.width ) - imageWidth || y > int( sourceDesc.height ) - imageHeight || source == texture.Get() )
+	{
+		common->Warning( "CopyFramebuffer: invalid region or aliased source for %s", GetName() );
+		return false;
+	}
+
+	const bool sharedTarget = this == globalImages->currentRenderImage || this == globalImages->accumImage;
+	const textureFormat_t sourceFormat = sourceDesc.format == nvrhi::Format::RGBA16_FLOAT ? FMT_RGBA16F : FMT_RGBA8;
+	if( sourceDesc.format != nvrhi::Format::RGBA16_FLOAT && sourceDesc.format != nvrhi::Format::RGBA8_UNORM )
+	{
+		common->Warning( "CopyFramebuffer: unsupported source format for %s", GetName() );
+		return false;
+	}
+	if( !opts.isRenderTarget || !texture || ( !sharedTarget &&
+		( opts.width != imageWidth || opts.height != imageHeight || opts.format != sourceFormat ) ) )
+	{
+		// Keep shared HDR/accumulation allocations. Only private capture images follow the crop size.
+		idImageOpts captureOpts;
+		captureOpts.format = sourceFormat;
+		captureOpts.width = imageWidth;
+		captureOpts.height = imageHeight;
+		captureOpts.numLevels = 1;
+		captureOpts.isRenderTarget = true;
+		AllocImage( captureOpts, TF_LINEAR, TR_CLAMP );
+		isLoaded = true;
+	}
+
+	nvrhi::TextureHandle resolved;
+	if( sourceDesc.sampleCount > 1 )
+	{
+		nvrhi::TextureDesc resolveDesc = sourceDesc;
+		resolveDesc.dimension = nvrhi::TextureDimension::Texture2D;
+		resolveDesc.sampleCount = 1;
+		resolveDesc.sampleQuality = 0;
+		resolveDesc.debugName = "Resolved capture source";
+		resolved = deviceManager->GetDevice()->createTexture( resolveDesc );
+		backEnd.GL_GetCommandList()->resolveTexture( resolved, nvrhi::AllSubresources, source, nvrhi::AllSubresources );
+		source = resolved;
+	}
+	nvrhi::FramebufferHandle target = deviceManager->GetDevice()->createFramebuffer( nvrhi::FramebufferDesc().addColorAttachment( texture ) );
+	BlitParameters blitParms;
+	blitParms.sourceTexture = source;
+	blitParms.targetFramebuffer = target;
+	blitParms.targetViewport = nvrhi::Viewport( opts.width, opts.height );
+	blitParms.sourceBox = idVec4( float( x ) / sourceDesc.width,
+		float( flipY ? y + imageHeight : y ) / sourceDesc.height,
+		float( imageWidth ) / sourceDesc.width, float( flipY ? -imageHeight : imageHeight ) / sourceDesc.height );
+#if defined( DOMINION ) // Fullscreen damage effects must not inherit glass opacity
+	if( this == globalImages->currentRenderImage )
+	{
+		// PlayerView blends a colour snapshot, not the scene's material alpha masks.
+		// Preserve opaque alpha while copying RGB; otherwise glass masks limit double vision.
+		backEnd.GL_GetCommandList()->clearTextureFloat( texture, nvrhi::AllSubresources, nvrhi::Color( 0.f, 0.f, 0.f, 1.f ) );
+		blitParms.blendState.setColorWriteMask( nvrhi::ColorMask::Red | nvrhi::ColorMask::Green | nvrhi::ColorMask::Blue );
+	}
+#endif
+	backEnd.GetCommonPasses().BlitTexture( backEnd.GL_GetCommandList(), blitParms );
+	backEnd.pc.c_copyFrameBuffer++;
+	return true;
+}
+#endif
 
 /*
 ====================
@@ -405,6 +488,12 @@ void idImage::AllocImage()
 		case FMT_DXT1:
 			format = nvrhi::Format::BC1_UNORM;
 			break;
+
+#if defined( DOMINION ) // Original assets - preserve native DDS BC2 blocks
+		case FMT_DXT3:
+			format = nvrhi::Format::BC2_UNORM;
+			break;
+#endif
 
 		case FMT_DXT5:
 			format = nvrhi::Format::BC3_UNORM;

@@ -76,7 +76,12 @@ If you have questions concerning this license or the applicable additional terms
 	// <= Doom v1.1: 1. no DS_VERSION token ( default )
 	// Doom v1.2:  2
 	// Doom 3 BFG: 3
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+	// Version 4 preserves capture discard and view flags; older engines reject it at the header.
+	#define RENDERDEMO_VERSION				4
+#else
 	#define RENDERDEMO_VERSION				3
+#endif
 #endif
 
 // win32 info

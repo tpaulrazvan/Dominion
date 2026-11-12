@@ -3538,6 +3538,11 @@ void idFuncRadioChatter::Event_Activate( idEntity* activator )
 {
 	idPlayer* player = gameLocal.GetLocalPlayer();
 
+#if defined( DOMINION ) // OLD GUIs - HUD
+	if( player != NULL && player->guiHud != NULL ) {
+		player->guiHud->HandleNamedEvent( "radioChatterUp" );
+	}
+#endif
 	if( player != NULL && player->hudManager )
 	{
 		player->hudManager->SetRadioMessage( true );
@@ -3565,6 +3570,11 @@ void idFuncRadioChatter::Event_ResetRadioHud( idEntity* activator )
 {
 	idPlayer* player = ( activator->IsType( idPlayer::Type ) ) ? static_cast<idPlayer*>( activator ) : gameLocal.GetLocalPlayer();
 
+#if defined( DOMINION ) // OLD GUIs - HUD
+	if( player != NULL && player->guiHud != NULL ) {
+		player->guiHud->HandleNamedEvent( "radioChatterDown" );
+	}
+#endif
 	if( player != NULL && player->hudManager )
 	{
 		player->hudManager->SetRadioMessage( false );

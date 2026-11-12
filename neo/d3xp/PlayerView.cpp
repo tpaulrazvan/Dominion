@@ -34,6 +34,24 @@ If you have questions concerning this license or the applicable additional terms
 // _D3XP : rename all gameLocal.time to gameLocal.slow.time for merge!
 
 const int IMPULSE_DELAY = 150;
+#if defined( DOMINION ) // Original assets - fullscreen effect material fallback
+/*
+==================
+FindOriginalFullscreenMaterial
+Keep a supplied BFG effect, then try RoE's original material. Base Doom 3 has
+neither set: its ordinary coloured framebuffer material supplies the copy/blend.
+==================
+*/
+static const idMaterial *FindOriginalFullscreenMaterial( const char *bfgName, const char *originalName )
+{
+	const idMaterial *material = declManager->FindMaterial( bfgName, false );
+	if( material == NULL )
+	{
+		material = declManager->FindMaterial( originalName, false );
+	}
+	return material != NULL ? material : declManager->FindMaterial( "_currentRender" );
+}
+#endif
 /*
 ==============
 idPlayerView::idPlayerView
@@ -335,7 +353,13 @@ void idPlayerView::DamageImpulse( idVec3 localKickDir, const idDict* damageDef )
 	//
 	// save lastDamageTime for tunnel vision accentuation
 	//
+#if defined( DOMINION ) // Damage feedback after slow motion
+	// The cooldown above and ClearEffects use slow time, as in dhewm3. Recording fast
+	// time here could reject later hits after the two clocks diverged during slow motion.
+	lastDamageTime = MS2SEC( gameLocal.slow.time );
+#else
 	lastDamageTime = MS2SEC( gameLocal.fast.time );
+#endif
 
 }
 
@@ -441,6 +465,12 @@ void idPlayerView::SingleView( const renderView_t* view, idMenuHandler_HUD* hudM
 	// if the objective system is up, don't do normal drawing
 	if( player->objectiveSystemOpen )
 	{
+#if defined( DOMINION ) // OLD GUIs - PDA
+		if( player->objectiveSystem != NULL ) {
+			player->UpdateGuiPDA();
+		}
+		else
+#endif
 		if( player->pdaMenu != NULL )
 		{
 			player->pdaMenu->Update();
@@ -456,8 +486,21 @@ void idPlayerView::SingleView( const renderView_t* view, idMenuHandler_HUD* hudM
 	{
 		renderView_t portalView = hackedView;
 		portalView.vieworg = gameLocal.portalSkyEnt.GetEntity()->GetPhysics()->GetOrigin();
+#if defined( DOMINION ) // Portal sky fix
+		// The portal camera shares orientation with the player but has independent screen-space state.
+		portalView.rdflags |= RDF_PORTALSKY;
+		// Match remote cameras: a portal view must not draw surfaces restricted to the player's view ID.
+		portalView.viewID = 0;
+#endif
 		gameRenderWorld->RenderScene( &portalView );
+#if defined( DOMINION ) // Portal sky fix
+		// Retain the captured sky image, then discard the auxiliary colour so uncovered main-view
+		// pixels cannot expose it outside sky surfaces. Direct mirror underlays remain unchanged.
+		// Postprocessing overwrites _currentRender even when the portal camera is inactive.
+		renderSystem->CaptureRenderToImage( "_portalSky", true );
+#else
 		renderSystem->CaptureRenderToImage( "_currentRender" );
+#endif
 
 		hackedView.forceUpdate = true;				// FIX: for smoke particles not drawing when portalSky present
 	}
@@ -1395,6 +1438,13 @@ FullscreenFX_EnviroSuit::Initialize
 */
 void FullscreenFX_EnviroSuit::Initialize()
 {
+#if defined( DOMINION ) // Original assets - fullscreen effect material fallback
+	if( fileSystem->IsDoom2004() )
+	{
+		material = FindOriginalFullscreenMaterial( "textures/d3bfg/enviro_suit", "textures/smf/enviro_suit" );
+		return;
+	}
+#endif
 	material = declManager->FindMaterial( "textures/d3bfg/enviro_suit" );
 }
 
@@ -1437,6 +1487,15 @@ FullscreenFX_DoubleVision::Initialize
 */
 void FullscreenFX_DoubleVision::Initialize()
 {
+#if defined( DOMINION ) // Original assets - fullscreen effect material fallback
+	// The original base game's double vision is a coloured framebuffer blend,
+	// not an image named textures/d3bfg/doubleVision (which is absent there).
+	if( fileSystem->IsDoom2004() )
+	{
+		material = FindOriginalFullscreenMaterial( "textures/d3bfg/doubleVision", "textures/smf/doubleVision" );
+		return;
+	}
+#endif
 	material = declManager->FindMaterial( "textures/d3bfg/doubleVision" );
 }
 
@@ -1838,6 +1897,13 @@ void FullscreenFXManager::Initialize( idPlayerView* pv )
 {
 	// set the playerview
 	playerView = pv;
+#if defined( DOMINION ) // Original assets - fullscreen effect material fallback
+	if( fileSystem->IsDoom2004() )
+	{
+		blendBackMaterial = FindOriginalFullscreenMaterial( "textures/d3bfg/blendBack", "textures/smf/blendBack" );
+	}
+	else
+#endif
 	blendBackMaterial = declManager->FindMaterial( "textures/d3bfg/blendBack" );
 
 	// allocate the fx
@@ -1959,10 +2025,14 @@ void FullscreenFXManager::Process( const renderView_t* view )
 			// handle the accum pass if we have one
 			if( pfx->HasAccum() )
 			{
-				pfx->AccumPass( view );
-				// we need to crop the accum pass
-				//
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+				// Render at the requested accumulation resolution before capturing that rectangle.
 				renderSystem->CropRenderSize( 512, 512 );
+				pfx->AccumPass( view );
+#else
+				pfx->AccumPass( view );
+				renderSystem->CropRenderSize( 512, 512 );
+#endif
 				renderSystem->CaptureRenderToImage( "_accum" );
 				renderSystem->UnCrop();
 			}

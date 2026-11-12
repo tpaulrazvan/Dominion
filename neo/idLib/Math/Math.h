@@ -45,6 +45,10 @@ If you have questions concerning this license or the applicable additional terms
 	#undef FLOAT_EPSILON
 #endif
 
+#ifdef DBL_EPSILON
+	#undef DBL_EPSILON
+#endif
+
 #define DEG2RAD(a)				( (a) * idMath::M_DEG2RAD )
 #define RAD2DEG(a)				( (a) * idMath::M_RAD2DEG )
 
@@ -58,6 +62,9 @@ If you have questions concerning this license or the applicable additional terms
 #define	BYTE2ANGLE(x)			( (x) * ( 360.0f / 256.0f ) )
 
 #define C_FLOAT_TO_INT( x )		(int)(x)
+
+
+#define C_FLOAT_TO_ULONG(x) (unsigned long)(x)
 
 /*
 ================================================================================================
@@ -128,7 +135,7 @@ ID_INLINE_EXTERN int INT32_SIGNBITNOTSET( int i )
 #define IEEE_FLT_EXPONENT_BITS		8
 #define IEEE_FLT_EXPONENT_BIAS		127
 #define IEEE_FLT_SIGN_BIT			31
-#define IEEE_FLT_SIGN_MASK			( 1UL << IEEE_FLT_SIGN_BIT )
+#define IEEE_FLT_SIGN_MASK			( 1UL << IEEE_FLT_SIGN_BIT )	// Keep the L or not ??
 
 #define IEEE_DBL_MANTISSA_BITS		52
 #define IEEE_DBL_EXPONENT_BITS		11
@@ -253,6 +260,8 @@ ID_INLINE_EXTERN bool IsValid( const type& v )
 /*
 ========================
 IsValid
+
+This should be a template ???
 ========================
 */
 template<>
@@ -265,6 +274,8 @@ bool IsValid( const float& f )  	// these parameter must be a reference for the 
 /*
 ========================
 IsNAN
+
+This should be a template ???
 ========================
 */
 template<>
@@ -354,6 +365,34 @@ template<class T> ID_INLINE T	Cube( T x )
 	return x * x * x;
 }
 
+// ADD Templated CLAMP ???
+#if 0
+template<class T>
+inline T idMath::Clamp( const T& i, const T& mi, const T& ma )
+{
+	return i > ma ? ma : ( i < mi ? mi : i );
+}
+#endif
+
+#if 0
+inline float idMath::IntBitsToFloat( int i )
+{
+	union bit
+	{
+		int i = 0;
+		float f;
+	} u;
+	memset( &u, 0, sizeof( union bit ) );
+	u.i = i;
+	return u.f;
+}
+// NETLizard
+//ID_INLINE float IntBitsToFloat( uint32_t bits )
+//{
+//	return std::bit_cast<float>(bits);
+//}
+#endif
+
 class idMath
 {
 public:
@@ -369,6 +408,57 @@ public:
 	static float				Sqrt16( float x );			// square root with 16 bits precision
 
 	static float				Sin( float a );				// sine with 32 bits precision
+
+	// Documentation from BOOM3
+	// https://github.com/libretro/boom3/commit/e87ec65e93dcb4d486417a195e622d638ec39077
+	/*	Commit
+		idlib: document what the *16 math functions actually do
+		Two comments in Math.h describe behaviour the code does not have.
+
+		FtoiFast is named for, and its MSVC branch comments, round-to-nearest
+		via fistp. Every other target - which is every target we ship - falls
+		through to a plain (int) cast, i.e. truncation toward zero. This is
+		visible in ANGLE2SHORT/ANGLE2BYTE, so network angle quantisation does
+		not match the original 32-bit Windows build. It is consistent across
+		our targets and so not a determinism problem, and changing it would
+		alter behaviour relative to shipped builds, so the behaviour is left
+		alone and only the comment is corrected. (Also fixes 'rouding'.)
+
+		The 'maximum absolute error' figures on the *16 trig functions are the
+		minimax polynomial's error in double. Evaluated in float, as the code
+		does, rounding of the Horner chain dominates and measured error is
+		~1e-07 - about 100x the quoted 2.3082e-09 for Sin16/Cos16, and 13x the
+		quoted figure for ATan16. Measured against libm over the full float
+		exponent range.
+
+		Sin16/Cos16 additionally lose accuracy with argument magnitude, because
+		range reduction uses a float TWO_PI that is 2.78e-08 off 2*pi and
+		reduction scales that by the quotient. Measured: 2.27e-04 at |a|~2^11,
+		5.99e-02 at |a|~2^19, 8.74e-01 at |a|~2^23. idMath::Sin holds at
+		3.2e-08 throughout because it calls libm, which reduces properly.
+
+		In practice this is minor: the callers passing unbounded time-derived
+		arguments - AI.cpp fly bob and aim error, Weapon.cpp trace jitter - are
+		all cosmetic, and see ~3.8e-04 error at an hour of playtime. Documented
+		rather than changed, with a pointer to Sin/Cos for callers that care.
+
+		No functional change.
+	*/
+
+	/*
+		The "maximum absolute error" figures on the *16 trig functions below are
+		the error of the underlying minimax polynomial evaluated in double. The
+		code evaluates in float, so float rounding of the Horner chain dominates
+		and the measured error is ~1e-07, roughly two orders of magnitude larger.
+
+		Separately, Sin16/Cos16 reduce range with a -= floorf(a/TWO_PI)*TWO_PI.
+		TWO_PI as a float is 2.78e-08 off 2*pi, and reduction multiplies that by
+		the quotient, so phase error grows linearly with |a|: ~2e-04 at |a|~2^11
+		and ~0.9 at |a|~2^24, by which point the result is meaningless. Callers
+		passing an unbounded time-derived argument (see AI.cpp and Weapon.cpp)
+		should prefer Sin/Cos, which call libm and reduce properly.
+	*/
+
 	static float				Sin16( float a );			// sine with 16 bits precision, maximum absolute error is 2.3082e-09
 
 	static float				Cos( float a );				// cosine with 32 bits precision
@@ -376,6 +466,8 @@ public:
 
 	static void					SinCos( float a, float& s, float& c );		// sine and cosine with 32 bits precision
 	static void					SinCos16( float a, float& s, float& c );	// sine and cosine with 16 bits precision
+
+	// NOTE: other sin funcs in doom 3 may have bugs, review before if want to bring them back!
 
 	static float				Tan( float a );				// tangent with 32 bits precision
 	static float				Tan16( float a );			// tangent with 16 bits precision, maximum absolute error is 1.8897e-08
@@ -423,6 +515,8 @@ public:
 
 	static float				Frac( float f );			// f - Floor( f )
 
+
+	// xyzz: should we check for NaNs ???
 	static int					Ftoi( float f );			// float to int conversion
 	static char					Ftoi8( float f );			// float to char conversion
 	static short				Ftoi16( float f );			// float to short conversion
@@ -433,6 +527,8 @@ public:
 	static signed short			ClampShort( int i );
 	static int					ClampInt( int min, int max, int value );
 	static float				ClampFloat( float min, float max, float value );
+	static byte					ClampByte( byte min, byte max, int value );	// Revelation!
+
 
 	static float				AngleNormalize360( float angle );
 	static float				AngleNormalize180( float angle );
@@ -442,8 +538,31 @@ public:
 	static float				BitsToFloat( int i, int exponentBits, int mantissaBits );
 
 	static int					FloatHash( const float* array, const int numFloats );
+	// add vector hash
+//	public static int VectorHash(Vector3 v)
+//	{
+//		int hash = 0;
+//
+//		hash ^= (int)v.X;
+//		hash ^= (int)v.Y;
+//		hash ^= (int)v.Z;
+//
+//		return hash;
+//	}
 
 	static float				LerpToWithScale( const float cur, const float dest, const float scale );
+
+	static int					gcd( int a, int b );	// TwelveEyes --> used in dhewm3-sdk-tfphobos to get aspect ratio
+	// TODO:: add lcm
+
+
+	static float				MinNormalizeMax( float number, float max, float min );	// Biel Bestué de Luna --> dhewm3 fork / branch new_movement
+
+	// NETLizard (needed ? IsNearlyZero, isZero (separate) )
+	inline bool IsZero( float f )
+	{
+		return fabs( f ) < FLOAT_EPSILON;
+	}
 
 	static const float			PI;							// pi
 	static const float			TWO_PI;						// pi * 2
@@ -462,6 +581,7 @@ public:
 	static const float			M_MS2SEC;					// milliseconds to seconds multiplier
 	static const float			INFINITUM;					// huge number which should be larger than any valid number used
 	static const float			FLOAT_EPSILON;				// smallest positive number such that 1.0+FLOAT_EPSILON != 1.0
+	static const float                        DBL_EPSILON;  // smallest positive number such that 1.0+DBL_EPSILON != 1.0  (REVELATION)
 	static const float			FLT_SMALLEST_NON_DENORMAL;	// smallest non-denormal 32-bit floating point value
 
 #if defined(USE_INTRINSICS_SSE)
@@ -499,6 +619,47 @@ private:
 	static bool					initialized;
 };
 
+#if 0 // NETLizard
+
+void remove_fraction( float& f, int prec )
+{
+	if( prec <= 0 )
+	{
+		f = float( int( f ) );
+	}
+	else
+	{
+		std::string str = idStr::va( "%f", f );
+#define _DECIMAL_CASE(x) \
+			case x: {\
+				dec::decimal<x, dec::half_up_round_policy> d##x(str); \
+				f = (float)d##x.getAsDouble(); \
+		break; \
+					}
+
+		switch( prec )
+		{
+				_DECIMAL_CASE( 1 );
+				_DECIMAL_CASE( 2 );
+				_DECIMAL_CASE( 3 );
+				_DECIMAL_CASE( 4 );
+				_DECIMAL_CASE( 5 );
+				_DECIMAL_CASE( 6 );
+		};
+	}
+}
+#if 0
+#define _DECIMAL_CASE(x) \
+			case x: {\
+				dec::decimal<x, dec::half_up_round_policy> d##x(str); d##x *= pow(10, x); \
+						int i = d##x.getAsInteger(); idStr n = idStr::va("%06d", i); n.insert(n.length() - x, ".");  sscanf(n, "%f", &f); printf("%s\n", n.c_str());\
+				 \
+		break; \
+					}
+#endif
+
+#endif
+
 ID_INLINE byte CLAMP_BYTE( int x )
 {
 	return ( ( x ) < 0 ? ( 0 ) : ( ( x ) > 255 ? 255 : ( byte )( x ) ) );
@@ -516,6 +677,12 @@ ID_INLINE float idMath::RSqrt( float x )
 	r = *reinterpret_cast< float* >( &i );
 	r = r * ( 1.5f - r * r * y );
 	return r;
+#if 0
+	uint32_t i = std::bit_cast<uint32_t>( x );
+	i = 0x5f3759dfu - ( i >> 1 );
+
+	float r = std::bit_cast<float>( i );
+#endif
 }
 
 
@@ -876,7 +1043,7 @@ ID_INLINE float idMath::ASin16( float a )
 			return -HALF_PI;
 		}
 		a = fabsf( a );
-		return ( ( ( -0.0187293f * a + 0.0742610f ) * a - 0.2121144f ) * a + 1.5707288f ) * idMath::Sqrt( 1.0f - a ) - HALF_PI;
+		return ( ( ( -0.0187293f * a + 0.0742610f ) * a - 0.2121144f ) * a + 1.5707288f ) * idMath::Sqrt( 1.0f - a ) - HALF_PI; // wasm uses sqrtf
 	}
 	else
 	{
@@ -884,7 +1051,7 @@ ID_INLINE float idMath::ASin16( float a )
 		{
 			return HALF_PI;
 		}
-		return HALF_PI - ( ( ( -0.0187293f * a + 0.0742610f ) * a - 0.2121144f ) * a + 1.5707288f ) * idMath::Sqrt( 1.0f - a );
+		return HALF_PI - ( ( ( -0.0187293f * a + 0.0742610f ) * a - 0.2121144f ) * a + 1.5707288f ) * idMath::Sqrt( 1.0f - a ); // wasm uses sqrtf
 	}
 }
 
@@ -920,7 +1087,7 @@ ID_INLINE float idMath::ACos16( float a )
 			return PI;
 		}
 		a = fabsf( a );
-		return PI - ( ( ( -0.0187293f * a + 0.0742610f ) * a - 0.2121144f ) * a + 1.5707288f ) * idMath::Sqrt( 1.0f - a );
+		return PI - ( ( ( -0.0187293f * a + 0.0742610f ) * a - 0.2121144f ) * a + 1.5707288f ) * idMath::Sqrt( 1.0f - a ); // wasm sqrtf
 	}
 	else
 	{
@@ -928,7 +1095,7 @@ ID_INLINE float idMath::ACos16( float a )
 		{
 			return 0.0f;
 		}
-		return ( ( ( -0.0187293f * a + 0.0742610f ) * a - 0.2121144f ) * a + 1.5707288f ) * idMath::Sqrt( 1.0f - a );
+		return ( ( ( -0.0187293f * a + 0.0742610f ) * a - 0.2121144f ) * a + 1.5707288f ) * idMath::Sqrt( 1.0f - a ); // wasm sqr
 	}
 }
 
@@ -939,6 +1106,8 @@ idMath::ATan
 */
 ID_INLINE float idMath::ATan( float a )
 {
+	// assert( fabs( y ) > idMath::FLT_SMALLEST_NON_DENORMAL || fabs( x ) > idMath::FLT_SMALLEST_NON_DENORMAL );
+	// I think this is in OG BFG, but as of right now I havent diffed that, this line uncommented appears to be there and commented out in SnowFall
 	return atanf( a );
 }
 
@@ -1122,6 +1291,16 @@ idMath::IPow
 */
 ID_INLINE int idMath::IPow( int x, int y )
 {
+#if 0 // fix
+	assert( y >= 0 );
+
+	int result = 1;
+	for( ; y > 0; y-- )
+	{
+		result *= x;
+	}
+	return result;
+#endif
 	int r;
 	for( r = x; y > 1; y-- )
 	{
@@ -1129,6 +1308,24 @@ ID_INLINE int idMath::IPow( int x, int y )
 	}
 	return r;
 }
+
+#if 0
+ID_INLINE int idMath::ILog2( float f )
+{
+	return ( ( ( *reinterpret_cast<int*>( &f ) ) >> IEEE_FLT_MANTISSA_BITS )
+			 & ( ( 1 << IEEE_FLT_EXPONENT_BITS ) - 1 ) ) - IEEE_FLT_EXPONENT_BIAS;
+}
+
+ID_INLINE int idMath::ILog2( int i )
+{
+	return ILog2( ( float )i );
+}
+ID_INLINE int idMath::ILog2( int i )
+{
+	assert( i > 0 );
+	return std::bit_width( static_cast<unsigned int>( i ) ) - 1;
+}
+#endif
 
 /*
 ========================
@@ -1197,6 +1394,9 @@ idMath::FloorPowerOfTwo
 */
 ID_INLINE int idMath::FloorPowerOfTwo( int x )
 {
+	// consider using this!!!
+	//  return x > 0 ? static_cast<int>( std::bit_floor( static_cast<unsigned int>( x ) ) ) : 0;
+
 	x |= x >> 1;
 	x |= x >> 2;
 	x |= x >> 4;
@@ -1254,6 +1454,17 @@ idMath::BitReverse
 */
 ID_INLINE int idMath::BitReverse( int x )
 {
+#if 0
+	uint32_t x = static_cast<uint32_t>( value );
+
+	x = ( ( x >> 1 ) & 0x55555555u ) | ( ( x & 0x55555555u ) << 1 );
+	x = ( ( x >> 2 ) & 0x33333333u ) | ( ( x & 0x33333333u ) << 2 );
+	x = ( ( x >> 4 ) & 0x0f0f0f0fu ) | ( ( x & 0x0f0f0f0fu ) << 4 );
+	x = ( ( x >> 8 ) & 0x00ff00ffu ) | ( ( x & 0x00ff00ffu ) << 8 );
+
+	x = ( x >> 16 ) | ( x << 16 );
+	return std::bit_cast<int32_t>( x );
+#endif
 	x = ( ( ( x >> 1 ) & 0x55555555 ) | ( ( x & 0x55555555 ) << 1 ) );
 	x = ( ( ( x >> 2 ) & 0x33333333 ) | ( ( x & 0x33333333 ) << 2 ) );
 	x = ( ( ( x >> 4 ) & 0x0f0f0f0f ) | ( ( x & 0x0f0f0f0f ) << 4 ) );
@@ -1319,6 +1530,14 @@ idMath::Rint
 */
 ID_INLINE float idMath::Rint( float f )
 {
+#if 0
+	if( fabsf( f ) >= 8388608.0f )
+	{
+		return f;
+	}
+
+	return floorf( f + 0.5f );
+#endif
 	return floorf( f + 0.5f );
 }
 
@@ -1350,265 +1569,415 @@ ID_INLINE int idMath::Ftoi( float f )
 #endif
 }
 
+// BOOM 3 Documentation
+// https://github.com/libretro/boom3/commit/e87ec65e93dcb4d486417a195e622d638ec39077
 /*
-========================
-idMath::Ftoi8
-========================
+	NOTE: despite the name and the comment in the MSVC branch below, this is
+	NOT round-to-nearest anywhere except 32-bit MSVC. Every other target falls
+	through to the plain (int) cast at the bottom, which truncates toward zero.
+
+	That difference is visible in ANGLE2SHORT/ANGLE2BYTE above, so network
+	angle quantisation here does not match the original 32-bit Windows build.
+	It is however consistent across all targets we ship, so it is not a
+	determinism hazard, and changing it now would alter behaviour relative to
+	builds already in the wild. Left as-is deliberately.
 */
-ID_INLINE char idMath::Ftoi8( float f )
+
+#if 0
+ID_INLINE int idMath::FtoiFast( float f )
 {
-#if defined(USE_INTRINSICS_SSE)
+//	from revelator clean src latest. WRONG but keep here for note when we bring back!
+	// If a converted result is larger than the maximum signed doubleword integer,
+	// the floating-point invalid exception is raised, and if this exception is masked,
+	// the indefinite integer value (80000000H) is returned.
 	__m128 x = _mm_load_ss( &f );
-	x = _mm_max_ss( x, SIMD_SP_min_char );
-	x = _mm_min_ss( x, SIMD_SP_max_char );
-	return static_cast<char>( _mm_cvttss_si32( x ) );
-#else
-	// The converted result is clamped to the range [-128,127].
-	int i = C_FLOAT_TO_INT( f );
-	if( i < -128 )
-	{
-		return -128;
-	}
-	else if( i > 127 )
-	{
-		return 127;
-	}
-	return static_cast<char>( i );
-#endif
+	return _mm_cvttss_si32( x );
 }
+#endif
 
-/*
-========================
-idMath::Ftoi16
-========================
-*/
-ID_INLINE short idMath::Ftoi16( float f )
+#if 0 // revelation changes to those from OG D3
+
+
+ID_INLINE unsigned long idMath::Ftol( float f )
 {
-#if defined(USE_INTRINSICS_SSE)
 	__m128 x = _mm_load_ss( &f );
-	x = _mm_max_ss( x, SIMD_SP_min_short );
-	x = _mm_min_ss( x, SIMD_SP_max_short );
-	return static_cast<short>( _mm_cvttss_si32( x ) );
-#else
-	// The converted result is clamped to the range [-32768,32767].
-	int i = C_FLOAT_TO_INT( f );
-	if( i < -32768 )
-	{
-		return -32768;
-	}
-	else if( i > 32767 )
-	{
-		return 32767;
-	}
-	return static_cast<short>( i );
+	return static_cast<unsigned long>( _mm_cvttss_si32( x ) );
+	//return static_cast<unsigned long>(_mm_cvttss_si32(x));
+}
+
+ID_INLINE unsigned long idMath::FtolFast( float f )
+{
+	return Ftol( f );
+
 #endif
-}
 
-/*
-========================
-idMath::Ftoui16
-========================
-*/
-ID_INLINE unsigned short idMath::Ftoui16( float f )
-{
-	// TO DO - SSE ??
-
-	// The converted result is clamped to the range [-32768,32767].
-	int i = C_FLOAT_TO_INT( f );
-	if( i < 0 )
+	/*
+	========================
+	idMath::Ftoi8
+	========================
+	*/
+	ID_INLINE char idMath::Ftoi8( float f )
 	{
-		return 0;
+#if defined(USE_INTRINSICS_SSE)
+		__m128 x = _mm_load_ss( &f );
+		x = _mm_max_ss( x, SIMD_SP_min_char );
+		x = _mm_min_ss( x, SIMD_SP_max_char );
+		return static_cast<char>( _mm_cvttss_si32( x ) );
+#else
+		// The converted result is clamped to the range [-128,127].
+		int i = C_FLOAT_TO_INT( f );
+		if( i < -128 )
+		{
+			return -128;
+		}
+		else if( i > 127 )
+		{
+			return 127;
+		}
+		return static_cast<char>( i );
+#endif
 	}
-	else if( i > 65535 )
-	{
-		return 65535;
-	}
-	return static_cast<unsigned short>( i );
-}
 
-/*
-========================
-idMath::Ftob
-========================
-*/
-ID_INLINE byte idMath::Ftob( float f )
-{
-	// If a converted result is negative the value (0) is returned and if the
-	// converted result is larger than the maximum byte the value (255) is returned.
+	/*
+	========================
+	idMath::Ftoi16
+	========================
+	*/
+	ID_INLINE short idMath::Ftoi16( float f )
+	{
+#if defined(USE_INTRINSICS_SSE)
+		__m128 x = _mm_load_ss( &f );
+		x = _mm_max_ss( x, SIMD_SP_min_short );
+		x = _mm_min_ss( x, SIMD_SP_max_short );
+		return static_cast<short>( _mm_cvttss_si32( x ) );
+#else
+		// The converted result is clamped to the range [-32768,32767].
+		int i = C_FLOAT_TO_INT( f );
+		if( i < -32768 )
+		{
+			return -32768;
+		}
+		else if( i > 32767 )
+		{
+			return 32767;
+		}
+		return static_cast<short>( i );
+#endif
+	}
+
+	/*
+	========================
+	idMath::Ftoui16
+	========================
+	*/
+	ID_INLINE unsigned short idMath::Ftoui16( float f )
+	{
+		// TO DO - SSE ??
+
+		// The converted result is clamped to the range [-32768,32767].
+		int i = C_FLOAT_TO_INT( f );
+		if( i < 0 )
+		{
+			return 0;
+		}
+		else if( i > 65535 )
+		{
+			return 65535;
+		}
+		return static_cast<unsigned short>( i );
+	}
+
+	/*
+	========================
+	idMath::Ftob
+	========================
+	*/
+	ID_INLINE byte idMath::Ftob( float f )
+	{
+		// If a converted result is negative the value (0) is returned and if the
+		// converted result is larger than the maximum byte the value (255) is returned.
 
 #if defined(USE_INTRINSICS_SSE)
-	__m128 x = _mm_load_ss( &f );
-	x = _mm_max_ss( x, SIMD_SP_zero );
-	x = _mm_min_ss( x, SIMD_SP_255 );
-	return static_cast<byte>( _mm_cvttss_si32( x ) );
+		__m128 x = _mm_load_ss( &f );
+		x = _mm_max_ss( x, SIMD_SP_zero );
+		x = _mm_min_ss( x, SIMD_SP_255 );
+		return static_cast<byte>( _mm_cvttss_si32( x ) );
 #else
-	// The converted result is clamped to the range [0,255].
-	int i = C_FLOAT_TO_INT( f );
-	if( i < 0 )
-	{
-		return 0;
-	}
-	else if( i > 255 )
-	{
-		return 255;
-	}
-	return static_cast<byte>( i );
+		// The converted result is clamped to the range [0,255].
+		int i = C_FLOAT_TO_INT( f );
+		if( i < 0 )
+		{
+			return 0;
+		}
+		else if( i > 255 )
+		{
+			return 255;
+		}
+		return static_cast<byte>( i );
 #endif
-}
-
-/*
-========================
-idMath::ClampChar
-========================
-*/
-ID_INLINE signed char idMath::ClampChar( int i )
-{
-	if( i < -128 )
-	{
-		return -128;
 	}
-	if( i > 127 )
+
+	/*
+	========================
+	idMath::ClampChar
+	========================
+	*/
+	ID_INLINE signed char idMath::ClampChar( int i )
 	{
-		return 127;
+		if( i < -128 )
+		{
+			return -128;
+		}
+		if( i > 127 )
+		{
+			return 127;
+		}
+		return static_cast<signed char>( i );
 	}
-	return static_cast<signed char>( i );
-}
 
-/*
-========================
-idMath::ClampShort
-========================
-*/
-ID_INLINE signed short idMath::ClampShort( int i )
-{
-	if( i < -32768 )
+	/*
+	========================
+	idMath::ClampShort
+	========================
+	*/
+	ID_INLINE signed short idMath::ClampShort( int i )
 	{
-		return -32768;
+		if( i < -32768 )
+		{
+			return -32768;
+		}
+		if( i > 32767 )
+		{
+			return 32767;
+		}
+		return static_cast<signed short>( i );
 	}
-	if( i > 32767 )
+
+	/*
+	========================
+	idMath::ClampInt
+	========================
+	*/
+	ID_INLINE int idMath::ClampInt( int min, int max, int value )
 	{
-		return 32767;
+		if( value < min )
+		{
+			return min;
+		}
+		if( value > max )
+		{
+			return max;
+		}
+		return value;
 	}
-	return static_cast<signed short>( i );
-}
 
-/*
-========================
-idMath::ClampInt
-========================
-*/
-ID_INLINE int idMath::ClampInt( int min, int max, int value )
-{
-	if( value < min )
+	/*
+	========================
+	idMath::ClampFloat
+	========================
+	*/
+	ID_INLINE float idMath::ClampFloat( float min, float max, float value )
 	{
-		return min;
+		return Max( min, Min( max, value ) );
 	}
-	if( value > max )
+
+// method from RevelatioN!
+	ID_INLINE byte idMath::ClampByte( byte min, byte max, int value )
 	{
-		return max;
+		if( value < min )
+		{
+			return min;
+		}
+		if( value > max )
+		{
+			return max;
+		}
+		return value;
 	}
-	return value;
-}
 
-/*
-========================
-idMath::ClampFloat
-========================
-*/
-ID_INLINE float idMath::ClampFloat( float min, float max, float value )
-{
-	return Max( min, Min( max, value ) );
-}
+	/*
+	========================
+	idMath::AngleNormalize360
 
-/*
-========================
-idMath::AngleNormalize360
-========================
-*/
-ID_INLINE float idMath::AngleNormalize360( float angle )
-{
-	if( ( angle >= 360.0f ) || ( angle < 0.0f ) )
+	/// -n- On ajuste l'angle pour pour qu'il soit positif et ne fasse pas plus d'un tour de cercle.
+	//	-n- We adjust the angle to be positive and no more than 360 degrees.
+	========================
+	*/
+	ID_INLINE float idMath::AngleNormalize360( float angle )
 	{
-		angle -= floorf( angle * ( 1.0f / 360.0f ) ) * 360.0f;
+		if( ( angle >= 360.0f ) || ( angle < 0.0f ) )
+		{
+			angle -= floorf( angle * ( 1.0f / 360.0f ) ) * 360.0f;
+		}
+		return angle;
 	}
-	return angle;
-}
 
-/*
-========================
-idMath::AngleNormalize180
-========================
-*/
-ID_INLINE float idMath::AngleNormalize180( float angle )
-{
-	angle = AngleNormalize360( angle );
-	if( angle > 180.0f )
+	/*
+	========================
+	idMath::AngleNormalize180
+
+	/// -n- Retourne soit une valeur entre 0 et 180, soit une valeur entre -179 et -1 (si l'angle dépasse 180).
+	//	-n- Returns a value that is either between 0 and 180, or between -179 and -1 (if the angle exceeds 180)
+	========================
+	*/
+	ID_INLINE float idMath::AngleNormalize180( float angle )
 	{
-		angle -= 360.0f;
+		angle = AngleNormalize360( angle );
+		if( angle > 180.0f )
+		{
+			angle -= 360.0f;
+		}
+		return angle;
 	}
-	return angle;
-}
 
-/*
-========================
-idMath::AngleDelta
-========================
-*/
-ID_INLINE float idMath::AngleDelta( float angle1, float angle2 )
-{
-	return AngleNormalize180( angle1 - angle2 );
-}
-
-/*
-========================
-idMath::FloatHash
-========================
-*/
-ID_INLINE int idMath::FloatHash( const float* array, const int numFloats )
-{
-	int i, hash = 0;
-	const int* ptr;
-
-	ptr = reinterpret_cast<const int*>( array );
-	for( i = 0; i < numFloats; i++ )
+	/*
+	========================
+	idMath::AngleDelta
+	========================
+	*/
+	ID_INLINE float idMath::AngleDelta( float angle1, float angle2 )
 	{
-		hash ^= ptr[i];
+		return AngleNormalize180( angle1 - angle2 );
 	}
-	return hash;
-}
 
-template< typename T >
-ID_INLINE
-T Lerp( const T from, const T to, float f )
-{
-	return from + ( ( to - from ) * f );
-}
-
-template<>
-ID_INLINE
-int Lerp( const int from, const int to, float f )
-{
-	return idMath::Ftoi( ( float ) from + ( ( ( float ) to - ( float ) from ) * f ) );
-}
-
-
-/*
-========================
-LerpToWithScale
-
-Lerps from "cur" to "dest", scaling the delta to change by "scale"
-If the delta between "cur" and "dest" is very small, dest is returned to prevent denormals.
-========================
-*/
-inline float idMath::LerpToWithScale( const float cur, const float dest, const float scale )
-{
-	float delta = dest - cur;
-	if( delta > -1.0e-6f && delta < 1.0e-6f )
+	/*
+	========================
+	idMath::FloatHash
+	========================
+	*/
+	ID_INLINE int idMath::FloatHash( const float * array, const int numFloats )
 	{
-		return dest;
-	}
-	return cur + ( dest - cur ) * scale;
-}
+		int i, hash = 0;
+		const int* ptr;
 
+		ptr = reinterpret_cast<const int*>( array );
+		for( i = 0; i < numFloats; i++ )
+		{
+			hash ^= ptr[i];
+		}
+		return hash;
+
+#if 0 // djoom3
+		public static int FloatHash( final float[] array, final int numFloats )
+		{
+			int i, hash = 0;
+//	const int *ptr;
+
+//	ptr = reinterpret_cast<const int *>( array );
+			for( i = 0; i < numFloats; i++ )
+			{
+//		hash ^= ptr[i];
+				hash ^= Float.floatToIntBits( array[i] );
+			}
+			return hash;
+		}
+#endif
+#if 0 // proposal 
+		uint32_t hash = 0;
+
+		for( int i = 0; i < numFloats; i++ )
+		{
+			hash ^= std::bit_cast<uint32_t>( array[i] );
+		}
+
+		return std::bit_cast<int32_t>( hash );
+#endif
+	}
+
+// kotlin overload for the above. note that kotlin canonicalizes nans with toBits !!!
+//
+//fun FloatHash(x: Float, y : Float, z : Float) : Int{
+//	return x.toBits() xor y.toBits() xor z.toBits()
+//}
+
+
+	template< typename T >
+	ID_INLINE
+	T Lerp( const T from, const T to, float f )
+	{
+		return from + ( ( to - from ) * f );
+	}
+
+	//	This should be a template ? ? ?
+	template<>
+	ID_INLINE
+	int Lerp( const int from, const int to, float f )
+	{
+		return idMath::Ftoi( ( float ) from + ( ( ( float ) to - ( float ) from ) * f ) );
+	}
+
+
+	/*
+	========================
+	LerpToWithScale
+
+	Lerps from "cur" to "dest", scaling the delta to change by "scale"
+	If the delta between "cur" and "dest" is very small, dest is returned to prevent denormals.
+	========================
+	*/
+	inline float idMath::LerpToWithScale( const float cur, const float dest, const float scale )
+	{
+		float delta = dest - cur;
+		if( delta > -1.0e-6f && delta < 1.0e-6f )
+		{
+			return dest;
+		}
+		return cur + ( dest - cur ) * scale;
+	}
+
+// TwelveEyes -->
+	ID_INLINE int idMath::gcd( int a, int b )
+	{
+		int R;
+		while( ( a % b ) > 0 )
+		{
+			R = a % b;
+			a = b;
+			b = R;
+		}
+		return b;
+	}
+// <---
+
+// BieldBdeLuna
+	/*
+	================
+	blMathUtils::MinNormalizeMax
+	================
+	*     //////////////////////////////////////////////////////////////////
+	*    //      return a normalized value between a min and a max       //
+	*   //////////////////////////////////////////////////////////////////
+	*/
+	ID_INLINE float idMath::MinNormalizeMax( float number, float max, float min )
+	{
+		float interval, incorporated;
+
+		interval = max - min;
+		incorporated = number - min;
+
+		if( incorporated <= 0.0f )
+		{
+			return 0.0f;
+		}
+		else
+		{
+			return ( ( 1 / interval ) * incorporated );
+		}
+
+		// xyzz: same mathematical operation is in Interpolate.h ???
+
+		// xyzz: inverselerp ??
+
+		// xyzz
+		// consider reimplementation as something NormalizeRange ? better name
+		// example: but must match biel's intentions
+		/*
+			if( max <= min ) {
+		    return 0.0f;
+		}
+
+		return ClampFloat( 0.0f, 1.0f, ( value - min ) / ( max - min ) );
+		*/
+	}
 
 #endif /* !__MATH_MATH_H__ */

@@ -3020,7 +3020,24 @@ ammo_t idWeapon::GetAmmoNumForName( const char* ammoname )
 
 	if( !ammoDict->GetInt( ammoname, "-1", num ) )
 	{
-
+#if defined( DOMINION ) // Original expansion/mod ammo definitions
+		// RoE/dhewm3 keeps Artifact ammo in ammo_types_d3xp instead of base ammo_types.
+		// Restore its game-base/mod lookup order without overriding existing BFG entries.
+		const char *const directoryCVars[] = { "fs_game_base", "fs_game" };
+		for( int directoryIndex = 0; directoryIndex < 2; ++directoryIndex )
+		{
+			const idStr directory = cvarSystem->GetCVarString( directoryCVars[directoryIndex] );
+			if( directory.IsEmpty() )
+			{
+				continue;
+			}
+			ammoDict = gameLocal.FindEntityDefDict( va( "ammo_types_%s", directory.c_str() ), false );
+			if( ammoDict != NULL && ammoDict->GetInt( ammoname, "-1", num ) )
+			{
+				break;
+			}
+		}
+#endif
 	}
 
 	if( ( num < 0 ) || ( num >= AMMO_NUMTYPES ) )
@@ -3063,6 +3080,32 @@ const char* idWeapon::GetAmmoNameForNum( ammo_t ammonum )
 			return kv->GetKey();
 		}
 	}
+
+#if defined( DOMINION ) // Original expansion/mod ammo definitions
+	// Match RoE/dhewm3's reverse lookup too, so inventory code can resolve Artifact ammo.
+	const char *const directoryCVars[] = { "fs_game_base", "fs_game" };
+	for( int directoryIndex = 0; directoryIndex < 2; ++directoryIndex )
+	{
+		const idStr directory = cvarSystem->GetCVarString( directoryCVars[directoryIndex] );
+		if( directory.IsEmpty() )
+		{
+			continue;
+		}
+		ammoDict = gameLocal.FindEntityDefDict( va( "ammo_types_%s", directory.c_str() ), false );
+		if( ammoDict == NULL )
+		{
+			continue;
+		}
+		for( int entryIndex = 0; entryIndex < ammoDict->GetNumKeyVals(); ++entryIndex )
+		{
+			kv = ammoDict->GetKeyVal( entryIndex );
+			if( kv->GetValue() == text )
+			{
+				return kv->GetKey();
+			}
+		}
+	}
+#endif
 
 	return NULL;
 }

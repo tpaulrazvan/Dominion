@@ -345,7 +345,39 @@ public:
 	idEntityPtr<idWeapon>	weapon;
 	idMenuHandler_HUD* 		hudManager;
 	idMenuScreen_HUD* 		hud;
+#if defined( DOMINION ) // OLD GUIs - HUD
+	idUserInterface* guiHud;
+	void InitializeGuiHud();
+	void UpdateGuiHudStats( idUserInterface* gui );
+	void UpdateGuiHudAmmo( idUserInterface* gui );
+#endif
 	idMenuHandler_PDA* 		pdaMenu;
+#if defined( DOMINION ) // OLD GUIs - PDA
+	idUserInterface        *objectiveSystem;
+	const idDeclAudio      *guiPdaAudio;
+	const idDeclVideo      *guiPdaVideo;
+	bool                   guiPdaInitialized;
+	void InitializeGuiPDA();
+	void UpdateGuiPDA();
+	void ToggleGuiPDA();
+	void UpdatePDAInfo( bool updatePDASel );
+	void UpdateObjectiveInfo();
+	int AddGuiPDAData( declType_t dataType, const char *listName, const idDeclPDA *src, idUserInterface *gui );
+#endif
+#if defined( DOMINION ) // OLD GUIs - Multiplayer messages
+	// Private desktops are reconstructed with the player, not serialized into saves.
+	idUserInterface *guiMPChat = NULL;
+	idUserInterface *guiMPSpectate = NULL;
+	idUserInterface *guiMPMessageMode = NULL;
+	int guiMPChatOpeningKey = K_NONE;
+	int guiMPChatOpeningChar = 0;
+	void InitializeGuiMPMessages();
+	void BeginGuiMessageMode( bool team );
+	bool HandleGuiMessageMode( const sysEvent_t *event );
+#endif
+#if defined( DOMINION ) // OLD GUIs - HUD weapon numbers
+	bool guiExpansionWeaponSlots = false;
+#endif
 	idSWF* 					mpMessages;
 	bool					objectiveSystemOpen;
 	int						quickSlot[ NUM_QUICK_SLOTS ];
@@ -582,6 +614,9 @@ public:
 	float					PowerUpModifier( int type );
 
 	int						SlotForWeapon( const char* weaponName );
+#if defined( DOMINION ) // OLD GUIs - HUD weapon numbers
+	int						GuiWeaponSlot( const int weaponSlot ) const;
+#endif
 	void					Reload();
 	void					NextWeapon();
 	void					NextBestWeapon();

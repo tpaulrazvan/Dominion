@@ -31,6 +31,15 @@ If you have questions concerning this license or the applicable additional terms
 
 const char* DEFAULT_FONT = "Arial_Narrow";
 
+#if defined( DOMINION ) // OLD GUIs - Shared support
+idCVar gui_smallFontLimit( "gui_smallFontLimit", "0.30", CVAR_GUI | CVAR_ARCHIVE, "maximum text scale using the original small GUI font" );
+idCVar gui_mediumFontLimit( "gui_mediumFontLimit", "0.60", CVAR_GUI | CVAR_ARCHIVE, "maximum text scale using the original medium GUI font" );
+
+int idFont::OriginalFontSize( float scale ) const {
+	return scale <= gui_smallFontLimit.GetFloat() ? 0 : scale <= gui_mediumFontLimit.GetFloat() ? 1 : 2;
+}
+#endif
+
 static const float old_scale2 = 0.6f;
 static const float old_scale1 = 0.3f;
 
@@ -86,6 +95,9 @@ idFont::~idFont
 */
 idFont::~idFont()
 {
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	delete originalFont;
+#endif
 	// SRS - Free glyph data before deleting fontInfo, otherwise will leak
 	if( fontInfo )
 	{
@@ -105,6 +117,17 @@ idFont::idFont
 idFont::idFont( const char* n ) : name( n )
 {
 	fontInfo = NULL;
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	originalFont = NULL;
+	if ( name.Icmpn( "oldgui/", 7 ) == 0 ) {
+		alias = NULL;
+		if ( !LoadOriginalFont() ) {
+			common->Warning( "Could not load original menu font %s", n );
+			alias = renderSystem->RegisterFont( DEFAULT_FONT );
+		}
+		return;
+	}
+#endif
 	alias = RemapFont( n );
 
 	if( alias != NULL )
@@ -124,6 +147,12 @@ idFont::idFont( const char* n ) : name( n )
 	{
 		if( name.Icmp( DEFAULT_FONT ) == 0 )
 		{
+#if defined( DOMINION ) // OLD GUIs - Shared support
+			if( LoadOriginalFont( "fonts/english" ) ) {
+				common->Printf( "Default font: fonts/english (original Doom 3)\n" );
+				return;
+			}
+#endif
 			idLib::FatalError( "Could not load default font \"%s\"", DEFAULT_FONT );
 		}
 		else
@@ -134,6 +163,62 @@ idFont::idFont( const char* n ) : name( n )
 	}
 }
 
+#if defined( DOMINION ) // OLD GUIs - Shared support
+#if defined( DOMINION ) // OLD GUIs - Shared support
+bool idFont::LoadOriginalFont( const char* fontDirectory ) {
+	const idStr directory = fontDirectory != NULL ? idStr( fontDirectory ) : "fonts/" + name.Mid( 7, name.Length() );
+#else
+bool idFont::LoadOriginalFont() {
+	const idStr directory = "fonts/" + name.Mid( 7, name.Length() );
+#endif
+	originalFont = new( TAG_FONT ) originalFontInfo_t;
+	memset( originalFont, 0, sizeof( *originalFont ) );
+	const int sizes[3] = { 12, 24, 48 };
+	for ( int size = 0; size < 3; size++ ) {
+		idFileLocal file( fileSystem->OpenFileRead( va( "%s/fontImage_%d.dat", directory.c_str(), sizes[size] ) ) );
+		// Each disk glyph has seven ints, four floats, a 32-bit obsolete handle
+		// and a 32-byte image name. Never deserialize a native pointer/struct.
+		if ( file == NULL || file->Length() < 256 * 80 + 4 ) {
+			delete originalFont;
+			originalFont = NULL;
+			return false;
+		}
+		for ( int i = 0; i < 256; i++ ) {
+			int height, top, bottom, pitch, skip, width, imageHeight, unused;
+			float s, t, s2, t2;
+			char imageName[33] = {};
+			file->ReadInt( height ); file->ReadInt( top ); file->ReadInt( bottom );
+			file->ReadInt( pitch ); file->ReadInt( skip ); file->ReadInt( width );
+			file->ReadInt( imageHeight );
+			file->ReadFloat( s ); file->ReadFloat( t ); file->ReadFloat( s2 ); file->ReadFloat( t2 );
+			file->ReadInt( unused );
+			file->Read( imageName, 32 );
+			scaledGlyphInfo_t& glyph = originalFont->glyphs[size][i];
+			glyph.top = top;
+			glyph.left = 0;
+			glyph.width = width;
+			glyph.height = imageHeight;
+			glyph.xSkip = skip;
+			glyph.s1 = s; glyph.t1 = t; glyph.s2 = s2; glyph.t2 = t2;
+			idStr imagePath = imageName;
+			imagePath.StripLeading( "fonts/" );
+			if ( !imagePath.IsEmpty() ) {
+				glyph.material = declManager->FindMaterial( directory + "/" + imagePath );
+				glyph.material->SetSort( SS_GUI );
+			}
+			originalFont->maxWidth[size] = Max( originalFont->maxWidth[size], (float)skip );
+			originalFont->maxHeight[size] = Max( originalFont->maxHeight[size], (float)height );
+		}
+		file->ReadFloat( originalFont->glyphScale[size] );
+		if ( originalFont->glyphScale[size] <= 0 || originalFont->glyphScale[size] > 16 ) {
+			delete originalFont;
+			originalFont = NULL;
+			return false;
+		}
+	}
+	return true;
+}
+#endif
 struct oldGlyphInfo_t
 {
 	int					height;			// number of scan lines
@@ -354,6 +439,12 @@ idFont::GetLineHeight
 */
 float idFont::GetLineHeight( float scale ) const
 {
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	if ( originalFont != NULL ) {
+		const int size = OriginalFontSize( scale );
+		return scale * originalFont->glyphScale[size] * originalFont->maxHeight[size];
+	}
+#endif
 	if( alias != NULL )
 	{
 		return alias->GetLineHeight( scale );
@@ -372,6 +463,12 @@ idFont::GetAscender
 */
 float idFont::GetAscender( float scale ) const
 {
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	if ( originalFont != NULL ) {
+		const int size = OriginalFontSize( scale );
+		return scale * originalFont->glyphScale[size] * originalFont->maxHeight[size];
+	}
+#endif
 	if( alias != NULL )
 	{
 		return alias->GetAscender( scale );
@@ -390,6 +487,12 @@ idFont::GetMaxCharWidth
 */
 float idFont::GetMaxCharWidth( float scale ) const
 {
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	if ( originalFont != NULL ) {
+		const int size = OriginalFontSize( scale );
+		return scale * originalFont->glyphScale[size] * originalFont->maxWidth[size];
+	}
+#endif
 	if( alias != NULL )
 	{
 		return alias->GetMaxCharWidth( scale );
@@ -408,6 +511,12 @@ idFont::GetGlyphWidth
 */
 float idFont::GetGlyphWidth( float scale, uint32 idx ) const
 {
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	if ( originalFont != NULL ) {
+		const int size = OriginalFontSize( scale );
+		return scale * originalFont->glyphScale[size] * originalFont->glyphs[size][idx < 256 ? idx : 42].xSkip;
+	}
+#endif
 	if( alias != NULL )
 	{
 		return alias->GetGlyphWidth( scale, idx );
@@ -435,6 +544,19 @@ idFont::GetScaledGlyph
 */
 void idFont::GetScaledGlyph( float scale, uint32 idx, scaledGlyphInfo_t& glyphInfo ) const
 {
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	if ( originalFont != NULL ) {
+		const int size = OriginalFontSize( scale );
+		glyphInfo = originalFont->glyphs[size][idx < 256 ? idx : 42];
+		const float useScale = scale * originalFont->glyphScale[size];
+		glyphInfo.top *= useScale;
+		glyphInfo.left *= useScale;
+		glyphInfo.width *= useScale;
+		glyphInfo.height *= useScale;
+		glyphInfo.xSkip *= useScale;
+		return;
+	}
+#endif
 	if( alias != NULL )
 	{
 		return alias->GetScaledGlyph( scale, idx, glyphInfo );
@@ -475,6 +597,20 @@ idFont::Touch
 */
 void idFont::Touch()
 {
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	if ( originalFont != NULL ) {
+		for ( int size = 0; size < 3; size++ ) {
+			for ( int i = 0; i < 256; i++ ) {
+				const idMaterial* material = originalFont->glyphs[size][i].material;
+				if ( material != NULL ) {
+					const_cast<idMaterial*>( material )->EnsureNotPurged();
+					material->SetSort( SS_GUI );
+				}
+			}
+		}
+		return;
+	}
+#endif
 	if( alias != NULL )
 	{
 		alias->Touch();

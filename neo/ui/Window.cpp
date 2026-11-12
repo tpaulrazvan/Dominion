@@ -115,7 +115,11 @@ void idWindow::CommonInit()
 	flags = 0;
 	lastTimeRun = 0;
 	origin.Zero();
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	font = ( gui->IsFullscreenMenu() || fileSystem->IsDoom2004() ) ? gui->RegisterMenuFont( "fonts" ) : renderSystem->RegisterFont( "" );
+#else
 	font = renderSystem->RegisterFont( "" );
+#endif
 	timeLine = -1;
 	xOffset = yOffset = 0.0;
 	cursor = 0;
@@ -448,6 +452,15 @@ idWindow* idWindow::GetChildWithOnAction( float xd, float yd )
 	while( c > 0 )
 	{
 		idWindow* child = children[--c];
+#if defined( DOMINION ) // OLD GUIs - Menu hover clipping
+		// Original menus collapse a parent panel to hide its controls. Like Doom 3,
+		// only search inside a visible, interactive parent containing the cursor.
+		if( gui->IsFullscreenMenu() && ( !child->visible || child->noEvents ||
+			!child->Contains( child->drawRect, gui->CursorX(), gui->CursorY() ) ) )
+		{
+			continue;
+		}
+#endif
 		if( child->visible && child->Contains( child->drawRect, gui->CursorX(), gui->CursorY() ) && !child->noEvents )
 		{
 			child->hover = true;
@@ -1264,7 +1277,13 @@ void idWindow::Time()
 		}
 	}
 
+#if defined( DOMINION ) // OLD GUIs - Timeline commands
+	// Empty windows must not fill the command list with semicolons: the command
+	// tokenizer has a fixed argument limit and can discard later sounds/actions.
+	if( gui->Active() && !cmd.IsEmpty() )
+#else
 	if( gui->Active() )
+#endif
 	{
 		if( gui->GetPendingCmd().Length() > 0 )
 		{
@@ -1456,6 +1475,14 @@ void idWindow::Redraw( float x, float y, bool hud )
 
 	SetFont();
 
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	if( gui->IsFullscreenMenu() ) {
+		float sx, sy, ox, oy;
+		gui->GetMenuTransform( sx, sy, ox, oy );
+		dc->SetSize( forceAspectWidth / sx, forceAspectHeight / sy );
+		dc->SetOffset( ox, oy );
+	} else
+#endif
 	if( hud )
 	{
 		float tileSafeOffset = hud_titlesafe.GetFloat();
@@ -1836,7 +1863,7 @@ idWindow* idWindow::SetFocus( idWindow* w, bool scripts )
 idWindow::ParseScript
 ================
 */
-bool idWindow::ParseScript( idTokenParser* src, idGuiScriptList& list, int* timeParm, bool elseBlock )
+bool idWindow::ParseScript( idTokenParser *src, idGuiScriptList &list, int *timeParm, bool elseBlock )
 {
 
 	bool	ifElseBlock = false;
@@ -1847,63 +1874,81 @@ bool idWindow::ParseScript( idTokenParser* src, idGuiScriptList& list, int* time
 	// arg.. basically we want everything between the { } as it will be interpreted at
 	// run time
 
-	if( elseBlock )
+	if ( elseBlock )
 	{
 		src->ReadToken( &token );
 
-		if( !token.Icmp( "if" ) )
+		if ( !token.Icmp( "if" ) )
 		{
 			ifElseBlock = true;
 		}
 
 		src->UnreadToken( &token );
 
-		if( !ifElseBlock && !src->ExpectTokenString( "{" ) )
+		if ( !ifElseBlock && !src->ExpectTokenString( "{" ) )
 		{
 			return false;
 		}
 	}
-	else if( !src->ExpectTokenString( "{" ) )
+	else if ( !src->ExpectTokenString( "{" ) )
 	{
 		return false;
 	}
 
 	int nest = 0;
 
-	while( 1 )
+	while ( 1 )
 	{
-		if( !src->ReadToken( &token ) )
+		if ( !src->ReadToken( &token ) )
 		{
 			src->Error( "Unexpected end of file" );
 			return false;
 		}
 
-		if( token == "{" )
+		if ( token == "{" )
 		{
 			nest++;
 		}
 
-		if( token == "}" )
+		if ( token == "}" )
 		{
-			if( nest-- <= 0 )
+			if ( nest-- <= 0 )
 			{
 				return true;
 			}
 		}
 
-		idGuiScript* gs = new( TAG_OLD_UI ) idGuiScript();
-		if( token.Icmp( "if" ) == 0 )
+		idGuiScript *gs = new( TAG_OLD_UI ) idGuiScript();
+		if ( token.Icmp( "if" ) == 0 )
 		{
 			gs->conditionReg = ParseExpression( src );
 			gs->ifList = new( TAG_OLD_UI ) idGuiScriptList();
-			ParseScript( src, *gs->ifList, NULL );
-			if( src->ReadToken( &token ) )
+#if defined( DOMINION ) // OLD GUIs - Reject malformed scripts
+			// Propagate the failure so the fullscreen selector can try a valid parent GUI.
+			if ( !ParseScript( src, *gs->ifList, NULL ) )
 			{
-				if( token == "else" )
+				delete gs;
+				return false;
+			}
+#else
+			ParseScript( src, *gs->ifList, NULL );
+#endif
+			if ( src->ReadToken( &token ) )
+			{
+				if ( token == "else" )
 				{
 					gs->elseList = new( TAG_OLD_UI ) idGuiScriptList();
 					// pass true to indicate we are parsing an else condition
+#if defined( DOMINION ) // OLD GUIs - Reject malformed scripts
+					// Propagate the failure so the fullscreen selector can try a valid parent GUI.
+					if ( !ParseScript( src, *gs->elseList, NULL, true ) )
+					{
+						delete gs;
+						return false;
+					}
+#else
 					ParseScript( src, *gs->elseList, NULL, true );
+#endif
 				}
 				else
 				{
@@ -1915,7 +1960,7 @@ bool idWindow::ParseScript( idTokenParser* src, idGuiScriptList& list, int* time
 
 			// if we are parsing an else if then return out so
 			// the initial "if" parser can handle the rest of the tokens
-			if( ifElseBlock )
+			if ( ifElseBlock )
 			{
 				return true;
 			}
@@ -1927,14 +1972,23 @@ bool idWindow::ParseScript( idTokenParser* src, idGuiScriptList& list, int* time
 		}
 
 		// empty { } is not allowed
-		if( token == "{" )
+		if ( token == "{" )
 		{
 			src->Error( "Unexpected {" );
 			delete gs;
 			return false;
 		}
 
+#if defined( DOMINION ) // OLD GUIs - Reject malformed scripts
+		// Propagate the failure so the fullscreen selector can try a valid parent GUI.
+		if ( !gs->Parse( src ) )
+		{
+			delete gs;
+			return false;
+		}
+#else
 		gs->Parse( src );
+#endif
 		list.Append( gs );
 	}
 
@@ -2447,7 +2501,11 @@ bool idWindow::ParseInternalVar( const char* _name, idTokenParser* src )
 	{
 		idStr fontName;
 		ParseString( src, fontName );
+#if defined( DOMINION ) // OLD GUIs - Shared support
+		font = ( gui->IsFullscreenMenu() || fileSystem->IsDoom2004() ) ? gui->RegisterMenuFont( fontName ) : renderSystem->RegisterFont( fontName );
+#else
 		font = renderSystem->RegisterFont( fontName );
+#endif
 		return true;
 	}
 	return false;
@@ -2764,6 +2822,9 @@ bool idWindow::Parse( idTokenParser* src, bool rebuild )
 
 			if( !ParseScript( src, *ev->mEvent ) )
 			{
+#if defined( DOMINION ) // OLD GUIs - Reject malformed scripts
+				delete ev;
+#endif
 				ret = false;
 				break;
 			}
@@ -4146,7 +4207,11 @@ void idWindow::ReadFromSaveGame( idFile* savefile )
 	/*	if ( savefile->GetFileVersion() < BUILD_NUMBER_8TH_ANNIVERSARY_1 ) {
 			unsigned char fontNum;
 			savefile->Read( &fontNum, sizeof( fontNum ) );
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	font = ( gui->IsFullscreenMenu() || fileSystem->IsDoom2004() ) ? gui->RegisterMenuFont( "fonts" ) : renderSystem->RegisterFont( "" );
+#else
 			font = renderSystem->RegisterFont( "" );
+#endif
 		}*/
 	savefile->Read( &timeLine, sizeof( timeLine ) );
 	savefile->Read( &xOffset, sizeof( xOffset ) );

@@ -1360,7 +1360,11 @@ cinData_t idCinematicLocal::ImageForTime( int thisTime, nvrhi::ICommandList* com
 	cinData.imageWidth = CIN_WIDTH;
 	cinData.imageHeight = CIN_HEIGHT;
 	cinData.status = status;
+#if defined( DOMINION ) // OLD GUIs - Menu
+	img->UploadScratch( buf, CIN_WIDTH, CIN_HEIGHT, commandList );
+#else
 	img->UploadScratch( image, CIN_WIDTH, CIN_HEIGHT, commandList );
+#endif
 	cinData.image = img;
 
 	return cinData;
@@ -2402,7 +2406,11 @@ unsigned int idCinematicLocal::yuv_to_rgb24( int y, int u, int v )
 		b = 255;
 	}
 
+#if defined( DOMINION ) // OLD GUIs - Menu
+	return LittleLong( ( r ) | ( g << 8 ) | ( b << 16 ) | 0xff000000 );
+#else
 	return LittleLong( ( r ) + ( g << 8 ) + ( b << 16 ) );
+#endif
 }
 // RB end
 

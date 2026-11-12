@@ -122,7 +122,11 @@ public:
 	virtual void				RunFrame( idUserCmdMgr& cmdMgr, gameReturn_t& gameReturn ) = 0;
 
 	// Makes rendering and sound system calls to display for a given clientNum.
+#if defined( DOMINION ) // OLD GUIs - Save previews isolate the player's temporal history
+	virtual bool				Draw( int clientNum, bool savePreview = false ) = 0;
+#else
 	virtual bool				Draw( int clientNum ) = 0;
+#endif
 
 	virtual bool				HandlePlayerGuiEvent( const sysEvent_t* ev ) = 0;
 

@@ -121,6 +121,12 @@ idSoundSample_XAudio2::WriteAllSamples
 */
 void idSoundSample_XAudio2::WriteAllSamples( const idStr& sampleName )
 {
+#if defined( DOMINION ) // Original assets - binary sound cache
+	if( !fileSystem->UseBinaryAssets() )
+	{
+		return;
+	}
+#endif
 	idSoundSample_XAudio2* samplePC = new idSoundSample_XAudio2();
 	{
 		idStrStatic< MAX_OSPATH > inName = sampleName;
@@ -149,6 +155,12 @@ idSoundSample_XAudio2::LoadGeneratedSound
 */
 bool idSoundSample_XAudio2::LoadGeneratedSample( const idStr& filename )
 {
+#if defined( DOMINION ) // Original assets - binary sound cache
+	if( !fileSystem->UseBinaryAssets() )
+	{
+		return false;
+	}
+#endif
 	idFileLocal fileIn( fileSystem->OpenFileReadMemory( filename ) );
 	if( fileIn != NULL )
 	{
@@ -239,7 +251,13 @@ void idSoundSample_XAudio2::LoadResource()
 			loaded = LoadWav( sampleName );
 		}
 
+#if defined( DOMINION ) // Original sound assets - Ogg fallback without ADPCM
+		// Ogg sources are decoded to PCM in memory. Disabling ADPCM must not hide
+		// original Doom 3 recordings that have no WAV counterpart.
+		if( !loaded )
+#else
 		if( !loaded && s_useCompression.GetBool() )
+#endif
 		{
 			sampleName.SetFileExtension( "ogg" );
 			loaded = LoadOgg( sampleName );
@@ -300,7 +318,18 @@ bool idSoundSample_XAudio2::LoadOgg( const idStr& filename )
 
 	timestamp = 1;
 
+#if defined( DOMINION ) // Original sound assets - record decoded buffer size
+	// Use the member shared with WAV loading; a local with the same name left
+	// Ogg memory accounting and generated-sample headers reporting zero bytes.
+	const int64_t decodedSize = decoder.Size();
+	if( decodedSize <= 0 || decodedSize > INT_MAX )
+	{
+		return false;
+	}
+	totalBufferSize = static_cast<int>( decodedSize );
+#else
 	int64_t totalBufferSize = decoder.Size();
+#endif
 
 	decoder.GetFormat( format );
 

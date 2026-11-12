@@ -241,7 +241,11 @@ bool idMD5Anim::LoadAnim( const char* filename, const idImportOptions* options )
 
 	idFileLocal file( fileptr );
 
+#if defined( DOMINION ) // Original assets - binary cache policy
+	if( ( fileSystem->UseBinaryAssets( binaryLoadAnim.GetBool() ) || isGLTF ) && LoadBinary( file, sourceTimeStamp ) )
+#else
 	if( ( binaryLoadAnim.GetBool() || isGLTF ) && LoadBinary( file, sourceTimeStamp ) )
+#endif
 	{
 		name = filename;
 		if( cvarSystem->GetCVarBool( "fs_buildresources" ) )
@@ -250,7 +254,11 @@ bool idMD5Anim::LoadAnim( const char* filename, const idImportOptions* options )
 			fileSystem->AddAnimPreload( name );
 		}
 
+#if defined( DOMINION ) // Original assets - binary cache policy
+		if( doWrite && fileSystem->UseBinaryAssets( binaryLoadAnim.GetBool() ) )
+#else
 		if( doWrite && binaryLoadAnim.GetBool() )
+#endif
 		{
 			idLib::Printf( "Writing %s\n", generatedFileName.c_str() );
 			fileptr->Seek( 0, FS_SEEK_SET );
@@ -455,7 +463,11 @@ bool idMD5Anim::LoadAnim( const char* filename, const idImportOptions* options )
 	// we don't count last frame because it would cause a 1 frame pause at the end
 	animLength = ( ( numFrames - 1 ) * 1000 + frameRate - 1 ) / frameRate;
 
+#if defined( DOMINION ) // Original assets - binary cache policy
+	if( fileSystem->UseBinaryAssets( binaryLoadAnim.GetBool() ) )
+#else
 	if( binaryLoadAnim.GetBool() )
+#endif
 	{
 		idLib::Printf( "Writing %s\n", generatedFileName.c_str() );
 		idFileLocal outputFile( fileSystem->OpenFileWrite( generatedFileName, "fs_basepath" ) );

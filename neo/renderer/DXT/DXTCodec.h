@@ -583,6 +583,9 @@ public:
 
 	// DXT1 decompression (no alpha)
 	void	DecompressImageDXT1( const byte* inBuf, byte* outBuf, int width, int height );
+#if defined( DOMINION ) // Original assets - DDS explicit-alpha BC2 decoding
+	void DecompressImageDXT3( const byte *inBuf, byte *outBuf, int width, int height );
+#endif
 
 	// DXT5 decompression
 	void	DecompressImageDXT5( const byte* inBuf, byte* outBuf, int width, int height );

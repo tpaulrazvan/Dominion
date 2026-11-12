@@ -514,6 +514,16 @@ void idCommonDialog::ShowSaveIndicator( bool show )
 {
 	idLib::PrintfIf( popupDialog_debug.GetBool(), "[%s]\n", __FUNCTION__ );
 
+#if defined( DOMINION ) // OLD GUIs - Avoid invisible saving-dialog pause
+	// Original Doom 3 shows save feedback on its HUD. Its data has no BFG saving
+	// dialog, whose minimum display time otherwise freezes play after map loading.
+	// Errors still use their normal error dialogs; this only replaces the indicator.
+	if( fileSystem->IsDoom2004() && ( dialog == NULL || !dialog->IsLoaded() ) )
+	{
+		return;
+	}
+#endif
+
 	if( show )
 	{
 		idStr msg = idStrId( "#str_dlg_pc_saving" ).GetLocalizedString();

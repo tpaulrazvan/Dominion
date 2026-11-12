@@ -683,7 +683,11 @@ void idZipBuilder::CleanSourceFolder()
 
 	// get the game's base path
 	idStr basePath = fileSystem->GetBasePathStr( FSPATH_BASE );
+#if defined( DOMINION ) // Selectable base data directory
+	basePath.AppendPath( fileSystem->GetBaseGameDir() );
+#else
 	basePath.AppendPath( BASE_GAMEDIR );
+#endif
 	basePath.AppendPath( "maps" );
 	basePath.SlashesToBackSlashes();
 	basePath.ToLower();

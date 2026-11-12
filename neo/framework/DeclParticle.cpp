@@ -557,7 +557,11 @@ bool idDeclParticle::Parse( const char* text, const int textLength, bool allowBi
 		idFileLocal file( fileSystem->OpenFileReadMemory( generatedFileName ) );
 		sourceChecksum = MD5_BlockChecksum( text, textLength );
 
+#if defined( DOMINION ) // Original assets - binary cache policy
+		if( fileSystem->UseBinaryAssets( binaryLoadParticles.GetBool() ) && LoadBinary( file, sourceChecksum ) )
+#else
 		if( binaryLoadParticles.GetBool() && LoadBinary( file, sourceChecksum ) )
+#endif
 		{
 			return true;
 		}
@@ -632,7 +636,11 @@ bool idDeclParticle::Parse( const char* text, const int textLength, bool allowBi
 		bounds = idBounds( vec3_origin ).Expand( 8.0f );
 	}
 
+#if defined( DOMINION ) // Original assets - binary cache policy
+	if( allowBinaryVersion && fileSystem->UseBinaryAssets( binaryLoadParticles.GetBool() ) )
+#else
 	if( allowBinaryVersion && binaryLoadParticles.GetBool() )
+#endif
 	{
 		idLib::Printf( "Writing %s\n", generatedFileName.c_str() );
 		idFileLocal outputFile( fileSystem->OpenFileWrite( generatedFileName, "fs_basepath" ) );

@@ -878,6 +878,11 @@ Sys_DefaultBasePath
 */
 const char* Sys_DefaultBasePath()
 {
+#if defined( DOMINION ) // Selectable base data directory
+	const char *baseGameDir = fileSystem->GetBaseGameDir();
+#else
+	const char *baseGameDir = BASE_GAMEDIR;
+#endif
 	idStr testbase;
 
 	// Try the exe path first
@@ -887,14 +892,14 @@ const char* Sys_DefaultBasePath()
 		basepath.StripFilename();
 		testbase = basepath;
 		testbase += "/";
-		testbase += BASE_GAMEDIR;
+		testbase += baseGameDir;
 		if( Sys_IsFolder( testbase.c_str() ) == FOLDER_YES )
 		{
 			return basepath.c_str();
 		}
 		else
 		{
-			common->Printf( "no '%s' directory in exe path %s, skipping\n", BASE_GAMEDIR, basepath.c_str() );
+			common->Printf( "no '%s' directory in exe path %s, skipping\n", baseGameDir, basepath.c_str() );
 		}
 	}
 
@@ -904,14 +909,14 @@ const char* Sys_DefaultBasePath()
 	{
 		testbase = basepath;
 		testbase += "/";
-		testbase += BASE_GAMEDIR;
+		testbase += baseGameDir;
 		if( Sys_IsFolder( testbase.c_str() ) == FOLDER_YES )
 		{
 			return basepath.c_str();
 		}
 		else
 		{
-			common->Printf( "no '%s' directory in Steam path %s, skipping\n", BASE_GAMEDIR, basepath.c_str() );
+			common->Printf( "no '%s' directory in Steam path %s, skipping\n", baseGameDir, basepath.c_str() );
 		}
 	}
 
@@ -921,14 +926,14 @@ const char* Sys_DefaultBasePath()
 	{
 		testbase = basepath;
 		testbase += "/";
-		testbase += BASE_GAMEDIR;
+		testbase += baseGameDir;
 		if( Sys_IsFolder( testbase.c_str() ) == FOLDER_YES )
 		{
 			return basepath.c_str();
 		}
 		else
 		{
-			common->Printf( "no '%s' directory in GOG.com path %s, skipping\n", BASE_GAMEDIR, basepath.c_str() );
+			common->Printf( "no '%s' directory in GOG.com path %s, skipping\n", baseGameDir, basepath.c_str() );
 		}
 	}
 

@@ -177,6 +177,9 @@ public:
 
 	// Opens a file for reading, reads the file completely in memory and returns an idFile_Memory obj.
 	virtual idFile* 		OpenFileReadMemory( const char* relativePath, bool allowCopyFiles = true, const char* gamedir = NULL ) = 0;
+#if defined( DOMINION ) // OLD GUIs - Shared directory lookup
+	virtual void GetGameDirectories( idStrList& directories ) const = 0;
+#endif
 
 	// Opens a file for writing, will create any needed subdirectories.
 	virtual idFile* 		OpenFileWrite( const char* relativePath, const char* basePath = "fs_savepath" ) = 0;
@@ -243,7 +246,11 @@ public:
 	virtual int				ReadFromBGL( idFile* _resourceFile, void* _buffer, int _offset, int _len ) = 0;
 	virtual bool			IsBinaryModel( const idStr& resName ) const = 0;
 	virtual bool			IsSoundSample( const idStr& resName ) const = 0;
+#if defined( DOMINION ) // OLD GUIs - Shared directory lookup
+	virtual bool			GetResourceCacheEntry( const char* fileName, idResourceCacheEntry& rc, const char* gamedir = NULL ) = 0;
+#else
 	virtual bool			GetResourceCacheEntry( const char* fileName, idResourceCacheEntry& rc ) = 0;
+#endif
 	virtual void			FreeResourceBuffer() = 0;
 	virtual void			AddImagePreload( const char* resName, int filter, int repeat, int usage, int cube ) = 0;
 	virtual void			AddSamplePreload( const char* resName ) = 0;
@@ -253,6 +260,12 @@ public:
 	virtual void			AddCollisionPreload( const char* resName ) = 0;
 
 	// RB begin
+
+#if defined( DOMINION ) // Selectable base data directory
+	virtual const char *GetBaseGameDir() const = 0;
+	// Master cache policy; individual asset switches can still disable their own caches.
+	virtual bool UseBinaryAssets( const bool assetEnabled = true ) const = 0;
+#endif
 
 	// Returns true if Doom 2004 is detected
 	virtual bool			IsDoom2004() const = 0;

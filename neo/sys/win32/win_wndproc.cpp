@@ -295,7 +295,12 @@ LONG WINAPI MainWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam )
 			soundSystem->SetMute( !win32.activeApp );
 			// DG: set com_pause so game pauses when focus is lost
 			// and continues when focus is regained
+#if defined( DOMINION ) // Background test execution
+			// Release input normally, but allow an opted-in test window to keep simulating.
+			cvarSystem->SetCVarBool( "com_pause", !win32.activeApp && cvarSystem->GetCVarBool( "com_pauseOnFocusLoss" ) );
+#else
 			cvarSystem->SetCVarBool( "com_pause", !win32.activeApp );
+#endif
 			cvarSystem->SetCVarBool( "com_activeApp", win32.activeApp );
 			// DG end
 

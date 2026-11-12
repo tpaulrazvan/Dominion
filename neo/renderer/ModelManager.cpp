@@ -69,7 +69,11 @@ public:
 	virtual void			CreateMeshBuffers( nvrhi::ICommandList* commandList );
 	virtual void			FreeModelVertexCaches();
 	virtual void			WritePrecacheCommands( idFile* file );
+#if defined( DOMINION ) // Original map reload - retain source assets
+	virtual void			BeginLevelLoad( bool reuseAssets = false );
+#else
 	virtual void			BeginLevelLoad();
+#endif
 	virtual void			EndLevelLoad();
 	virtual void			Preload( const idPreloadManifest& manifest );
 
@@ -361,7 +365,11 @@ idRenderModel* idRenderModelManagerLocal::GetModel( const char* _modelName, bool
 					sourceTimeStamp = fileSystem->GetTimestamp( canonical );
 				}
 
+#if defined( DOMINION ) // Original assets - binary cache policy
+				if( model->SupportsBinaryModel() && fileSystem->UseBinaryAssets( binaryLoadRenderModels.GetBool() ) )
+#else
 				if( model->SupportsBinaryModel() && binaryLoadRenderModels.GetBool() )
+#endif
 				{
 					idFileLocal file( fileSystem->OpenFileReadMemory( generatedFileName ) );
 					model->PurgeModel();
@@ -468,7 +476,11 @@ idRenderModel* idRenderModelManagerLocal::GetModel( const char* _modelName, bool
 
 		idFileLocal file( fileSystem->OpenFileReadMemory( generatedFileName ) );
 
+#if defined( DOMINION ) // Original assets - binary cache policy
+		if( !model->SupportsBinaryModel() || !fileSystem->UseBinaryAssets( binaryLoadRenderModels.GetBool() ) )
+#else
 		if( !model->SupportsBinaryModel() || !binaryLoadRenderModels.GetBool() )
+#endif
 		{
 			model->InitFromFile( canonical, options );
 		}
@@ -816,7 +828,11 @@ void idRenderModelManagerLocal::FreeModelVertexCaches()
 idRenderModelManagerLocal::BeginLevelLoad
 =================
 */
+#if defined( DOMINION ) // Original map reload - retain source assets
+void idRenderModelManagerLocal::BeginLevelLoad( bool reuseAssets )
+#else
 void idRenderModelManagerLocal::BeginLevelLoad()
+#endif
 {
 	insideLevelLoad = true;
 
@@ -825,7 +841,12 @@ void idRenderModelManagerLocal::BeginLevelLoad()
 		idRenderModel* model = models[i];
 
 		// always reload all models
+#if defined( DOMINION ) // Original map reload - retain source assets
+		// Retain parsed models, then rebuild static GPU buffers through EndLevelLoad.
+		if( !reuseAssets && model->IsReloadable() )
+#else
 		if( model->IsReloadable() )
+#endif
 		{
 			R_CheckForEntityDefsUsingModel( model );
 			model->PurgeModel();

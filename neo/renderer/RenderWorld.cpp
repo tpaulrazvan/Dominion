@@ -1126,6 +1126,26 @@ void idRenderWorldLocal::RenderScene( const renderView_t* renderView )
 	int windowWidth = tr.GetWidth();
 	int windowHeight = tr.GetHeight();
 
+#if defined( DOMINION ) // OLD GUIs - Objective camera pictures
+	if( renderView->rdflags & RDF_OBJECTIVE )
+	{
+		// Honour the caller's snapshot crop rather than replacing it with the window size.
+		idScreenRect crop;
+		tr.GetCroppedViewport( &crop );
+		tr.CropRenderSize( crop.x1, crop.y1, crop.x2 + 1, crop.y2 + 1, true );
+		tr.GetCroppedViewport( &parms->viewport );
+	}
+	else
+#endif
+#if defined( DOMINION ) // OLD GUIs - Menu
+	if ( renderView->guiWidth > 0 && renderView->guiHeight > 0 ) {
+		const int left = renderView->guiX;
+		const int top = renderView->guiY;
+		// NVRHI uses top-origin viewports; this crop API takes the endpoints.
+		tr.CropRenderSize( left, top, left + renderView->guiWidth, top + renderView->guiHeight, true );
+		tr.GetCroppedViewport( &parms->viewport );
+	} else
+#endif
 	if( parms->renderView.rdflags & RDF_IRRADIANCE )
 	{
 		windowWidth = ENVPROBE_CAPTURE_SIZE;
@@ -1155,6 +1175,17 @@ void idRenderWorldLocal::RenderScene( const renderView_t* renderView )
 	parms->scissor.y1 = 0;
 	parms->scissor.x2 = parms->viewport.x2 - parms->viewport.x1;
 	parms->scissor.y2 = parms->viewport.y2 - parms->viewport.y1;
+#if defined( DOMINION ) // OLD GUIs - Menu model clipping
+	if( renderView->guiWidth > 0 && renderView->guiHeight > 0 )
+	{
+		// Keep the full viewport/projection during slide animations, clipping only drawing.
+		// Local scissor Y runs upward; the native NVRHI viewport uses top-origin Y.
+		parms->scissor.x1 = Max( 0, -parms->viewport.x1 );
+		parms->scissor.x2 = Min( int( parms->scissor.x2 ), windowWidth - 1 - parms->viewport.x1 );
+		parms->scissor.y1 = Max( 0, parms->viewport.y2 - windowHeight + 1 );
+		parms->scissor.y2 = Min( int( parms->scissor.y2 ), int( parms->viewport.y2 ) );
+	}
+#endif
 
 	parms->isSubview = false;
 	parms->isObliqueProjection = false;
@@ -1186,7 +1217,15 @@ void idRenderWorldLocal::RenderScene( const renderView_t* renderView )
 	R_RenderView( parms );
 
 	// render any post processing after the view and all its subviews has been draw
+#if defined( DOMINION ) // OLD GUIs - Menu model rendering
+	// Menu previews already occupy their rectangle on the LDR GUI canvas.
+	if( renderView->guiWidth <= 0 || renderView->guiHeight <= 0 )
+	{
+		R_RenderPostProcess( parms );
+	}
+#else
 	R_RenderPostProcess( parms );
+#endif
 
 #if defined( RENDERDEMOS )
 	// now write delete commands for any modified-but-not-visible entities, and

@@ -837,3 +837,31 @@ void idDxtDecoder::DecomposeImageDXT5( const byte* inBuf, byte* colorIndices, by
 	}
 }
 
+
+#if defined( DOMINION ) // Original assets - DDS explicit-alpha BC2 decoding
+/*
+========================
+idDxtDecoder::DecompressImageDXT3
+BC2 uses four-bit alpha per texel and the same four-color palette as BC3.
+========================
+*/
+void idDxtDecoder::DecompressImageDXT3( const byte *inBuf, byte *outBuf, int width, int height )
+{
+	byte block[64];
+	this->width = width;
+	this->height = height;
+	for( int y = 0; y < height; y += 4 )
+	{
+		for( int x = 0; x < width; x += 4, inBuf += 16 )
+		{
+			inData = inBuf + 8;
+			DecodeColorValues( block, true, false );
+			for( int pixel = 0; pixel < 16; ++pixel )
+			{
+				block[pixel * 4 + 3] = ( ( inBuf[pixel / 2] >> ( ( pixel & 1 ) * 4 ) ) & 15 ) * 17;
+			}
+			EmitBlock( outBuf, x, y, block );
+		}
+	}
+}
+#endif

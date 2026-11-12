@@ -416,6 +416,10 @@ enum
 
 	BUILTIN_INTERACTION,
 	BUILTIN_INTERACTION_SKINNED,
+#if defined( DOMINION ) // OLD GUIs - Menu
+	BUILTIN_INTERACTION_OLD_GUI,
+	BUILTIN_INTERACTION_OLD_GUI_SKINNED,
+#endif
 	BUILTIN_INTERACTION_AMBIENT,
 	BUILTIN_INTERACTION_AMBIENT_SKINNED,
 
@@ -686,6 +690,12 @@ public:
 	{
 		BindShader_Builtin( BUILTIN_INTERACTION_SKINNED );
 	}
+
+#if defined( DOMINION ) // OLD GUIs - Menu
+	void BindShader_InteractionOldGui( bool skinned ) {
+		BindShader_Builtin( skinned ? BUILTIN_INTERACTION_OLD_GUI_SKINNED : BUILTIN_INTERACTION_OLD_GUI );
+	}
+#endif
 
 	void	BindShader_InteractionAmbient()
 	{

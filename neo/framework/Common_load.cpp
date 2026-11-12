@@ -39,6 +39,9 @@ If you have questions concerning this license or the applicable additional terms
 #define LAUNCH_TITLE_DOOM2_EXECUTABLE		"doom2.exe"
 
 idCVar com_wipeSeconds( "com_wipeSeconds", "1", CVAR_SYSTEM, "" );
+#if defined( DOMINION ) // Original map reload - retain source assets
+idCVar com_reuseMapAssets( "com_reuseMapAssets", "1", CVAR_SYSTEM | CVAR_BOOL, "retain original Doom 3 media on same-map reloads; entity state and GPU geometry are rebuilt" );
+#endif
 idCVar com_disableAutoSaves( "com_disableAutoSaves", "0", CVAR_SYSTEM | CVAR_BOOL, "" );
 idCVar com_disableAllSaves( "com_disableAllSaves", "0", CVAR_SYSTEM | CVAR_BOOL, "" );
 
@@ -123,6 +126,20 @@ void idCommonLocal::StartNewGame( const char* mapName, bool devmap, int gameMode
 	idStr mapNameClean = mapName;
 	mapNameClean.StripFileExtension();
 	mapNameClean.BackSlashesToSlashes();
+#if defined( DOMINION ) // OLD GUIs - Map failure and menu return
+	// Like vanilla/dhewm3, reject a mistyped map before leaving the current game.
+	// BFG maps may live in an unmounted per-map resource file; allow that container
+	// too, since BeginLevelLoad opens it later. Loose and PK4 maps use the .map path.
+	const idStr mapFile = "maps/" + mapNameClean + ".map";
+	idStr mapResources = mapNameClean;
+	mapResources.StripPath();
+	mapResources = "maps/" + mapResources + ".resources";
+	if( mapNameClean.IsEmpty() || ( fileSystem->GetFileLength( mapFile ) < 0 && fileSystem->GetFileLength( mapResources ) < 0 ) )
+	{
+		common->Printf( "Can't find map %s\n", mapFile.c_str() );
+		return;
+	}
+#endif
 
 	idMatchParameters matchParameters;
 	matchParameters.mapName = mapNameClean;
@@ -252,7 +269,28 @@ idCommonLocal::LoadLoadingGui
 void idCommonLocal::LoadLoadingGui( const char* mapName, bool& hellMap )
 {
 	defaultLoadscreen = false;
+#if defined( DOMINION ) // OLD GUIs - Loading screens
+	delete loadGUI;
+	loadGUI = NULL;
+	uiManager->DeAlloc( legacyLoadGUI );
+	legacyLoadGUI = NULL;
+	idStr guiMap = mapName;
+	guiMap.StripFileExtension();
+	guiMap.StripPath();
+	guiMap = "guis/map/" + guiMap + ".gui";
+	// Share the original menus' optional 4:3 presentation with loading screens.
+	UI_LoadFullscreenGui( "loading/default", guiMap, "guis/map/loading.gui", NULL, loadGUI, legacyLoadGUI, true );
+	if( legacyLoadGUI != NULL ) {
+		hellMap = false;
+		legacyLoadGUI->SetStateFloat( "map_loading", 0.0f );
+		legacyLoadGUI->Activate( true, Sys_Milliseconds() );
+		legacyLoadGUI->StateChanged( Sys_Milliseconds() );
+		renderSystem->LoadLevelImages();
+		return;
+	}
+#else
 	loadGUI = new idSWF( "loading/default", NULL );
+#endif
 
 	if( g_demoMode.GetBool() )
 	{
@@ -387,6 +425,30 @@ void idCommonLocal::LoadLoadingGui( const char* mapName, bool& hellMap )
 	}
 }
 
+#if defined( DOMINION ) // OLD GUIs - Loading progress across all map stages
+/*
+================
+idCommonLocal::SetLegacyLoadProgress
+Advance at completed work milestones; image counts fill only their own stage.
+This is an estimate of overall work, not a byte-accurate or time-driven counter.
+================
+*/
+void idCommonLocal::SetLegacyLoadProgress( float completed, float span )
+{
+	if( legacyLoadGUI == NULL )
+	{
+		return;
+	}
+	legacyLoadProgressBase = completed;
+	legacyLoadProgressSpan = span;
+	loadPacifierCount = 0;
+	loadPacifierExpectedCount = 0;
+	legacyLoadGUI->SetStateFloat( "map_loading", completed );
+	legacyLoadGUI->StateChanged( Sys_Milliseconds() );
+	UpdateLevelLoadPacifier();
+}
+#endif
+
 /*
 ===============
 idCommonLocal::ExecuteMapChange
@@ -452,6 +514,12 @@ void idCommonLocal::ExecuteMapChange()
 	soundSystem->Render();
 
 	// extract the map name from serverinfo
+#if defined( DOMINION ) // Original map reload - retain source assets
+	// Match vanilla/dhewm3's same-map media reuse for source data. BFG resource
+	// containers keep their existing load lifecycle; changing maps still purges.
+	const bool reuseMapAssets = com_reuseMapAssets.GetBool() && fileSystem->IsDoom2004() &&
+		!fileSystem->UsingResourceFiles() && currentMapName.Icmp( matchParameters.mapName ) == 0;
+#endif
 	currentMapName = matchParameters.mapName;
 	currentMapName.StripFileExtension();
 
@@ -483,9 +551,18 @@ void idCommonLocal::ExecuteMapChange()
 	// Free media from previous level and
 	// note which media we are going to need to load
 	sm = Sys_Milliseconds();
+#if defined( DOMINION ) // Original map reload - retain source assets
+	renderSystem->BeginLevelLoad( reuseMapAssets );
+	soundSystem->BeginLevelLoad( reuseMapAssets );
+	if( !reuseMapAssets )
+	{
+		declManager->BeginLevelLoad();
+	}
+#else
 	renderSystem->BeginLevelLoad();
 	soundSystem->BeginLevelLoad();
 	declManager->BeginLevelLoad();
+#endif
 	uiManager->BeginLevelLoad();
 	ms = Sys_Milliseconds() - sm;
 	common->Printf( "%6d msec to free assets\n", ms );
@@ -496,9 +573,21 @@ void idCommonLocal::ExecuteMapChange()
 	// set the loading gui that we will wipe to
 	bool hellMap = false;
 	LoadLoadingGui( currentMapName, hellMap );
+#if defined( DOMINION ) // OLD GUIs - Loading progress across all map stages
+	SetLegacyLoadProgress( 0.0f );
+#endif
 
 	// Stop rendering the wipe
 	ClearWipe();
+#if defined( DOMINION ) // OLD GUIs - Loading screens
+	if( legacyLoadGUI != NULL ) {
+		const int endTime = Sys_Milliseconds() + 1000;
+		while( Sys_Milliseconds() < endTime ) {
+			UpdateScreen( false );
+			Sys_Sleep( 16 );
+		}
+	}
+#endif
 
 
 	if( fileSystem->UsingResourceFiles() )
@@ -537,6 +626,9 @@ void idCommonLocal::ExecuteMapChange()
 	Sys_GrabMouseCursor( false );
 
 	// let the renderSystem load all the geometry
+#if defined( DOMINION ) // OLD GUIs - Loading progress across all map stages
+	SetLegacyLoadProgress( 0.02f );
+#endif
 	if( !renderWorld->InitFromMap( fullMapName ) )
 	{
 		common->Error( "couldn't load %s", fullMapName.c_str() );
@@ -547,6 +639,9 @@ void idCommonLocal::ExecuteMapChange()
 	usercmdGen->InitForNewMap();
 
 	// load and spawn all other entities ( from a savegame possibly )
+#if defined( DOMINION ) // OLD GUIs - Loading progress across all map stages
+	SetLegacyLoadProgress( 0.15f );
+#endif
 	if( mapSpawnData.savegameFile )
 	{
 		if( !game->InitFromSaveGame( fullMapName, renderWorld, soundWorld, mapSpawnData.savegameFile, mapSpawnData.stringTableFile, mapSpawnData.savegameVersion ) )
@@ -607,11 +702,20 @@ void idCommonLocal::ExecuteMapChange()
 		}
 	}
 
+#if defined( DOMINION ) // OLD GUIs - Loading progress across all map stages
+	SetLegacyLoadProgress( 0.45f, 0.40f );
+#endif
 	renderSystem->EndLevelLoad();
+#if defined( DOMINION ) // OLD GUIs - Loading progress across all map stages
+	SetLegacyLoadProgress( 0.85f, 0.05f );
+#endif
 	soundSystem->EndLevelLoad();
 	declManager->EndLevelLoad();
 	uiManager->EndLevelLoad( currentMapName );
 	fileSystem->EndLevelLoad();
+#if defined( DOMINION ) // OLD GUIs - Loading progress across all map stages
+	SetLegacyLoadProgress( 0.90f );
+#endif
 
 	if( !mapSpawnData.savegameFile && !IsMultiplayer() )
 	{
@@ -631,6 +735,9 @@ void idCommonLocal::ExecuteMapChange()
 
 		// kick off an auto-save of the game (so we can always continue in this map if we die before hitting an autosave)
 		common->Printf( "----- Saving Game -----\n" );
+#if defined( DOMINION ) // OLD GUIs - Loading progress across all map stages
+		SetLegacyLoadProgress( 0.95f );
+#endif
 		SaveGame( "autosave" );
 	}
 
@@ -638,6 +745,9 @@ void idCommonLocal::ExecuteMapChange()
 
 	// let the renderSystem generate interactions now that everything is spawned
 	renderWorld->GenerateAllInteractions();
+#if defined( DOMINION ) // OLD GUIs - Loading progress across all map stages
+	SetLegacyLoadProgress( 0.99f );
+#endif
 
 	{
 		int vertexMemUsedKB = vertexCache.staticData.vertexMemUsed.GetValue() / 1024;
@@ -676,6 +786,15 @@ void idCommonLocal::ExecuteMapChange()
 	Sys_SetPhysicalWorkMemory( -1, -1 );
 
 	// at this point we should be done with the loading gui so we kill it
+#if defined( DOMINION ) // OLD GUIs - Loading screens
+	if( legacyLoadGUI != NULL ) {
+		legacyLoadGUI->SetStateFloat( "map_loading", 1.0f );
+		legacyLoadGUI->StateChanged( Sys_Milliseconds() );
+		UpdateScreen( false );
+		uiManager->DeAlloc( legacyLoadGUI );
+		legacyLoadGUI = NULL;
+	}
+#endif
 	delete loadGUI;
 	loadGUI = NULL;
 
@@ -706,6 +825,14 @@ Pumps the session and if multiplayer, displays dialogs during the loading proces
 */
 void idCommonLocal::UpdateLevelLoadPacifier()
 {
+#if defined( DOMINION ) // OLD GUIs - Loading screens
+	if( legacyLoadGUI != NULL && loadPacifierExpectedCount > 0 ) {
+		const float stageProgress = idMath::ClampFloat( 0.0f, 1.0f, float( loadPacifierCount ) / float( loadPacifierExpectedCount ) );
+		const float progress = legacyLoadProgressBase + legacyLoadProgressSpan * stageProgress;
+		legacyLoadGUI->SetStateFloat( "map_loading", Max( progress, legacyLoadGUI->State().GetFloat( "map_loading" ) ) );
+		legacyLoadGUI->StateChanged( Sys_Milliseconds() );
+	}
+#endif
 	autoRenderIconType_t icon = AUTORENDER_DEFAULTICON;
 	bool autoswapsRunning = renderSystem->AreAutomaticBackgroundSwapsRunning( &icon );
 	if( !insideExecuteMapChange && !autoswapsRunning )
@@ -1035,11 +1162,19 @@ bool idCommonLocal::SaveGame( const char* saveName )
 	soundSystem->Render();
 
 	Dialog().ShowSaveIndicator( true );
+#if defined( DOMINION ) // OLD GUIs - Skip priming an absent saving dialog
+	// The classic HUD needs no BFG dialog frames or automatic background renderer.
+	const bool drawSaveIndicator = Dialog().HasDialogMsg( GDM_SAVING, NULL );
+#endif
 	if( insideExecuteMapChange )
 	{
 		UpdateLevelLoadPacifier();
 	}
+#if defined( DOMINION ) // OLD GUIs - Skip priming an absent saving dialog
+	else if( drawSaveIndicator )
+#else
 	else
+#endif
 	{
 		// Heremake sure we pump the gui enough times to show the 'saving' dialog
 		const bool captureToImage = false;
@@ -1082,11 +1217,45 @@ bool idCommonLocal::SaveGame( const char* saveName )
 	idSaveGameDetails gameDetails;
 	game->GetSaveGameDetails( gameDetails );
 
+#if defined( DOMINION ) // OLD GUIs - Menu
+	gameDetails.descriptors.Set( "legacySaveName", saveName );
+	gameDetails.descriptors.Set( "legacyMap", session->GetActingGameStateLobbyBase().GetMatchParms().mapName );
+#endif
 	gameDetails.descriptors.Set( SAVEGAME_DETAIL_FIELD_LANGUAGE, sys_lang.GetString() );
 	gameDetails.descriptors.SetInt( SAVEGAME_DETAIL_FIELD_CHECKSUM, ( int )gameDetails.descriptors.Checksum() );
 
 	gameDetails.slotName = saveName;
 	ScrubSaveGameFileName( gameDetails.slotName );
+
+#if defined( DOMINION ) // OLD GUIs - Save previews like vanilla
+	if( fileSystem->IsDoom2004() )
+	{
+		if( insideExecuteMapChange )
+		{
+			// Vanilla autosaves use the map's supplied artwork, not a spawn-time render.
+			idStr mapBase = currentMapName;
+			mapBase.StripPath();
+			gameDetails.descriptors.Set( "legacyPreview", va( "guis/assets/autosave/%s", mapBase.c_str() ) );
+		}
+		else
+		{
+			// Queue the same 320x240 game view as vanilla. Readback happens after GPU
+			// submission, and the loose TGA lives with the saves in fs_savepath.
+			const idStr preview = "savegames/" + gameDetails.slotName + ".tga";
+			renderSystem->CropRenderSize( 320, 240 );
+			if( game->Draw( game->GetLocalClientNum(), true ) )
+			{
+				renderSystem->CaptureRenderToImage( "_dominionSavePreview", true );
+				renderSystem->WriteRenderImageToFile( "_dominionSavePreview", preview, "fs_savepath" );
+				gameDetails.descriptors.Set( "legacyPreview", preview );
+			}
+			renderSystem->UnCrop();
+		}
+		// Include the thumbnail descriptor in the integrity check written with this save.
+		gameDetails.descriptors.Delete( SAVEGAME_DETAIL_FIELD_CHECKSUM );
+		gameDetails.descriptors.SetInt( SAVEGAME_DETAIL_FIELD_CHECKSUM, ( int )gameDetails.descriptors.Checksum() );
+	}
+#endif
 
 	saveFileEntryList_t files;
 	files.Append( &stringsFile );
@@ -1094,7 +1263,11 @@ bool idCommonLocal::SaveGame( const char* saveName )
 
 	session->SaveGameSync( gameDetails.slotName, files, gameDetails );
 
+#if defined( DOMINION ) // OLD GUIs - Skip priming an absent saving dialog
+	if( !insideExecuteMapChange && drawSaveIndicator )
+#else
 	if( !insideExecuteMapChange )
+#endif
 	{
 		renderSystem->EndAutomaticBackgroundSwaps();
 	}

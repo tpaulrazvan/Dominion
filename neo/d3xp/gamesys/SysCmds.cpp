@@ -2392,6 +2392,14 @@ static void Cmd_RecordViewNotes_f( const idCmdArgs& args )
 	viewComments += "\n";
 	viewComments += args.Argv( 3 );
 
+#if defined( DOMINION ) // OLD GUIs - HUD view notes
+	if( player->guiHud != NULL )
+	{
+		player->guiHud->SetStateString( "viewcomments", viewComments );
+		player->guiHud->HandleNamedEvent( "showViewComments" );
+	}
+#endif
+
 	// TODO_SPARTY: removed old hud need to find a way of doing this with the new hud
 	//player->hud->SetStateString( "viewcomments", viewComments );
 	//player->hud->HandleNamedEvent( "showViewComments" );
@@ -2411,6 +2419,13 @@ static void Cmd_CloseViewNotes_f( const idCmdArgs& args )
 		return;
 	}
 
+#if defined( DOMINION ) // OLD GUIs - HUD view notes
+	if( player->guiHud != NULL )
+	{
+		player->guiHud->SetStateString( "viewcomments", "" );
+		player->guiHud->HandleNamedEvent( "hideViewComments" );
+	}
+#endif
 	// TODO_SPARTY: removed old hud need to find a way of doing this with the new hud
 	//player->hud->SetStateString( "viewcomments", "" );
 	//player->hud->HandleNamedEvent( "hideViewComments" );
@@ -2465,6 +2480,13 @@ static void Cmd_ShowViewNotes_f( const idCmdArgs& args )
 		// TODO_SPARTY: removed old hud need to find a way of doing this with the new hud
 		//player->hud->SetStateString( "viewcomments", token );
 		//player->hud->HandleNamedEvent( "showViewComments" );
+#if defined( DOMINION ) // OLD GUIs - HUD view notes
+		if( player->guiHud != NULL )
+		{
+			player->guiHud->SetStateString( "viewcomments", token );
+			player->guiHud->HandleNamedEvent( "showViewComments" );
+		}
+#endif
 		player->Teleport( origin, axis.ToAngles(), NULL );
 	}
 	else
@@ -2472,6 +2494,12 @@ static void Cmd_ShowViewNotes_f( const idCmdArgs& args )
 		parser.FreeSource();
 		// TODO_SPARTY: removed old hud need to find a way of doing this with the new hud
 		//player->hud->HandleNamedEvent( "hideViewComments" );
+#if defined( DOMINION ) // OLD GUIs - HUD view notes
+		if( player->guiHud != NULL )
+		{
+			player->guiHud->HandleNamedEvent( "hideViewComments" );
+		}
+#endif
 		return;
 	}
 }

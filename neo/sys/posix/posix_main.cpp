@@ -420,6 +420,11 @@ Try to be intelligent: if there is no BASE_GAMEDIR, try the next path
 */
 const char* Sys_DefaultBasePath()
 {
+#if defined( DOMINION ) // Selectable base data directory
+	const char *baseGameDir = fileSystem->GetBaseGameDir();
+#else
+	const char *baseGameDir = BASE_GAMEDIR;
+#endif
 	struct stat st;
 	idStr testbase, exepath = {};
 	basepath = Sys_EXEPath();
@@ -428,14 +433,14 @@ const char* Sys_DefaultBasePath()
 		exepath = basepath.StripFilename();
 		testbase = basepath;
 		testbase += "/";
-		testbase += BASE_GAMEDIR;
+		testbase += baseGameDir;
 		if( stat( testbase.c_str(), &st ) != -1 && S_ISDIR( st.st_mode ) )
 		{
 			return basepath.c_str();
 		}
 		else
 		{
-			common->Printf( "no '%s' directory in exe path %s, skipping\n", BASE_GAMEDIR, basepath.c_str() );
+			common->Printf( "no '%s' directory in exe path %s, skipping\n", baseGameDir, basepath.c_str() );
 		}
 	}
 	if( basepath != Posix_Cwd() )
@@ -443,14 +448,14 @@ const char* Sys_DefaultBasePath()
 		basepath = Posix_Cwd();
 		testbase = basepath;
 		testbase += "/";
-		testbase += BASE_GAMEDIR;
+		testbase += baseGameDir;
 		if( stat( testbase.c_str(), &st ) != -1 && S_ISDIR( st.st_mode ) )
 		{
 			return basepath.c_str();
 		}
 		else
 		{
-			common->Printf( "no '%s' directory in cwd path %s, skipping\n", BASE_GAMEDIR, basepath.c_str() );
+			common->Printf( "no '%s' directory in cwd path %s, skipping\n", baseGameDir, basepath.c_str() );
 		}
 	}
 	if( exepath.Length() )
@@ -461,14 +466,14 @@ const char* Sys_DefaultBasePath()
 		basepath = basepath.StripFilename() + "/Resources";
 		testbase = basepath;
 		testbase += "/";
-		testbase += BASE_GAMEDIR;
+		testbase += baseGameDir;
 		if( stat( testbase.c_str(), &st ) != -1 && S_ISDIR( st.st_mode ) )
 		{
 			return basepath.c_str();
 		}
 		else
 		{
-			common->Printf( "no '%s' directory in macOS app bundle resources path %s, skipping\n", BASE_GAMEDIR, basepath.c_str() );
+			common->Printf( "no '%s' directory in macOS app bundle resources path %s, skipping\n", baseGameDir, basepath.c_str() );
 		}
 #endif
 		// SRS - Check for linux/macOS build path (directory structure with build dir and possible config suffix)
@@ -479,14 +484,14 @@ const char* Sys_DefaultBasePath()
 #endif
 		testbase = basepath;
 		testbase += "/";
-		testbase += BASE_GAMEDIR;
+		testbase += baseGameDir;
 		if( stat( testbase.c_str(), &st ) != -1 && S_ISDIR( st.st_mode ) )
 		{
 			return basepath.c_str();
 		}
 		else
 		{
-			common->Printf( "no '%s' directory in build path %s, skipping\n", BASE_GAMEDIR, basepath.c_str() );
+			common->Printf( "no '%s' directory in build path %s, skipping\n", baseGameDir, basepath.c_str() );
 		}
 	}
 	common->Printf( "WARNING: using hardcoded default base path %s\n", DEFAULT_BASEPATH );

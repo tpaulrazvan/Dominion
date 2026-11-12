@@ -168,6 +168,33 @@ idMenuHandler_Scoreboard::Initialize
 void idMenuHandler_Scoreboard::Initialize( const char* swfFile, idSoundWorld* sw )
 {
 	idMenuHandler::Initialize( swfFile, sw );
+#if defined( DOMINION ) // OLD GUIs - Multiplayer scoreboard
+	InitializeScreens();
+}
+
+/*
+========================
+idMenuHandler_Scoreboard::Initialize
+Keep the existing BFG screens while adopting a directory-selected SWF.
+========================
+*/
+void idMenuHandler_Scoreboard::Initialize( idSWF *selectedGui )
+{
+	Cleanup();
+	gui = selectedGui;
+	platform = 2;
+	InitializeScreens();
+}
+
+/*
+========================
+idMenuHandler_Scoreboard::InitializeScreens
+Share the original screen construction between both SWF initialization paths.
+========================
+*/
+void idMenuHandler_Scoreboard::InitializeScreens()
+{
+#endif
 
 	//---------------------
 	// Initialize the menus

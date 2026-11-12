@@ -164,6 +164,9 @@ public:
 	virtual idFile* 		OpenFileReadFlags( const char* relativePath, int searchFlags, bool allowCopyFiles = true, const char* gamedir = NULL );
 	virtual idFile* 		OpenFileRead( const char* relativePath, bool allowCopyFiles = true, const char* gamedir = NULL );
 	virtual idFile* 		OpenFileReadMemory( const char* relativePath, bool allowCopyFiles = true, const char* gamedir = NULL );
+#if defined( DOMINION ) // OLD GUIs - Shared directory lookup
+	void GetGameDirectories( idStrList& directories ) const;
+#endif
 	virtual idFile* 		OpenFileWrite( const char* relativePath, const char* basePath = "fs_savepath" );
 	virtual idFile* 		OpenFileAppend( const char* relativePath, bool sync = false, const char* basePath = "fs_basepath" );
 	virtual idFile* 		OpenFileByMode( const char* relativePath, fsMode_t mode );
@@ -184,6 +187,20 @@ public:
 
 	// RB begin
 	virtual bool			InProductionMode();
+
+#if defined( DOMINION ) // Selectable base data directory
+	virtual const char *GetBaseGameDir() const
+	{
+		return fs_basegame.GetString();
+	}
+
+	// Original pak000.pk4 is already identified by checksum when the root is mounted.
+	virtual bool UseBinaryAssets( const bool assetEnabled = true ) const
+	{
+		const int mode = binaryLoadAssets.GetInteger();
+		return assetEnabled && ( mode > 0 || ( mode < 0 && !doom2004Found ) );
+	}
+#endif
 
 	// Returns true if Doom 2004 is detected
 	virtual bool			IsDoom2004() const
@@ -213,8 +230,16 @@ public:
 
 	virtual void			StartPreload( const idStrList& _preload );
 	virtual void			StopPreload();
+#if defined( DOMINION ) // OLD GUIs - Shared directory lookup
+	idFile* 				GetResourceFile( const char* fileName, bool memFile, const char* gamedir = NULL );
+#else
 	idFile* 				GetResourceFile( const char* fileName, bool memFile );
+#endif
+#if defined( DOMINION ) // OLD GUIs - Shared directory lookup
+	bool					GetResourceCacheEntry( const char* fileName, idResourceCacheEntry& rc, const char* gamedir = NULL );
+#else
 	bool					GetResourceCacheEntry( const char* fileName, idResourceCacheEntry& rc );
+#endif
 	virtual int				ReadFromBGL( idFile* _resourceFile, void* _buffer, int _offset, int _len );
 	virtual bool			IsBinaryModel( const idStr& resName ) const;
 	virtual bool			IsSoundSample( const idStr& resName ) const;
@@ -271,6 +296,10 @@ private:
 	static idCVar			fs_debugResources;
 	static idCVar			fs_copyfiles;
 	static idCVar			fs_buildResources;
+#if defined( DOMINION ) // Selectable base data directory
+	static idCVar			fs_basegame;
+	static idCVar			binaryLoadAssets;
+#endif
 	static idCVar			fs_game;
 	static idCVar			fs_game_base;
 	static idCVar			fs_enableBGL;
@@ -325,8 +354,16 @@ private:
 	void					ReOpenCacheFiles();
 
 	// RB: PK4 support
+#if defined( DOMINION ) // OLD GUIs - Shared directory lookup
+	idFile* 				GetZipFile( const char* fileName, bool memFile, const char* gamedir = NULL );
+#else
 	idFile* 				GetZipFile( const char* fileName, bool memFile );
+#endif
+#if defined( DOMINION ) // OLD GUIs - Shared directory lookup
+	bool					GetZipCacheEntry( const char* fileName, idZipCacheEntry& rc, const char* gamedir = NULL );
+#else
 	bool					GetZipCacheEntry( const char* fileName, idZipCacheEntry& rc );
+#endif
 };
 
 idCVar	idFileSystemLocal::fs_debug( "fs_debug", "0", CVAR_SYSTEM | CVAR_INTEGER, "", 0, 2, idCmdSystem::ArgCompletion_Integer<0, 2> );
@@ -335,6 +372,10 @@ idCVar	idFileSystemLocal::fs_enableBGL( "fs_enableBGL", "0", CVAR_SYSTEM | CVAR_
 idCVar	idFileSystemLocal::fs_debugBGL( "fs_debugBGL", "0", CVAR_SYSTEM | CVAR_BOOL, "" );
 idCVar	idFileSystemLocal::fs_copyfiles( "fs_copyfiles", "0", CVAR_SYSTEM | CVAR_INIT | CVAR_BOOL, "Copy every file touched to fs_savepath" );
 idCVar	idFileSystemLocal::fs_buildResources( "fs_buildresources", "0", CVAR_SYSTEM | CVAR_BOOL | CVAR_INIT, "Copy every file touched to a resource file" );
+#if defined( DOMINION ) // Selectable base data directory
+idCVar idFileSystemLocal::binaryLoadAssets( "binaryLoadAssets", "-1", CVAR_SYSTEM | CVAR_INTEGER, "generated asset caches: -1 automatic (off for original Doom 3), 0 source only, 1 enabled", -1, 1 );
+idCVar idFileSystemLocal::fs_basegame( "fs_basegame", BASE_GAMEDIR, CVAR_SYSTEM | CVAR_INIT | CVAR_SERVERINFO, "base data directory, searched after fs_game_base and fs_game" );
+#endif
 idCVar	idFileSystemLocal::fs_game( "fs_game", "", CVAR_SYSTEM | CVAR_INIT | CVAR_SERVERINFO, "mod path" );
 idCVar  idFileSystemLocal::fs_game_base( "fs_game_base", "", CVAR_SYSTEM | CVAR_INIT | CVAR_SERVERINFO, "alternate mod path, searched after the main fs_game path, before the basedir" );
 
@@ -1846,7 +1887,13 @@ const char* idFileSystemLocal::OSPathToRelativePath( const char* OSPath )
 		return OSPath;
 	}
 	// RB: bumped from 32 to 128
+#if defined( DOMINION ) // Selectable base data directory
+	// Retain the original game names for tools and recognize the selected root too.
+	idStaticList< idStrStatic< 128 >, 6 > basePaths;
+	basePaths.Append( GetBaseGameDir() );
+#else
 	idStaticList< idStrStatic< 128 >, 5 > basePaths;
+#endif
 	basePaths.Append( "base" );
 	basePaths.Append( "d3xp" );
 	basePaths.Append( "d3le" );
@@ -1984,11 +2031,24 @@ idFileSystemLocal::RemoveDir
 bool idFileSystemLocal::RemoveDir( const char* relativePath )
 {
 	bool success = true;
+#if defined( DOMINION ) // Save deletion - an absent copy in the other root is normal
+	// Saves may exist only in fs_savepath. Do not call Windows' fatal Rmdir path
+	// for a nonexistent fs_basepath copy (or delete the same directory twice).
+	if( fs_savepath.GetString()[0] && Sys_IsFolder( BuildOSPath( fs_savepath.GetString(), relativePath ) ) == FOLDER_YES )
+	{
+		success &= Sys_Rmdir( BuildOSPath( fs_savepath.GetString(), relativePath ) );
+	}
+	if( Sys_IsFolder( BuildOSPath( fs_basepath.GetString(), relativePath ) ) == FOLDER_YES )
+	{
+		success &= Sys_Rmdir( BuildOSPath( fs_basepath.GetString(), relativePath ) );
+	}
+#else
 	if( fs_savepath.GetString()[0] )
 	{
 		success &= Sys_Rmdir( BuildOSPath( fs_savepath.GetString(), relativePath ) );
 	}
 	success &= Sys_Rmdir( BuildOSPath( fs_basepath.GetString(), relativePath ) );
+#endif
 	return success;
 }
 
@@ -3314,22 +3374,38 @@ void idFileSystemLocal::Startup()
 
 	InitPrecache();
 
-	SetupGameDirectories( BASE_GAMEDIR );
+#if defined( DOMINION ) // Selectable base data directory
+	// The root is one game-folder name, just like fs_game; never mount BFG base implicitly.
+	const char *baseGameDir = GetBaseGameDir();
+	if( !baseGameDir[0] || !idStr::Icmp( baseGameDir, "." ) || !idStr::Icmp( baseGameDir, ".." ) ||
+		strpbrk( baseGameDir, "/\\:" ) != NULL )
+	{
+		common->FatalError( "fs_basegame must name a game directory: %s", baseGameDir );
+	}
+#else
+	const char *baseGameDir = BASE_GAMEDIR;
+#endif
+	SetupGameDirectories( baseGameDir );
 
 	// fs_game_base override
 	if( fs_game_base.GetString()[0] &&
-			idStr::Icmp( fs_game_base.GetString(), BASE_GAMEDIR ) )
+			idStr::Icmp( fs_game_base.GetString(), baseGameDir ) )
 	{
 		SetupGameDirectories( fs_game_base.GetString() );
 	}
 
 	// fs_game override
 	if( fs_game.GetString()[0] &&
-			idStr::Icmp( fs_game.GetString(), BASE_GAMEDIR ) &&
+			idStr::Icmp( fs_game.GetString(), baseGameDir ) &&
 			idStr::Icmp( fs_game.GetString(), fs_game_base.GetString() ) )
 	{
 		SetupGameDirectories( fs_game.GetString() );
 	}
+
+#if defined( DOMINION ) // Original assets - report effective cache policy once per filesystem startup
+	common->Printf( "Base data: %s; original Doom 3: %s; generated asset caches: %s\n",
+		baseGameDir, IsDoom2004() ? "yes" : "no", UseBinaryAssets() ? "enabled" : "disabled" );
+#endif
 
 	// add our commands
 	cmdSystem->AddCommand( "dir", Dir_f, CMD_FL_SYSTEM, "lists a folder", idCmdSystem::ArgCompletion_FileName );
@@ -3366,6 +3442,11 @@ void idFileSystemLocal::Init()
 	// we have to specially handle this, because normal command
 	// line variable sets don't happen until after the filesystem
 	// has already been initialized
+#if defined( DOMINION ) // Selectable base data directory
+	// System base-path discovery must already know which data folder to look for.
+	common->StartupVariable( "fs_basegame" );
+	common->StartupVariable( "binaryLoadAssets" );
+#endif
 	common->StartupVariable( "fs_basepath" );
 	common->StartupVariable( "fs_savepath" );
 	common->StartupVariable( "fs_game" );
@@ -3442,6 +3523,15 @@ void idFileSystemLocal::Shutdown( bool reloading )
 		search.zipFiles.DeleteContents();
 	}
 
+#if defined( DOMINION ) // Selectable base data directory
+	// A restart must rebuild both the search order and content detection from the new root.
+	searchPaths.Clear();
+	resourceFilesFound = false;
+	zipFilesFound = false;
+	doom2004Found = false;
+	doom2019Found = false;
+#endif
+
 	cmdSystem->RemoveCommand( "path" );
 	cmdSystem->RemoveCommand( "dir" );
 	cmdSystem->RemoveCommand( "dirtree" );
@@ -3474,7 +3564,11 @@ idFileSystemLocal::GetResourceCacheEntry
 Returns false if the entry isn't found
 ========================
 */
+#if defined( DOMINION ) // OLD GUIs - Shared directory lookup
+bool idFileSystemLocal::GetResourceCacheEntry( const char* fileName, idResourceCacheEntry& rc, const char* gamedir )
+#else
 bool idFileSystemLocal::GetResourceCacheEntry( const char* fileName, idResourceCacheEntry& rc )
+#endif
 {
 	idStrStatic< MAX_OSPATH > canonical;
 	if( strstr( fileName, ":" ) != NULL )
@@ -3496,6 +3590,13 @@ bool idFileSystemLocal::GetResourceCacheEntry( const char* fileName, idResourceC
 	for( int sp = fileSystemLocal.searchPaths.Num() - 1; sp >= 0; sp-- )
 	{
 		const searchpath_t& search = fileSystemLocal.searchPaths[sp];
+#if defined( DOMINION ) // OLD GUIs - Shared directory lookup
+		// A mod-local UI probe must not accidentally read a base archive.
+		if( gamedir != NULL && gamedir[0] != '\0' && search.gamedir.Icmp( gamedir ) != 0 )
+		{
+			continue;
+		}
+#endif
 
 		int idx = search.resourceFiles.Num() - 1;
 		while( idx >= 0 )
@@ -3530,7 +3631,11 @@ Returns false if the entry isn't found
 ========================
 */
 // RB begin
+#if defined( DOMINION ) // OLD GUIs - Shared directory lookup
+bool idFileSystemLocal::GetZipCacheEntry( const char* fileName, idZipCacheEntry& rc, const char* gamedir )
+#else
 bool idFileSystemLocal::GetZipCacheEntry( const char* fileName, idZipCacheEntry& rc )
+#endif
 {
 	idStrStatic< MAX_OSPATH > canonical;
 	if( strstr( fileName, ":" ) != NULL )
@@ -3550,6 +3655,13 @@ bool idFileSystemLocal::GetZipCacheEntry( const char* fileName, idZipCacheEntry&
 	for( int sp = fileSystemLocal.searchPaths.Num() - 1; sp >= 0; sp-- )
 	{
 		const searchpath_t& search = fileSystemLocal.searchPaths[sp];
+#if defined( DOMINION ) // OLD GUIs - Shared directory lookup
+		// A mod-local UI probe must not accidentally read a base archive.
+		if( gamedir != NULL && gamedir[0] != '\0' && search.gamedir.Icmp( gamedir ) != 0 )
+		{
+			continue;
+		}
+#endif
 
 		int idx = search.zipFiles.Num() - 1;
 		while( idx >= 0 )
@@ -3582,7 +3694,11 @@ idFileSystemLocal::GetZipFile
 Returns NULL
 ========================
 */
+#if defined( DOMINION ) // OLD GUIs - Shared directory lookup
+idFile* idFileSystemLocal::GetZipFile( const char* fileName, bool memFile, const char* gamedir )
+#else
 idFile* idFileSystemLocal::GetZipFile( const char* fileName, bool memFile )
+#endif
 {
 	if( !UsingZipFiles() )
 	{
@@ -3590,7 +3706,11 @@ idFile* idFileSystemLocal::GetZipFile( const char* fileName, bool memFile )
 	}
 
 	static idZipCacheEntry rc;
+#if defined( DOMINION ) // OLD GUIs - Shared directory lookup
+	if( GetZipCacheEntry( fileName, rc, gamedir ) )
+#else
 	if( GetZipCacheEntry( fileName, rc ) )
+#endif
 	{
 		if( fs_debugResources.GetBool() )
 		{
@@ -3631,6 +3751,10 @@ idFile* idFileSystemLocal::GetZipFile( const char* fileName, bool memFile )
 				if( mfile != NULL )
 				{
 					mfile->TakeDataOwnership();
+#if defined( DOMINION ) // OLD GUIs - Packed image cache validation
+					// Decompressing a small PK4 entry into memory must not discard its source date.
+					mfile->sourceTimestamp = file->Timestamp();
+#endif
 					delete file;
 					return mfile;
 				}
@@ -3651,7 +3775,11 @@ idFileSystemLocal::GetResourceFile
 Returns NULL
 ========================
 */
+#if defined( DOMINION ) // OLD GUIs - Shared directory lookup
+idFile* idFileSystemLocal::GetResourceFile( const char* fileName, bool memFile, const char* gamedir )
+#else
 idFile* idFileSystemLocal::GetResourceFile( const char* fileName, bool memFile )
+#endif
 {
 	if( !UsingResourceFiles() )
 	{
@@ -3659,7 +3787,11 @@ idFile* idFileSystemLocal::GetResourceFile( const char* fileName, bool memFile )
 	}
 
 	static idResourceCacheEntry rc;
+#if defined( DOMINION ) // OLD GUIs - Shared directory lookup
+	if( GetResourceCacheEntry( fileName, rc, gamedir ) )
+#else
 	if( GetResourceCacheEntry( fileName, rc ) )
+#endif
 	{
 		if( fs_debugResources.GetBool() )
 		{
@@ -3763,7 +3895,11 @@ idFile* idFileSystemLocal::OpenFileReadFlags( const char* relativePath, int sear
 	// RB: .pk4 files have a higher priority than .resources because they are aimed for modding
 	if( UsingZipFiles() && fs_resourceLoadPriority.GetInteger() == 1 )
 	{
+#if defined( DOMINION ) // OLD GUIs - Shared directory lookup
+		idFile* rf = GetZipFile( relativePath, ( searchFlags & FSFLAG_RETURN_FILE_MEM ) != 0, gamedir );
+#else
 		idFile* rf = GetZipFile( relativePath, ( searchFlags & FSFLAG_RETURN_FILE_MEM ) != 0 );
+#endif
 		if( rf != NULL )
 		{
 			return rf;
@@ -3773,7 +3909,11 @@ idFile* idFileSystemLocal::OpenFileReadFlags( const char* relativePath, int sear
 
 	if( UsingResourceFiles() && fs_resourceLoadPriority.GetInteger() == 1 )
 	{
+#if defined( DOMINION ) // OLD GUIs - Shared directory lookup
+		idFile* rf = GetResourceFile( relativePath, ( searchFlags & FSFLAG_RETURN_FILE_MEM ) != 0, gamedir );
+#else
 		idFile* rf = GetResourceFile( relativePath, ( searchFlags & FSFLAG_RETURN_FILE_MEM ) != 0 );
+#endif
 		if( rf != NULL )
 		{
 			return rf;
@@ -3912,7 +4052,11 @@ idFile* idFileSystemLocal::OpenFileReadFlags( const char* relativePath, int sear
 	// RB: .pk4 files have a higher priority than .resources because they are aimed for modding
 	if( UsingZipFiles() && fs_resourceLoadPriority.GetInteger() == 0 )
 	{
+#if defined( DOMINION ) // OLD GUIs - Shared directory lookup
+		idFile* rf = GetZipFile( relativePath, ( searchFlags & FSFLAG_RETURN_FILE_MEM ) != 0, gamedir );
+#else
 		idFile* rf = GetZipFile( relativePath, ( searchFlags & FSFLAG_RETURN_FILE_MEM ) != 0 );
+#endif
 		if( rf != NULL )
 		{
 			return rf;
@@ -3922,7 +4066,11 @@ idFile* idFileSystemLocal::OpenFileReadFlags( const char* relativePath, int sear
 
 	if( UsingResourceFiles() && fs_resourceLoadPriority.GetInteger() == 0 )
 	{
+#if defined( DOMINION ) // OLD GUIs - Shared directory lookup
+		idFile* rf = GetResourceFile( relativePath, ( searchFlags & FSFLAG_RETURN_FILE_MEM ) != 0, gamedir );
+#else
 		idFile* rf = GetResourceFile( relativePath, ( searchFlags & FSFLAG_RETURN_FILE_MEM ) != 0 );
+#endif
 		if( rf != NULL )
 		{
 			return rf;
@@ -4255,3 +4403,14 @@ sysFolder_t idFileSystemLocal::IsFolder( const char* relativePath, const char* b
 {
 	return Sys_IsFolder( RelativePathToOSPath( relativePath, basePath ) );
 }
+
+#if defined( DOMINION ) // OLD GUIs - Shared directory lookup
+void idFileSystemLocal::GetGameDirectories( idStrList& directories ) const
+{
+	directories.Clear();
+	for( int sp = searchPaths.Num() - 1; sp >= 0; --sp )
+	{
+		directories.AddUnique( searchPaths[sp].gamedir );
+	}
+}
+#endif

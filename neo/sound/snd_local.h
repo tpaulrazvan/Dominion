@@ -510,6 +510,9 @@ public:
 
 	// sends the current playing sound world information to the sound hardware
 	virtual void			Render();
+#if defined( DOMINION ) // OLD GUIs - Menu sound clock
+	virtual void			UpdateSoundTime();
+#endif
 
 	// Mutes the SSG_MUSIC group
 	virtual void			MuteBackgroundMusic( bool mute )
@@ -546,7 +549,11 @@ public:
 	virtual cinData_t		ImageForTime( const int milliseconds, const bool waveform );
 
 	// Free all sounds loaded during the last map load
+#if defined( DOMINION ) // Original map reload - retain source assets
+	virtual void			BeginLevelLoad( bool reuseAssets = false );
+#else
 	virtual	void			BeginLevelLoad();
+#endif
 
 	// We might want to defer the loading of new sounds to this point
 	virtual	void			EndLevelLoad();

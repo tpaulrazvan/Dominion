@@ -45,6 +45,13 @@ const idEventDef EV_RespawnItem( "respawn" );
 const idEventDef EV_RespawnFx( "<respawnFx>" );
 const idEventDef EV_GetPlayerPos( "<getplayerpos>" );
 const idEventDef EV_HideObjective( "<hideobjective>", "e" );
+#if defined( DOMINION ) // OLD GUIs - Objective camera pictures
+const idEventDef EV_CamShot( "<camshot>" );
+// Default to supplied pictures, with a runtime camera fallback; mode 1 forces fresh camera pictures.
+idCVar g_objectiveCameraShots( "g_objectiveCameraShots", "0", CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER,
+	"objective pictures: 0 prefer images and generate missing pictures, 1 always generate camera pictures", 0, 1 );
+static idLinkList<idObjective> pendingObjectivePictures;
+#endif
 
 CLASS_DECLARATION( idEntity, idItem )
 EVENT( EV_DropToFloor,		idItem::Event_DropToFloor )
@@ -1528,6 +1535,14 @@ void idItemTeam::UpdateGuis()
 	{
 		player = static_cast<idPlayer*>( gameLocal.entities[ i ] );
 
+#if defined( DOMINION ) // OLD GUIs - HUD
+		if( player != NULL && player->guiHud != NULL ) {
+			player->guiHud->SetStateInt( "red_flagstatus", gameLocal.mpGame.GetFlagStatus( 0 ) );
+			player->guiHud->SetStateInt( "blue_flagstatus", gameLocal.mpGame.GetFlagStatus( 1 ) );
+			player->guiHud->HandleNamedEvent( "RedFlagStatusChange" );
+			player->guiHud->HandleNamedEvent( "BlueFlagStatusChange" );
+		}
+#endif
 		if( player && player->hud )
 		{
 
@@ -1571,6 +1586,9 @@ void idItemTeam::Present()
 */
 
 CLASS_DECLARATION( idItem, idObjective )
+#if defined( DOMINION ) // OLD GUIs - Objective camera pictures
+EVENT( EV_CamShot, idObjective::Event_CamShot )
+#endif
 EVENT( EV_Activate,			idObjective::Event_Trigger )
 EVENT( EV_HideObjective,	idObjective::Event_HideObjective )
 EVENT( EV_GetPlayerPos,		idObjective::Event_GetPlayerPos )
@@ -1584,6 +1602,9 @@ idObjective::idObjective
 idObjective::idObjective()
 {
 	playerPos.Zero();
+#if defined( DOMINION ) // OLD GUIs - Objective camera pictures
+	cameraShotNode.SetOwner( this );
+#endif
 }
 
 /*
@@ -1606,6 +1627,13 @@ void idObjective::Restore( idRestoreGame* savefile )
 {
 	savefile->ReadVec3( playerPos );
 	savefile->ReadMaterial( screenshot );
+#if defined( DOMINION ) // OLD GUIs - Objective camera pictures
+	// Native Doom 3 rebuilds camera pictures after restoring a saved world as well.
+	if( fileSystem->IsDoom2004() )
+	{
+		PostEventMS( &EV_CamShot, 250 );
+	}
+#endif
 }
 
 /*
@@ -1623,7 +1651,102 @@ void idObjective::Spawn()
 	shotName += spawnArgs.GetString( "screenshot" );
 	shotName.SetFileExtension( ".tga" );
 	screenshot = declManager->FindMaterial( shotName );
+#if defined( DOMINION ) // OLD GUIs - Objective camera pictures
+	// BFG supplies these images; original maps can instead name a runtime camShot camera.
+	if( fileSystem->IsDoom2004() )
+	{
+		PostEventMS( &EV_CamShot, 250 );
+	}
+#endif
 }
+
+#if defined( DOMINION ) // OLD GUIs - Objective camera pictures
+/*
+================
+idObjective::Event_CamShot
+The native event requests the picture. NVRHI capture runs during normal drawing,
+after the renderer's per-frame buffers are ready, rather than during spawn/settling.
+================
+*/
+void idObjective::Event_CamShot()
+{
+	if( fileSystem->IsDoom2004() )
+	{
+		cameraShotNode.AddToEnd( pendingObjectivePictures );
+	}
+}
+
+/*
+================
+idObjective::RenderPendingPictures
+Drain the queue once before the player's view. Removing each node first permits
+safe requeueing; deleting an objective also removes its node without stale pointers.
+================
+*/
+void idObjective::RenderPendingPictures()
+{
+	// Requeue on a policy change so the CVar takes effect during play without reloading the map.
+	// Compare the consumed value explicitly; other game settings code can clear modified flags.
+	static int previousMode = -1;
+	const int mode = g_objectiveCameraShots.GetInteger();
+	if( mode != previousMode )
+	{
+		previousMode = mode;
+		for( int i = 0; i < gameLocal.num_entities; ++i )
+		{
+			if( gameLocal.entities[i] != NULL && gameLocal.entities[i]->IsType( idObjective::Type ) )
+			{
+				static_cast<idObjective *>( gameLocal.entities[i] )->Event_CamShot();
+			}
+		}
+	}
+	while( idObjective *objective = pendingObjectivePictures.Next() )
+	{
+		objective->cameraShotNode.Remove();
+		objective->CapturePicture();
+	}
+}
+
+/*
+================
+idObjective::CapturePicture
+Use vanilla/dhewm3's camera and framing. Keep the GPU copy for immediate display
+and queue a loose TGA cache after submission; the player then redraws the working targets.
+================
+*/
+void idObjective::CapturePicture()
+{
+	if( !fileSystem->IsDoom2004() || screenshot == NULL || screenshot->GetNumStages() == 0 )
+	{
+		return;
+	}
+	idImage *image = screenshot->GetStage( 0 )->texture.image;
+	if( image == NULL || ( g_objectiveCameraShots.GetInteger() == 0 && image->IsLoaded() && !image->IsDefaulted() ) )
+	{
+		return;
+	}
+	idEntity *camera = gameLocal.FindEntity( spawnArgs.GetString( "camShot" ) );
+	if( camera == NULL || camera->cameraTarget == NULL )
+	{
+		return;
+	}
+	renderView_t view = *camera->cameraTarget->GetRenderView();
+	view.viewID = 0;
+	view.forceUpdate = true;
+	view.rdflags |= RDF_OBJECTIVE;
+	// Original pictures use the camera's 4:3 framing, irrespective of the player's aspect ratio.
+	view.fov_x = camera->cameraTarget->spawnArgs.GetFloat( "fov", "90" );
+	view.fov_y = 2.0f * atan( tan( DEG2RAD( view.fov_x ) * 0.5f ) * 0.75f ) * idMath::M_RAD2DEG;
+	renderSystem->CropRenderSize( 0, 0, 256, 256, true );
+	gameRenderWorld->RenderScene( &view );
+	renderSystem->CaptureRenderToImage( image->GetName(), true );
+	// Like vanilla, keep a loose TGA for subsequent loads, using the active game/mod directory.
+	idStr fileName = screenshot->GetName();
+	fileName.SetFileExtension( ".tga" );
+	renderSystem->WriteRenderImageToFile( image->GetName(), fileName );
+	renderSystem->UnCrop();
+}
+#endif
 
 /*
 ================
@@ -1632,6 +1755,10 @@ idObjective::Event_Trigger
 */
 void idObjective::Event_Trigger( idEntity* activator )
 {
+#if defined( DOMINION ) // OLD GUIs - Objective camera pictures
+	// Also covers early objective triggers before the delayed spawn event has run.
+	Event_CamShot();
+#endif
 	idPlayer* player = gameLocal.GetLocalPlayer();
 	if( player )
 	{
@@ -2395,6 +2522,11 @@ void idObjectiveComplete::Event_Trigger( idEntity* activator )
 		if( spawnArgs.GetString( "inv_objective", NULL ) )
 		{
 			player->CompleteObjective( spawnArgs.GetString( "objectivetitle" ) );
+#if defined( DOMINION ) // OLD GUIs - HUD
+			if( player->guiHud != NULL ) {
+				player->guiHud->SetStateString( "objectivetext", spawnArgs.GetString( "objectivetext" ) );
+			}
+#endif
 			PostEventMS( &EV_GetPlayerPos, 2000 );
 		}
 	}

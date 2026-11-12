@@ -417,6 +417,19 @@ void* idSoundSystemLocal::GetOpenALDevice() const
 }
 // RB end
 
+#if defined( DOMINION ) // OLD GUIs - Menu sound clock
+/*
+========================
+idSoundSystemLocal::UpdateSoundTime
+Keep GUI sound timestamps current without submitting audio from the draw thread.
+========================
+*/
+void idSoundSystemLocal::UpdateSoundTime()
+{
+	soundTime = Sys_Milliseconds();
+}
+#endif
+
 /*
 ========================
 idSoundSystemLocal::SoundTime
@@ -546,7 +559,11 @@ cinData_t idSoundSystemLocal::ImageForTime( const int milliseconds, const bool w
 idSoundSystemLocal::BeginLevelLoad
 ========================
 */
+#if defined( DOMINION ) // Original map reload - retain source assets
+void idSoundSystemLocal::BeginLevelLoad( bool reuseAssets )
+#else
 void idSoundSystemLocal::BeginLevelLoad()
+#endif
 {
 	insideLevelLoad = true;
 	for( int i = 0; i < samples.Num(); i++ )
@@ -555,7 +572,15 @@ void idSoundSystemLocal::BeginLevelLoad()
 		{
 			continue;
 		}
+#if defined( DOMINION ) // Original map reload - retain source assets
+		// Emitters reset in MapShutdown; decoded samples can survive a same-map reload.
+		if( !reuseAssets )
+		{
+			samples[i]->FreeData();
+		}
+#else
 		samples[i]->FreeData();
+#endif
 		samples[i]->ResetLevelLoadReferenced();
 	}
 }

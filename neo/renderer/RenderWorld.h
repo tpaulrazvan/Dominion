@@ -240,6 +240,16 @@ const int RDF_NOSHADOWS		= BIT( 0 ); // force renderer to use faster lighting on
 const int RDF_NOAMBIENT		= BIT( 1 ); // don't render indirect lighting
 const int RDF_IRRADIANCE	= BIT( 2 ); // render into 256^2 HDR render target for irradiance/radiance GGX calculation
 const int RDF_UNDERWATER	= BIT( 3 ); // TODO enable automatic underwater caustics and fog
+#if defined( DOMINION ) // Portal sky fix
+// Portal sky is a separate RenderScene, so isSubview alone cannot identify this camera.
+const int RDF_PORTALSKY = BIT( 4 );
+#endif
+#if defined( DOMINION ) // OLD GUIs - Objective camera pictures
+// A fixed-size GUI snapshot is an independent camera, without player temporal history.
+const int RDF_OBJECTIVE = BIT( 5 );
+// OLD GUIs - Save previews use the same crop/orientation/history rules as objective pictures.
+const int RDF_SAVEGAME = RDF_OBJECTIVE;
+#endif
 
 typedef struct renderView_s
 {
@@ -265,6 +275,9 @@ typedef struct renderView_s
 	int						viewEyeBuffer;				// -1 = left eye, 1 = right eye, 0 = monoscopic view or GUI
 	float					stereoScreenSeparation;		// projection matrix horizontal offset, positive or negative based on camera eye
 
+#if defined( DOMINION ) // OLD GUIs - Menu
+	int guiX = 0, guiY = 0, guiWidth = 0, guiHeight = 0;
+#endif
 	int						rdflags;			// RB: RDF_NOSHADOWS, etc
 } renderView_t;
 

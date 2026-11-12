@@ -81,10 +81,23 @@ idLocalization::VerifyUTF8
 utf8Encoding_t idLocalization::VerifyUTF8( const uint8* buffer, const int bufferLen, const char* name )
 {
 	utf8Encoding_t encoding;
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	if( !idStr::IsValidUTF8( buffer, bufferLen, encoding ) )
+	{
+		// Invalid continuation bytes can leave encoding marked ASCII; honor the validation result.
+		const bool hasBOM = bufferLen >= 3 && buffer[0] == 0xEF && buffer[1] == 0xBB && buffer[2] == 0xBF;
+		encoding = hasBOM ? UTF8_INVALID_BOM : UTF8_INVALID;
+	}
+#else
 	idStr::IsValidUTF8( buffer, bufferLen, encoding );
+#endif
 	if( encoding == UTF8_INVALID )
 	{
+#if defined( DOMINION ) // OLD GUIs - Shared support
+		return encoding;
+#else
 		idLib::FatalError( "Language file %s is not valid UTF-8 or plain ASCII.", name );
+#endif
 	}
 	else if( encoding == UTF8_INVALID_BOM )
 	{
@@ -92,7 +105,11 @@ utf8Encoding_t idLocalization::VerifyUTF8( const uint8* buffer, const int buffer
 	}
 	else if( encoding == UTF8_ENCODED_NO_BOM )
 	{
+#if defined( DOMINION ) // OLD GUIs - Shared support
+		return encoding;
+#else
 		idLib::FatalError( "Language file %s has no byte order marker. Fix this or roll back to a version that has the marker.", name );
+#endif
 	}
 	else if( encoding != UTF8_ENCODED_BOM && encoding != UTF8_PURE_ASCII )
 	{
@@ -163,6 +180,11 @@ bool idLangDict::Load( const byte* buffer, const int bufferLen, const char* name
 
 	bool utf8 = false;
 
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	const utf8Encoding_t encoding = idLocalization::VerifyUTF8( buffer, bufferLen, name );
+	const bool legacyAnsi = encoding == UTF8_INVALID;
+	utf8 = encoding == UTF8_ENCODED_BOM || encoding == UTF8_ENCODED_NO_BOM;
+#else
 	// in all but retail builds, ensure that the byte-order mark is NOT MISSING so that
 	// we can avoid debugging UTF-8 code
 #ifndef ID_RETAIL
@@ -188,13 +210,19 @@ bool idLangDict::Load( const byte* buffer, const int bufferLen, const char* name
 	}
 #endif
 
+#endif
+
 	if( utf8 )
 	{
 		idLib::Printf( " as UTF-8\n" );
 	}
 	else
 	{
+#if defined( DOMINION ) // OLD GUIs - Shared support
+		idLib::Printf( legacyAnsi ? " as legacy Western ANSI\n" : " as ASCII\n" );
+#else
 		idLib::Printf( " as ASCII\n" );
+#endif
 	}
 
 	idStr tempKey;
@@ -265,7 +293,11 @@ bool idLangDict::Load( const byte* buffer, const int bufferLen, const char* name
 			while( i < bufferLen )
 			{
 				c = utf8 ? idStr::UTF8Char( buffer, i ) : buffer[i++];
-				if( !utf8 && c >= 0x80 )
+				if( !utf8 && c >= 0x80
+#if defined( DOMINION ) // OLD GUIs - Shared support
+					&& !legacyAnsi
+#endif
+				)
 				{
 					// this is a serious error and we must check this to avoid accidentally shipping a file where someone squased UTF-8 encodings
 					idLib::FatalError( "Language file %s is supposed to be plain ASCII, but has byte values > 127!", name );
@@ -273,6 +305,19 @@ bool idLangDict::Load( const byte* buffer, const int bufferLen, const char* name
 				if( c == '\"' )
 				{
 					valEnd = i - 1;
+#if defined( DOMINION ) // OLD GUIs - Language trailing comments
+					// Original .lang files can put // translator notes after the value.
+					// Keep BFG's permissive embedded-quote handling for other lines.
+					int next = i;
+					while( next < bufferLen && ( buffer[next] == ' ' || buffer[next] == '\t' ) )
+					{
+						++next;
+					}
+					if( next + 1 < bufferLen && buffer[next] == '/' && buffer[next + 1] == '/' )
+					{
+						break;
+					}
+#endif
 					continue;
 				}
 				if( c == '\n' )
@@ -308,6 +353,17 @@ bool idLangDict::Load( const byte* buffer, const int bufferLen, const char* name
 						idLib::Warning( "Unknown escape sequence %x at line %d", c, line );
 					}
 				}
+#if defined( DOMINION ) // OLD GUIs - Shared support
+				if( legacyAnsi && c >= 0x80 && c < 0xA0 ) {
+					static const uint32 westernAnsi[32] = {
+						0x20AC, 0x0081, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021,
+						0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0x008D, 0x017D, 0x008F,
+						0x0090, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014,
+						0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0x009D, 0x017E, 0x0178
+					};
+					c = westernAnsi[c - 0x80];
+				}
+#endif
 				tempVal.AppendUTF8Char( c );
 			}
 			if( valEnd < valStart )

@@ -168,11 +168,15 @@ void idMultiplayerGame::Reset()
 
 	if( common->IsMultiplayer() )
 	{
+#if defined( DOMINION ) // OLD GUIs - Multiplayer scoreboard
+		InitializeScoreboard();
+#else
 		scoreboardManager = new idMenuHandler_Scoreboard();
 		if( scoreboardManager != NULL )
 		{
 			scoreboardManager->Initialize( "scoreboard", common->SW() );
 		}
+#endif
 	}
 
 	ClearChatData();
@@ -262,6 +266,12 @@ idMultiplayerGame::Clear
 */
 void idMultiplayerGame::CleanupScoreboard()
 {
+#if defined( DOMINION ) // OLD GUIs - Multiplayer scoreboard
+	// Private original desktops follow the same map-change/reload lifetime as the SWF.
+	uiManager->DeAlloc( guiScoreboard );
+	guiScoreboard = NULL;
+	guiScoreboardActive = false;
+#endif
 	if( scoreboardManager != NULL )
 	{
 		delete scoreboardManager;
@@ -394,6 +404,12 @@ idMultiplayerGame::IsScoreboardActive
 */
 bool idMultiplayerGame::IsScoreboardActive()
 {
+#if defined( DOMINION ) // OLD GUIs - Multiplayer scoreboard
+	if( guiScoreboard != NULL )
+	{
+		return guiScoreboardActive;
+	}
+#endif
 
 	if( scoreboardManager != NULL )
 	{
@@ -2070,8 +2086,47 @@ bool idMultiplayerGame::Draw( int clientNum )
 		scoreboardManager->UpdateSpectating( spectatetext[0].c_str(), spectatetext[1].c_str() );
 	}
 
+#if defined( DOMINION ) // OLD GUIs - Multiplayer spectator display
+	if( player->spectating && player->guiMPSpectate != NULL )
+	{
+		// Native Doom 3/dhewm3 spectator labels. BFG's respawn prompt belongs to
+		// its SWF overlay; do not inject that prompt into the original GUI.
+		idStr labels[2];
+		int line = 0;
+		if( gameLocal.gameType == GAME_TOURNEY && !player->wantSpectate )
+		{
+			labels[0] = idLocalization::GetString( "#str_04246" );
+			labels[0] += player->tourneyLine >= 0 && player->tourneyLine < 3 ? idLocalization::GetString( va( "#str_%05d", 7003 + player->tourneyLine ) ) :
+				va( idLocalization::GetString( "#str_07006" ), player->tourneyLine );
+			++line;
+		}
+		else if( gameLocal.gameType == GAME_LASTMAN && !player->wantSpectate )
+		{
+			labels[0] = idLocalization::GetString( "#str_07007" );
+			++line;
+		}
+		if( player->spectator != player->entityNumber )
+		{
+			labels[line] = va( idLocalization::GetString( "#str_07008" ), session->GetActingGameStateLobbyBase().GetLobbyUserName( gameLocal.lobbyUserIDs[viewPlayer->entityNumber] ) );
+		}
+		else if( line == 0 )
+		{
+			labels[0] = idLocalization::GetString( "#str_04246" );
+		}
+		player->guiMPSpectate->SetStateString( "spectatetext0", labels[0] );
+		player->guiMPSpectate->SetStateString( "spectatetext1", labels[1] );
+		player->guiMPSpectate->SetStateString( "vote", "" );
+		player->guiMPSpectate->Redraw( gameLocal.time, false );
+	}
+#endif
 	DrawChat( player );
 	DrawScoreBoard( player );
+#if defined( DOMINION ) // OLD GUIs - Multiplayer messages
+	if( player->guiMPMessageMode != NULL && player->isChatting != 0 )
+	{
+		player->guiMPMessageMode->Redraw( gameLocal.time, false );
+	}
+#endif
 
 	return true;
 }
@@ -2172,6 +2227,54 @@ idMultiplayerGame::UpdateHud
 */
 void idMultiplayerGame::UpdateHud( idPlayer* player, idMenuHandler_HUD* hudManager )
 {
+#if defined( DOMINION ) // OLD GUIs - HUD
+	idPlayer* localPlayer = gameLocal.GetLocalPlayer();
+	if( localPlayer != NULL && localPlayer->guiHud != NULL ) {
+		idUserInterface* gui = localPlayer->guiHud;
+		gui->SetStateBool( "warmup", Warmup() );
+		gui->SetStateString( "warmuptext", idLocalization::GetString( gameState == SUDDENDEATH ? "#str_04252" : "#str_04251" ) );
+		gui->SetStateString( "timer", Warmup() ? idLocalization::GetString( "#str_04251" ) : gameState == SUDDENDEATH ? idLocalization::GetString( "#str_04252" ) : GameTime() );
+				gui->SetStateInt( "rank_self", 0 );
+		for( int i = 0; i < 5; ++i ) {
+			const bool ranked = gameState == GAMEON && i < numRankedPlayers;
+			gui->SetStateInt( va( "rank%d", i + 1 ), ranked ? 1 : 0 );
+			if( ranked ) {
+				idPlayer* rankedPlayer = rankedPlayers[i];
+				const int client = rankedPlayer->entityNumber;
+				gui->SetStateString( va( "player%d", i + 1 ), session->GetActingGameStateLobbyBase().GetLobbyUserName( gameLocal.lobbyUserIDs[client] ) );
+				gui->SetStateInt( va( "player%d_score", i + 1 ), IsGametypeTeamBased() ? playerState[client].teamFragCount : playerState[client].fragCount );
+				const idVec3 color = GetSkinColor( rankedPlayer->GetSkinIndex() );
+				for( int component = 0; component < 3; ++component ) {
+					gui->SetStateFloat( va( "rank%d_color%d", i + 1, component + 1 ), color[component] );
+				}
+				if( rankedPlayer == player ) {
+					gui->SetStateInt( "rank_self", i + 1 );
+				}
+			} else {
+				gui->SetStateString( va( "player%d", i + 1 ), "" );
+				gui->SetStateString( va( "player%d_score", i + 1 ), "" );
+			}
+		}
+		gui->SetStateInt( "self_team", IsGametypeTeamBased() ? player->team : -1 );
+		gui->SetStateInt( "red_flagstatus", GetFlagStatus( 0 ) );
+		gui->SetStateInt( "blue_flagstatus", GetFlagStatus( 1 ) );
+		if( IsGametypeFlagBased() ) {
+			gui->SetStateInt( "red_team_score", GetFlagPoints( 0 ) );
+			gui->SetStateInt( "blue_team_score", GetFlagPoints( 1 ) );
+		} else if( IsGametypeTeamBased() ) {
+			for( int i = 0; i < gameLocal.numClients; ++i ) {
+				idEntity* ent = gameLocal.entities[i];
+				if( ent != NULL && ent->IsType( idPlayer::Type ) ) {
+					idPlayer* teamPlayer = static_cast<idPlayer*>( ent );
+					gui->SetStateInt( teamPlayer->team == 0 ? "red_team_score" : "blue_team_score", playerState[i].teamFragCount );
+				}
+			}
+		}
+		gui->StateChanged( gameLocal.time );
+		return;
+	}
+#endif
+
 
 	if( hudManager && hudManager->GetHud() )
 	{
@@ -2244,6 +2347,17 @@ idMultiplayerGame::SetScoreboardActive
 */
 void idMultiplayerGame::SetScoreboardActive( bool active )
 {
+#if defined( DOMINION ) // OLD GUIs - Multiplayer scoreboard
+	if( guiScoreboard != NULL )
+	{
+		if( active != guiScoreboardActive )
+		{
+			guiScoreboard->Activate( active, gameLocal.time );
+			guiScoreboardActive = active;
+		}
+		return;
+	}
+#endif
 	if( scoreboardManager != NULL )
 	{
 		if( active )
@@ -2274,6 +2388,21 @@ idMultiplayerGame::DrawScoreBoard
 */
 void idMultiplayerGame::DrawScoreBoard( idPlayer* player )
 {
+#if defined( DOMINION ) // OLD GUIs - Multiplayer scoreboard
+	if( guiScoreboard != NULL )
+	{
+		// Native hold-to-view overlay: either scoreboard binding works, movement
+		// remains active, and the final results stay visible through game review.
+		const bool held = usercmdGen->ButtonState( UB_IMPULSE19 ) > 0 || usercmdGen->ButtonState( UB_SHOWSCORES ) > 0;
+		SetScoreboardActive( gameState == GAMEREVIEW || ( player != NULL && player->forceScoreBoard ) ||
+			( held && !gameLocal.Shell_IsActive() ) );
+		if( player != NULL && guiScoreboardActive )
+		{
+			UpdateGuiScoreboard( guiScoreboard, player );
+		}
+		return;
+	}
+#endif
 	if( scoreboardManager && scoreboardManager->IsActive() == true )
 	{
 		UpdateScoreboard( scoreboardManager, player );
@@ -2362,9 +2491,21 @@ void idMultiplayerGame::DrawChat( idPlayer* player )
 				player->ClearChatMessage( j );
 				j++;
 			}
+#if defined( DOMINION ) // OLD GUIs - Multiplayer messages
+			if( player->guiMPChat != NULL )
+			{
+				// Native chat.gui evaluates its fade levels in onActivate.
+				player->guiMPChat->Activate( true, gameLocal.time );
+			}
+#endif
 			chatDataUpdated = false;
 		}
-
+#if defined( DOMINION ) // OLD GUIs - Multiplayer messages
+		if( player->guiMPChat != NULL )
+		{
+			player->guiMPChat->Redraw( gameLocal.time, false );
+		}
+#endif
 	}
 }
 
@@ -2987,6 +3128,9 @@ void idMultiplayerGame::MessageMode( const idCmdArgs& args )
 		{
 			player->isChatting = 2;
 		}
+#if defined( DOMINION ) // OLD GUIs - Multiplayer messages
+		player->BeginGuiMessageMode( player->isChatting == 2 );
+#endif
 	}
 }
 
@@ -3870,10 +4014,18 @@ idMultiplayerGame::ReloadScoreboard
 void idMultiplayerGame::ReloadScoreboard()
 {
 
+#if defined( DOMINION ) // OLD GUIs - Multiplayer scoreboard
+	// A reload can change the selected presentation; release either previous owner.
+	if( common->IsMultiplayer() )
+	{
+		InitializeScoreboard();
+	}
+#else
 	if( scoreboardManager != NULL )
 	{
 		scoreboardManager->Initialize( "scoreboard", common->SW() );
 	}
+#endif
 
 	Precache();
 }
@@ -3904,3 +4056,231 @@ int idMultiplayerGame::GetGameModes( const char** * gameModes, const char** * ga
 		return GAME_COUNT - 1;
 	}
 }
+
+#if defined( DOMINION ) // OLD GUIs - Multiplayer scoreboard
+/*
+========================
+idMultiplayerGame::InitializeScoreboard
+Select SWF before GUI inside each mod/base directory, as for the other fullscreens.
+========================
+*/
+void idMultiplayerGame::InitializeScoreboard()
+{
+	CleanupScoreboard();
+	idSWF *swf = NULL;
+	UI_LoadFullscreenGui( "scoreboard", "guis/scoreboard.gui", NULL, common->SW(), swf, guiScoreboard );
+	if( swf != NULL )
+	{
+		scoreboardManager = new idMenuHandler_Scoreboard();
+		scoreboardManager->Initialize( swf );
+	}
+}
+
+/*
+========================
+idMultiplayerGame::UpdateGuiScoreboard
+Restore the original scoreboard's state protocol without changing multiplayer rules.
+========================
+*/
+void idMultiplayerGame::UpdateGuiScoreboard( idUserInterface *scoreBoard, idPlayer *player )
+{
+	// Native Doom 3/dhewm3 GUI keys and ranking order, using BFG lobby names/skins.
+	// BFG has no per-player ready switch; non-spectators use its existing ready label.
+	idLobbyBase &lobby = session->GetActingGameStateLobbyBase();
+	scoreBoard->SetStateInt( "rank_self", 0 );
+	int i, j, iline, k;
+	idStr gameinfo;
+	idStr livesinfo;
+	idStr timeinfo;
+	idEntity *ent;
+	idPlayer *p;
+	int value;
+
+	scoreBoard->SetStateString( "scoretext", gameLocal.gameType == GAME_LASTMAN ? idLocalization::GetString( "#str_04242" ) : idLocalization::GetString( "#str_04243" ) );
+
+	iline = 0; // the display lines
+	if ( gameState != WARMUP )
+	{
+		for ( i = 0; i < numRankedPlayers; ++i )
+		{
+			// ranked player
+			++iline;
+			scoreBoard->SetStateString( va( "player%i", iline ), lobby.GetLobbyUserName( gameLocal.lobbyUserIDs[rankedPlayers[i]->entityNumber] ) );
+			if ( IsGametypeTeamBased() )
+			{
+				value = idMath::ClampInt( MP_PLAYER_MINFRAGS, MP_PLAYER_MAXFRAGS, playerState[ rankedPlayers[ i ]->entityNumber ].fragCount );
+				scoreBoard->SetStateInt( va( "player%i_tdm_score", iline ), value );
+				value = idMath::ClampInt( MP_PLAYER_MINFRAGS, MP_PLAYER_MAXFRAGS, playerState[ rankedPlayers[ i ]->entityNumber ].teamFragCount );
+				scoreBoard->SetStateString( va( "player%i_tdm_tscore", iline ), va( "/ %i", value ) );
+				scoreBoard->SetStateString( va( "player%i_score", iline ), "" );
+			}
+			else
+			{
+				value = idMath::ClampInt( MP_PLAYER_MINFRAGS, MP_PLAYER_MAXFRAGS, playerState[ rankedPlayers[ i ]->entityNumber ].fragCount );
+				scoreBoard->SetStateInt( va( "player%i_score", iline ), value );
+				scoreBoard->SetStateString( va( "player%i_tdm_tscore", iline ), "" );
+				scoreBoard->SetStateString( va( "player%i_tdm_score", iline ), "" );
+			}
+			value = idMath::ClampInt( 0, MP_PLAYER_MAXWINS, playerState[ rankedPlayers[ i ]->entityNumber ].wins );
+			scoreBoard->SetStateInt( va( "player%i_wins", iline ), value );
+			scoreBoard->SetStateInt( va( "player%i_ping", iline ), playerState[ rankedPlayers[ i ]->entityNumber ].ping );
+			// set the color band
+			scoreBoard->SetStateInt( va( "rank%i", iline ), 1 );
+			UpdateRankColor( scoreBoard, "rank%i_color%i", iline, GetSkinColor( rankedPlayers[i]->GetSkinIndex() ) );
+			if ( rankedPlayers[ i ] == player )
+			{
+				// highlight who we are
+				scoreBoard->SetStateInt( "rank_self", iline );
+			}
+		}
+	}
+
+	// if warmup, this draws everyone, otherwise it goes over spectators only
+	// when doing warmup we loop twice to draw ready/not ready first *then* spectators
+	// NOTE: in tourney, shows spectators according to their playing rank order?
+	for ( k = 0; k < ( gameState == WARMUP ? 2 : 1 ); ++k )
+	{
+		for ( i = 0; i < MAX_CLIENTS; ++i )
+		{
+			ent = gameLocal.entities[ i ];
+			if ( !ent || !ent->IsType( idPlayer::Type ) )
+			{
+				continue;
+			}
+			if ( gameState != WARMUP )
+			{
+				// check he's not covered by ranks already
+				for ( j = 0; j < numRankedPlayers; ++j )
+				{
+					if ( ent == rankedPlayers[ j ] )
+					{
+						break;
+					}
+				}
+				if ( j != numRankedPlayers )
+				{
+					continue;
+				}
+			}
+			p = static_cast< idPlayer * >( ent );
+			if ( gameState == WARMUP )
+			{
+				if ( k == 0 && p->spectating )
+				{
+					continue;
+				}
+				if ( k == 1 && !p->spectating )
+				{
+					continue;
+				}
+			}
+
+			++iline;
+			// BFG tracks connection/loading in the lobby rather than mpPlayerState.
+			if ( !lobby.IsLobbyUserLoaded( gameLocal.lobbyUserIDs[i] ) )
+			{
+				scoreBoard->SetStateString( va( "player%i", iline ), idLocalization::GetString( "#str_04244" ) );
+				scoreBoard->SetStateString( va( "player%i_score", iline ), idLocalization::GetString( "#str_04245" ) );
+				// no color band
+				scoreBoard->SetStateInt( va( "rank%i", iline ), 0 );
+			}
+			else
+			{
+				scoreBoard->SetStateString( va( "player%i", iline ), lobby.GetLobbyUserName( gameLocal.lobbyUserIDs[i] ) );
+				if ( gameState == WARMUP )
+				{
+					if ( p->spectating )
+					{
+						scoreBoard->SetStateString( va( "player%i_score", iline ), idLocalization::GetString( "#str_04246" ) );
+						// no color band
+						scoreBoard->SetStateInt( va( "rank%i", iline ), 0 );
+					}
+					else
+					{
+						scoreBoard->SetStateString( va( "player%i_score", iline ), idLocalization::GetString( "#str_04247" ) );
+						// set the color band
+						scoreBoard->SetStateInt( va( "rank%i", iline ), 1 );
+						UpdateRankColor( scoreBoard, "rank%i_color%i", iline, GetSkinColor( p->GetSkinIndex() ) );
+					}
+				}
+				else
+				{
+					if ( gameLocal.gameType == GAME_LASTMAN && playerState[ i ].fragCount == LASTMAN_NOLIVES )
+					{
+						scoreBoard->SetStateString( va( "player%i_score", iline ), idLocalization::GetString( "#str_06736" ) );
+						// set the color band
+						scoreBoard->SetStateInt( va( "rank%i", iline ), 1 );
+						UpdateRankColor( scoreBoard, "rank%i_color%i", iline, GetSkinColor( p->GetSkinIndex() ) );
+					}
+					else
+					{
+						scoreBoard->SetStateString( va( "player%i_score", iline ), idLocalization::GetString( "#str_04246" ) );
+						// no color band
+						scoreBoard->SetStateInt( va( "rank%i", iline ), 0 );
+					}
+				}
+			}
+			scoreBoard->SetStateString( va( "player%i_tdm_tscore", iline ), "" );
+			scoreBoard->SetStateString( va( "player%i_tdm_score", iline ), "" );
+			scoreBoard->SetStateString( va( "player%i_wins", iline ), "" );
+			scoreBoard->SetStateInt( va( "player%i_ping", iline ), playerState[ i ].ping );
+			if ( i == player->entityNumber )
+			{
+				// highlight who we are
+				scoreBoard->SetStateInt( "rank_self", iline );
+			}
+		}
+	}
+
+	// clear remaining lines (empty slots)
+	++iline;
+	while ( iline <= MAX_CLIENTS )
+	{
+		scoreBoard->SetStateString( va( "player%i", iline ), "" );
+		scoreBoard->SetStateString( va( "player%i_score", iline ), "" );
+		scoreBoard->SetStateString( va( "player%i_tdm_tscore", iline ), "" );
+		scoreBoard->SetStateString( va( "player%i_tdm_score", iline ), "" );
+		scoreBoard->SetStateString( va( "player%i_wins", iline ), "" );
+		scoreBoard->SetStateString( va( "player%i_ping", iline ), "" );
+		scoreBoard->SetStateInt( va( "rank%i", iline ), 0 );
+		++iline;
+	}
+
+	// BFG stores the match mode in its session rather than the old si_gameType key.
+	const char **modeNames;
+	const char **modeDisplayNames;
+	const int modeCount = GetGameModes( &modeNames, &modeDisplayNames );
+	const char *modeName = gameLocal.gameType >= 0 && gameLocal.gameType < modeCount ?
+		idLocalization::GetString( modeDisplayNames[gameLocal.gameType] ) : "";
+	gameinfo = va( "%s: %s", idLocalization::GetString( "#str_02376" ), modeName );
+	if ( gameLocal.gameType == GAME_LASTMAN )
+	{
+		if ( gameState == GAMEON || gameState == SUDDENDEATH )
+		{
+			livesinfo = va( "%s: %i", idLocalization::GetString( "#str_04264" ), startFragLimit );
+		}
+		else
+		{
+			livesinfo = va( "%s: %i", idLocalization::GetString( "#str_04264" ), gameLocal.serverInfo.GetInt( "si_fragLimit" ) );
+		}
+
+	}
+	else
+	{
+		livesinfo = va( "%s: %i", idLocalization::GetString( "#str_01982" ), gameLocal.serverInfo.GetInt( "si_fragLimit" ) );
+	}
+	if ( gameLocal.serverInfo.GetInt( "si_timeLimit" ) > 0 )
+	{
+		timeinfo = va( "%s: %i", idLocalization::GetString( "#str_01983" ), gameLocal.serverInfo.GetInt( "si_timeLimit" ) );
+	}
+	else
+	{
+		timeinfo = va("%s", idLocalization::GetString( "#str_07209" ));
+	}
+	scoreBoard->SetStateString( "gameinfo", gameinfo );
+	scoreBoard->SetStateString( "livesinfo", livesinfo );
+	scoreBoard->SetStateString( "timeinfo", timeinfo );
+
+	scoreBoard->Redraw( gameLocal.time );
+}
+#endif

@@ -107,6 +107,16 @@ void idPlayerIcon::Draw( idPlayer* player, const idVec3& origin )
 			UpdateIcon( player, origin, axis );
 		}
 	}
+#if defined( DOMINION ) // OLD GUIs - Multiplayer chatting indicator
+	else if( localPlayer->guiMPChat != NULL && player->isChatting && !player->spectating )
+	{
+		// Restore the original typing bubble, keeping the existing lag/team icons.
+		if( !CreateIcon( player, ICON_CHAT, origin, axis ) )
+		{
+			UpdateIcon( player, origin, axis );
+		}
+	}
+#endif
 	else if( g_CTFArrows.GetBool() && gameLocal.mpGame.IsGametypeFlagBased() && gameLocal.GetLocalPlayer() && player->team == gameLocal.GetLocalPlayer()->team && !player->IsHidden() && !player->AI_DEAD )
 	{
 		int icon = ICON_TEAM_RED + player->team;

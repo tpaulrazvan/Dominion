@@ -30,6 +30,34 @@ If you have questions concerning this license or the applicable additional terms
 #include "../Game_local.h"
 
 
+#if defined( DOMINION ) // OLD GUIs - Menu
+#include "../../framework/Session_menu.h"
+
+idMenuHandler_Shell::~idMenuHandler_Shell() {
+	delete sessionMenu;
+	sessionMenu = NULL;
+	delete introGui;
+	introGui = NULL;
+}
+
+bool idMenuHandler_Shell::IsActive() {
+	return sessionMenu != NULL ? sessionMenu->IsActive() : idMenuHandler::IsActive();
+}
+
+void idMenuHandler_Shell::SetNextScreen( int screen, int trans ) {
+	if( sessionMenu != NULL && screen == SHELL_AREA_INVALID ) {
+		sessionMenu->Activate( false );
+	}
+	idMenuHandler::SetNextScreen( screen, trans );
+}
+
+void idMenuHandler_Shell::PlayOriginalIntro( bool play ) {
+	if( sessionMenu != NULL ) {
+		sessionMenu->PlayIntro( play );
+	}
+}
+#endif
+
 extern idCVar g_demoMode;
 
 static const int PEER_UPDATE_INTERVAL = 500;
@@ -37,6 +65,12 @@ static const int MAX_MENU_OPTIONS = 6;
 
 void idMenuHandler_Shell::Update()
 {
+#if defined( DOMINION ) // OLD GUIs - Menu
+	if( sessionMenu != NULL ) {
+		sessionMenu->Update();
+		return;
+	}
+#endif
 
 //#if defined ( ID_360 )
 //	if ( deviceRequestedSignal.Wait( 0 ) ) {
@@ -322,6 +356,11 @@ idMenuHandler_Shell::HandleGuiEvent
 */
 bool idMenuHandler_Shell::HandleGuiEvent( const sysEvent_t* sev )
 {
+#if defined( DOMINION ) // OLD GUIs - Menu
+	if( sessionMenu != NULL ) {
+		return sessionMenu->HandleEvent( sev );
+	}
+#endif
 
 	if( IsPacifierVisible() )
 	{
@@ -485,7 +524,15 @@ idMenuHandler_Shell::Initialize
 */
 void idMenuHandler_Shell::Initialize( const char* swfFile, idSoundWorld* sw )
 {
+#if defined( DOMINION ) // OLD GUIs - Menu
+	Cleanup();
+	platform = 2;
+	if( !Session_LoadMenu( swfFile, inGame, sw, gui, sessionMenu ) || sessionMenu != NULL ) {
+		return;
+	}
+#else
 	idMenuHandler::Initialize( swfFile, sw );
+#endif
 
 	//---------------------
 	// Initialize the menus
@@ -687,6 +734,10 @@ idMenuHandler_Shell::Cleanup
 */
 void idMenuHandler_Shell::Cleanup()
 {
+#if defined( DOMINION ) // OLD GUIs - Menu
+	delete sessionMenu;
+	sessionMenu = NULL;
+#endif
 	idMenuHandler::Cleanup();
 
 	delete introGui;
@@ -700,6 +751,12 @@ idMenuHandler_Shell::ActivateMenu
 */
 void idMenuHandler_Shell::ActivateMenu( bool show )
 {
+#if defined( DOMINION ) // OLD GUIs - Menu
+	if( sessionMenu != NULL ) {
+		sessionMenu->Activate( show );
+		return;
+	}
+#endif
 
 	if( show && gui != NULL && gui->IsActive() )
 	{
@@ -1282,6 +1339,12 @@ idMenuHandler_Shell::UpdateSavedGames
 */
 void idMenuHandler_Shell::UpdateSavedGames()
 {
+#if defined( DOMINION ) // OLD GUIs - Menu
+	if( sessionMenu != NULL ) {
+		sessionMenu->SetSaveGameGuiVars();
+		return;
+	}
+#endif
 	if( activeScreen == SHELL_AREA_LOAD )
 	{
 		idMenuScreen_Shell_Load* screen = dynamic_cast< idMenuScreen_Shell_Load* >( menuScreens[ SHELL_AREA_LOAD ] );

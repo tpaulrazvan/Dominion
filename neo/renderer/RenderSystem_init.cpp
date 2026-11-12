@@ -2408,13 +2408,23 @@ void idRenderSystemLocal::ResetGuiModels()
 idRenderSystemLocal::BeginLevelLoad
 ========================
 */
+#if defined( DOMINION ) // Original map reload - retain source assets
+void idRenderSystemLocal::BeginLevelLoad( bool reuseAssets )
+#else
 void idRenderSystemLocal::BeginLevelLoad()
+#endif
 {
 	// clear binding sets for previous level images and light data #676
 	backEnd.ClearCaches();
 
+#if defined( DOMINION ) // Original map reload - retain source assets
+	// Binding sets and GPU geometry still reset; only loaded source media is retained.
+	globalImages->BeginLevelLoad( reuseAssets );
+	renderModelManager->BeginLevelLoad( reuseAssets );
+#else
 	globalImages->BeginLevelLoad();
 	renderModelManager->BeginLevelLoad();
+#endif
 
 	// Re-Initialize the Default Materials if needed.
 	R_InitMaterials();

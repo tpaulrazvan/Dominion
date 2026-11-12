@@ -125,6 +125,12 @@ idSoundSample::WriteAllSamples
 */
 void idSoundSample::WriteAllSamples( const idStr& sampleName )
 {
+#if defined( DOMINION ) // Original assets - binary sound cache
+	if( !fileSystem->UseBinaryAssets() )
+	{
+		return;
+	}
+#endif
 	idSoundSample* samplePC = new idSoundSample();
 	{
 		idStrStatic< MAX_OSPATH > inName = sampleName;
@@ -153,6 +159,12 @@ idSoundSample::LoadGeneratedSound
 */
 bool idSoundSample::LoadGeneratedSample( const idStr& filename )
 {
+#if defined( DOMINION ) // Original assets - binary sound cache
+	if( !fileSystem->UseBinaryAssets() )
+	{
+		return false;
+	}
+#endif
 	idFileLocal fileIn( fileSystem->OpenFileReadMemory( filename ) );
 	if( fileIn != NULL )
 	{

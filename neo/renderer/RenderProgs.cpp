@@ -846,6 +846,10 @@ void idRenderProgManager::Init( nvrhi::IDevice* device )
 		{ BUILTIN_INTERACTION, "builtin/lighting/interaction", "", { { "USE_GPU_SKINNING", "0" }, { "USE_PBR", "0" }, { "USE_PUSH_CONSTANTS", usePushConstants( BINDING_LAYOUT_DRAW_INTERACTION ) } }, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_DRAW_INTERACTION },
 		{ BUILTIN_INTERACTION_SKINNED, "builtin/lighting/interaction", "_skinned", { { "USE_GPU_SKINNING", "1" }, { "USE_PBR", "0" }, { "USE_PUSH_CONSTANTS", usePushConstants( BINDING_LAYOUT_DRAW_INTERACTION_SKINNED ) } }, true, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_DRAW_INTERACTION_SKINNED },
 
+#if defined( DOMINION ) // OLD GUIs - Menu
+		{ BUILTIN_INTERACTION_OLD_GUI, "builtin/lighting/interactionOldGui", "", { { "DOMINION", "1" }, { "USE_GPU_SKINNING", "0" }, { "USE_PUSH_CONSTANTS", usePushConstants( BINDING_LAYOUT_DRAW_INTERACTION ) } }, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_DRAW_INTERACTION },
+		{ BUILTIN_INTERACTION_OLD_GUI_SKINNED, "builtin/lighting/interactionOldGui", "_skinned", { { "DOMINION", "1" }, { "USE_GPU_SKINNING", "1" }, { "USE_PUSH_CONSTANTS", usePushConstants( BINDING_LAYOUT_DRAW_INTERACTION_SKINNED ) } }, true, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_DRAW_INTERACTION_SKINNED },
+#endif
 		{ BUILTIN_INTERACTION_AMBIENT, "builtin/lighting/interactionAmbient", "", { { "USE_GPU_SKINNING", "0" }, { "USE_PBR", "0" }, { "USE_PUSH_CONSTANTS", usePushConstants( BINDING_LAYOUT_DRAW_INTERACTION ) } }, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_DRAW_INTERACTION },
 		{ BUILTIN_INTERACTION_AMBIENT_SKINNED, "builtin/lighting/interactionAmbient", "_skinned", { { "USE_GPU_SKINNING", "1" }, { "USE_PBR", "0" }, { "USE_PUSH_CONSTANTS", usePushConstants( BINDING_LAYOUT_DRAW_INTERACTION_SKINNED ) } }, true, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_DRAW_INTERACTION_SKINNED },
 
@@ -1057,6 +1061,9 @@ void idRenderProgManager::Init( nvrhi::IDevice* device )
 		renderProgs[builtinShaders[BUILTIN_COLOR_SKINNED]].usesJoints = true;
 		renderProgs[builtinShaders[BUILTIN_TEXTURE_VERTEXCOLOR_SKINNED]].usesJoints = true;
 		renderProgs[builtinShaders[BUILTIN_INTERACTION_SKINNED]].usesJoints = true;
+#if defined( DOMINION ) // OLD GUIs - Menu
+		renderProgs[builtinShaders[BUILTIN_INTERACTION_OLD_GUI_SKINNED]].usesJoints = true;
+#endif
 		renderProgs[builtinShaders[BUILTIN_INTERACTION_AMBIENT_SKINNED]].usesJoints = true;
 		renderProgs[builtinShaders[BUILTIN_ENVIRONMENT_SKINNED]].usesJoints = true;
 		renderProgs[builtinShaders[BUILTIN_BUMPY_ENVIRONMENT_SKINNED]].usesJoints = true;
@@ -1202,6 +1209,19 @@ int idRenderProgManager::FindShader( const char* name, rpStage_t stage, const ch
 {
 	idStr shaderName( name );
 	shaderName.StripFileExtension();
+
+#if defined( DOMINION ) // Enviro suit - match vertex and fragment shader inputs
+	// The original fragment shader asks for TEXCOORD0_centroid, but its vertex
+	// shader exports TEXCOORD0. Select the corrected fragment variant together
+	// with this engine fix; macro-off builds retain the original shader blob.
+	if( stage == SHADER_STAGE_FRAGMENT && shaderName.Icmp( "enviroSuit" ) == 0 )
+	{
+		// Macro order is part of ShaderMake's permutation key; match shaders.cfg.
+		idList<shaderMacro_t> fixedMacros = { { "DOMINION", "1" } };
+		fixedMacros.Append( macros );
+		return FindShader( "enviroSuitDominion", stage, nameOutSuffix, fixedMacros, builtin, vertexLayout );
+	}
+#endif
 
 	for( int i = 0; i < shaders.Num(); i++ )
 	{

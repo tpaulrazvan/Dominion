@@ -46,6 +46,9 @@ If you have questions concerning this license or the applicable additional terms
 #include "../libs/mesa/format_r11g11b10f.h"
 
 #include "RenderCommon.h"
+#if defined( DOMINION ) // Original assets - DDS source pixels
+#include "BinaryImage.h"
+#endif
 
 /*
 
@@ -950,6 +953,229 @@ static void LoadHDR( const char* filename, unsigned char** pic, int* width, int*
 //===================================================================
 
 
+#if defined( DOMINION ) && !defined( DMAP ) // Original assets - DDS pixels for image programs
+/*
+========================
+LoadDDS
+Explicit DDS inputs to an image program need ordinary RGBA pixels. Direct texture
+loads use LoadFromDDS at the upload boundary to preserve compressed blocks and mips.
+========================
+*/
+static void LoadDDS( const char *name, byte **pic, int *width, int *height, ID_TIME_T *timestamp )
+{
+	if( pic == NULL )
+	{
+		fileSystem->ReadFile( name, NULL, timestamp );
+		return;
+	}
+	*pic = NULL;
+	idBinaryImage image( name );
+	if( !image.LoadFromDDS( name, TD_LOOKUP_TABLE_RGBA, FILE_NOT_FOUND_TIMESTAMP, true ) )
+	{
+		return;
+	}
+	const bimageFile_t &header = image.GetFileHeader();
+	if( width != NULL )
+	{
+		*width = header.width;
+	}
+	if( height != NULL )
+	{
+		*height = header.height;
+	}
+	if( timestamp != NULL )
+	{
+		*timestamp = header.sourceFileTime;
+	}
+	const int bytes = header.width * header.height * 4;
+	*pic = static_cast<byte *>( R_StaticAlloc( bytes, TAG_IMAGE ) );
+	memcpy( *pic, image.GetImageData( 0 ), bytes );
+}
+#endif
+
+#if defined( DOMINION ) // Original assets - dhewm3 BMP source loader
+/*
+========================
+LoadBMP
+dhewm3's Windows BMP palette/BGR-to-RGBA path. Retain its 8/16/24/32-bit inputs,
+with bounded reads, file data offsets, padded rows and top-down images honored.
+========================
+*/
+static void LoadBMP( const char *name, byte **pic, int *width, int *height, ID_TIME_T *timestamp )
+{
+	if( pic == NULL )
+	{
+		fileSystem->ReadFile( name, NULL, timestamp );
+		return;
+	}
+	*pic = NULL;
+	idFileLocal file( fileSystem->OpenFileReadMemory( name ) );
+	if( file == NULL || file->Length() < 54 || file->Length() > 256 * 1024 * 1024 )
+	{
+		return;
+	}
+	idTempArray<byte> bytes( file->Length() );
+	if( file->Read( bytes.Ptr(), bytes.Num() ) != bytes.Num() )
+	{
+		return;
+	}
+	// These are the same little-endian fields read by dhewm3's BMPHeader_t parser.
+	const byte *header = bytes.Ptr();
+	auto read32 = [header]( const int offset )
+	{
+		uint32 value;
+		memcpy( &value, header + offset, sizeof( value ) );
+		LittleRevBytes( &value, sizeof( value ), 1 );
+		return value;
+	};
+	const uint32 dataOffset = read32( 10 );
+	const uint32 headerSize = read32( 14 );
+	const int w = int( read32( 18 ) );
+	const int signedHeight = int( read32( 22 ) );
+	const int bits = header[28] | ( header[29] << 8 );
+	if( header[0] != 'B' || header[1] != 'M' || headerSize < 40 ||
+		dataOffset < uint64( 14 ) + headerSize || dataOffset > uint32( bytes.Num() ) ||
+		header[26] != 1 || header[27] != 0 || read32( 30 ) != 0 ||
+		w < 1 || w > 16384 || signedHeight == 0 || signedHeight < -16384 || signedHeight > 16384 ||
+		( bits != 8 && bits != 16 && bits != 24 && bits != 32 ) )
+	{
+		common->Warning( "Unsupported BMP: %s", name );
+		return;
+	}
+	const int h = signedHeight < 0 ? -signedHeight : signedHeight;
+	const int pitch = ( ( w * bits + 31 ) / 32 ) * 4;
+	const uint32 paletteSize = read32( 46 ) != 0 ? read32( 46 ) : 256;
+	if( uint64( dataOffset ) + uint64( pitch ) * h > uint64( bytes.Num() ) ||
+		( bits == 8 && ( paletteSize > 256 || uint64( 14 ) + headerSize + paletteSize * 4 > dataOffset ) ) )
+	{
+		return;
+	}
+	byte *rgba = static_cast<byte *>( R_StaticAlloc( w * h * 4, TAG_IMAGE ) );
+	for( int y = 0; y < h; ++y )
+	{
+		const byte *input = header + dataOffset + y * pitch;
+		byte *output = rgba + ( signedHeight < 0 ? y : h - y - 1 ) * w * 4;
+		for( int x = 0; x < w; ++x, output += 4 )
+		{
+			if( bits == 8 )
+			{
+				const unsigned int index = *input++;
+				if( index >= paletteSize )
+				{
+					R_StaticFree( rgba );
+					return;
+				}
+				const byte *color = header + 14 + headerSize + index * 4;
+				output[0] = color[2]; output[1] = color[1]; output[2] = color[0]; output[3] = 255;
+			}
+			else if( bits == 16 )
+			{
+				const unsigned int pixel = input[0] | ( input[1] << 8 );
+				input += 2;
+				output[0] = ( ( pixel >> 10 ) & 31 ) * 255 / 31;
+				output[1] = ( ( pixel >> 5 ) & 31 ) * 255 / 31;
+				output[2] = ( pixel & 31 ) * 255 / 31;
+				output[3] = 255;
+			}
+			else
+			{
+				output[0] = input[2]; output[1] = input[1]; output[2] = input[0];
+				output[3] = bits == 32 ? input[3] : 255;
+				input += bits / 8;
+			}
+		}
+	}
+	*pic = rgba;
+	if( width != NULL ) { *width = w; }
+	if( height != NULL ) { *height = h; }
+	if( timestamp != NULL ) { *timestamp = file->Timestamp(); }
+}
+#endif
+
+#if defined( DOMINION ) // Original assets - PCX source format
+/*
+========================
+LoadPCX32
+dhewm3's 8-bit PCX palette/RLE path, returning RGBA. Respect bytes-per-line padding
+and bound each encoded run/palette read before touching the source or destination.
+========================
+*/
+static void LoadPCX32( const char *name, byte **pic, int *width, int *height, ID_TIME_T *timestamp )
+{
+	if( pic == NULL )
+	{
+		fileSystem->ReadFile( name, NULL, timestamp );
+		return;
+	}
+	*pic = NULL;
+	idFileLocal file( fileSystem->OpenFileReadMemory( name ) );
+	if( file == NULL || file->Length() < 897 || file->Length() > 256 * 1024 * 1024 )
+	{
+		return;
+	}
+	idTempArray<byte> bytes( file->Length() );
+	if( file->Read( bytes.Ptr(), bytes.Num() ) != bytes.Num() )
+	{
+		return;
+	}
+	const byte *header = bytes.Ptr();
+	const int xmin = header[4] | ( header[5] << 8 );
+	const int ymin = header[6] | ( header[7] << 8 );
+	const int w = ( header[8] | ( header[9] << 8 ) ) - xmin + 1;
+	const int h = ( header[10] | ( header[11] << 8 ) ) - ymin + 1;
+	const int pitch = header[66] | ( header[67] << 8 );
+	if( header[0] != 0x0a || header[1] != 5 || header[2] != 1 || header[3] != 8 ||
+		header[65] != 1 || w < 1 || h < 1 || w > 16384 || h > 16384 || pitch < w ||
+		header[bytes.Num() - 769] != 12 )
+	{
+		common->Warning( "Unsupported PCX: %s", name );
+		return;
+	}
+	idTempArray<byte> rgba( w * h * 4 );
+	const byte *input = header + 128;
+	const byte *end = header + bytes.Num() - 769;
+	const byte *palette = end + 1;
+	for( int y = 0; y < h; ++y )
+	{
+		for( int x = 0; x < pitch; )
+		{
+			if( input >= end )
+			{
+				return;
+			}
+			byte value = *input++;
+			const int run = ( value & 0xc0 ) == 0xc0 ? value & 0x3f : 1;
+			if( ( value & 0xc0 ) == 0xc0 )
+			{
+				if( input >= end )
+				{
+					return;
+				}
+				value = *input++;
+			}
+			if( run == 0 || run > pitch - x )
+			{
+				return;
+			}
+			for( int r = 0; r < run; ++r, ++x )
+			{
+				if( x < w )
+				{
+					byte *out = rgba.Ptr() + ( y * w + x ) * 4;
+					memcpy( out, palette + value * 3, 3 );
+					out[3] = 255;
+				}
+			}
+		}
+	}
+	*pic = static_cast<byte *>( R_StaticAlloc( rgba.Num(), TAG_IMAGE ) );
+	memcpy( *pic, rgba.Ptr(), rgba.Num() );
+	if( width != NULL ) { *width = w; }
+	if( height != NULL ) { *height = h; }
+	if( timestamp != NULL ) { *timestamp = file->Timestamp(); }
+}
+#endif
+
 typedef struct
 {
 	const char*	ext;
@@ -963,6 +1189,13 @@ static imageExtToLoader_t imageLoaders[] =
 	{"jpg", LoadSTB_RGBA8},
 	{"exr", LoadEXR},
 	{"hdr", LoadHDR},
+#if defined( DOMINION ) // Original assets - remaining native image formats
+	{"bmp", LoadBMP},
+	{"pcx", LoadPCX32},
+#if !defined( DMAP )
+	{"dds", LoadDDS},
+#endif
+#endif
 };
 
 static const int numImageLoaders = sizeof( imageLoaders ) / sizeof( imageLoaders[0] );

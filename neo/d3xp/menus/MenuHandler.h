@@ -336,10 +336,16 @@ struct lobbyPlayerInfo_t
 idMenuHandler_Shell
 ================================================
 */
+#if defined( DOMINION ) // OLD GUIs - Menu
+class idSessionMenu;
+#endif
 class idMenuHandler_Shell : public idMenuHandler
 {
 public:
 	idMenuHandler_Shell() :
+#if defined( DOMINION ) // OLD GUIs - Menu
+		sessionMenu( NULL ),
+#endif
 		state( SHELL_STATE_INVALID ),
 		nextState( SHELL_STATE_INVALID ),
 		smallFrameShowing( false ),
@@ -372,6 +378,13 @@ public:
 	virtual idMenuScreen* 	GetMenuScreen( int index );
 	virtual bool			HandleGuiEvent( const sysEvent_t* sev );
 
+#if defined( DOMINION ) // OLD GUIs - Menu
+	virtual ~idMenuHandler_Shell();
+	virtual bool IsActive();
+	virtual void SetNextScreen( int screen, int trans );
+	bool UsesOriginalMenu() const { return sessionMenu != NULL; }
+	void PlayOriginalIntro( bool play );
+#endif
 	void					UpdateSavedGames();
 	void					ShowSmallFrame( bool show );
 	void					ShowMPFrame( bool show );
@@ -460,6 +473,9 @@ public:
 
 private:
 
+#if defined( DOMINION ) // OLD GUIs - Menu
+	idSessionMenu* sessionMenu;
+#endif
 	shellState_t			state;
 	shellState_t			nextState;
 	bool					smallFrameShowing;
@@ -510,6 +526,11 @@ public:
 	virtual void			ActivateMenu( bool show );
 	virtual void			TriggerMenu();
 	virtual void			Initialize( const char* swfFile, idSoundWorld* sw );
+#if defined( DOMINION ) // OLD GUIs - PDA
+	// Share screen setup while adopting the SWF selected from the proper game directory.
+	void Initialize( idSWF *selectedGui );
+	void InitializeScreens();
+#endif
 	virtual bool			HandleAction( idWidgetAction& action, const idWidgetEvent& event, idMenuWidget* widget, bool forceHandled = false );
 	virtual idMenuScreen* 	GetMenuScreen( int index );
 	void					UpdateAudioLogPlaying( bool playing );
@@ -555,6 +576,10 @@ public:
 	virtual void			Update();
 	virtual void			ActivateMenu( bool show );
 	virtual void			Initialize( const char* swfFile, idSoundWorld* sw );
+#if defined( DOMINION ) // OLD GUIs - HUD
+	void					Initialize( idSWF *selectedGui );
+	void					InitializeScreens();
+#endif
 	virtual idMenuScreen* 	GetMenuScreen( int index );
 
 	idMenuScreen_HUD* 		GetHud();
@@ -594,6 +619,11 @@ public:
 	virtual void			TriggerMenu();
 	virtual void			ActivateMenu( bool show );
 	virtual void			Initialize( const char* swfFile, idSoundWorld* sw );
+#if defined( DOMINION ) // OLD GUIs - Multiplayer scoreboard
+	// Adopt the SWF selected from the same directory policy as original GUIs.
+	void Initialize( idSWF *selectedGui );
+	void InitializeScreens();
+#endif
 	virtual idMenuScreen* 	GetMenuScreen( int index );
 	virtual bool			HandleAction( idWidgetAction& action, const idWidgetEvent& event, idMenuWidget* widget, bool forceHandled = false );
 

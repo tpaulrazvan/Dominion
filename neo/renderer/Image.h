@@ -120,6 +120,9 @@ enum textureFormat_t
 	FMT_R8F,			// 8 bpp, RT only
 	FMT_DEPTH_STENCIL,  // 32 bpp, RT only
 	FMT_RGBA16S,		// 64 bpp, RT only
+#if defined( DOMINION ) // Original assets - DDS DXT3; append to preserve every existing bimage format number
+	FMT_DXT3,			// 8 bpp, BC2 with explicit alpha
+#endif
 };
 
 int BitsForFormat( textureFormat_t format );
@@ -294,6 +297,10 @@ public:
 	// RB end
 
 	void		CopyFramebuffer( int x, int y, int width, int height );
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+	// Copy a completed colour pass; the producer supplies its source and consumer orientation.
+	bool        CopyFramebufferFrom( nvrhi::ITexture *source, int x, int y, int width, int height, bool flipY );
+#endif
 	void		CopyDepthbuffer( int x, int y, int width, int height );
 
 	void		UploadScratch( const byte* pic, int width, int height, nvrhi::ICommandList* commandList );
@@ -381,7 +388,11 @@ public:
 
 	bool		IsCompressed() const
 	{
+#if defined( DOMINION ) // Original assets - DDS DXT3
+		return ( opts.format == FMT_DXT1 || opts.format == FMT_DXT3 || opts.format == FMT_DXT5 || opts.format == FMT_BC6H || opts.format == FMT_BC7 );
+#else
 		return ( opts.format == FMT_DXT1 || opts.format == FMT_DXT5 || opts.format == FMT_BC6H || opts.format == FMT_BC7 );
+#endif
 	}
 
 	textureUsage_t GetUsage() const
@@ -595,7 +606,11 @@ public:
 	void				ReloadImages( bool all, nvrhi::ICommandList* commandList );
 
 	// Called only by renderSystem::BeginLevelLoad
+#if defined( DOMINION ) // Original map reload - retain source assets
+	void				BeginLevelLoad( bool reuseAssets = false );
+#else
 	void				BeginLevelLoad();
+#endif
 
 	// Called only by renderSystem::EndLevelLoad
 	void				EndLevelLoad();
@@ -668,6 +683,10 @@ public:
 	idImage* 			hellLoadingIconImage;			// loading icon must exist always
 	idImage*			guiEdit;						// SP: GUI editor image
 	idImage*			guiEditDepthStencilImage;		// SP: Gui-editor image depth-stencil
+#if defined( DOMINION ) // Portal sky fix
+	idImage*			ssrRenderImage;					// give SSR it's own render target
+	idImage*			portalSkyImage;					// keep portal colour separate from PlayerView/postprocessing
+#endif
 
 	//--------------------------------------------------------
 

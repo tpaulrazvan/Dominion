@@ -644,7 +644,11 @@ bool idCollisionModelManagerLocal::LoadCollisionModelFile( const char* name, uns
 
 	// see if we have a generated version of this
 	bool loaded = false;
+#if defined( DOMINION ) // Original assets - binary cache for parsed collision files
+	idFileLocal file( fileSystem->UseBinaryAssets() ? fileSystem->OpenFileReadMemory( generatedFileName ) : NULL );
+#else
 	idFileLocal file( fileSystem->OpenFileReadMemory( generatedFileName ) );
+#endif
 	if( file != NULL )
 	{
 		int numEntries = 0;
@@ -688,7 +692,11 @@ bool idCollisionModelManagerLocal::LoadCollisionModelFile( const char* name, uns
 		}
 
 		int numEntries = 0;
+#if defined( DOMINION ) // Original assets - binary cache for parsed collision files
+		idFileLocal outputFile( fileSystem->UseBinaryAssets() ? fileSystem->OpenFileWrite( generatedFileName, "fs_basepath" ) : NULL );
+#else
 		idFileLocal outputFile( fileSystem->OpenFileWrite( generatedFileName, "fs_basepath" ) );
+#endif
 		if( outputFile != NULL )
 		{
 			outputFile->WriteBig( numEntries );

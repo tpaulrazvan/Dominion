@@ -196,6 +196,33 @@ idMenuHandler_PDA::Initialize
 void idMenuHandler_PDA::Initialize( const char* swfFile, idSoundWorld* sw )
 {
 	idMenuHandler::Initialize( swfFile, sw );
+#if defined( DOMINION ) // OLD GUIs - PDA
+	InitializeScreens();
+}
+
+/*
+========================
+idMenuHandler_PDA::Initialize
+Adopt the directory-selected SWF and retain normal BFG PDA screen construction.
+========================
+*/
+void idMenuHandler_PDA::Initialize( idSWF *selectedGui )
+{
+	Cleanup();
+	gui = selectedGui;
+	platform = 2;
+	InitializeScreens();
+}
+
+/*
+========================
+idMenuHandler_PDA::InitializeScreens
+Share screen construction between ordinary and explicitly selected SWFs.
+========================
+*/
+void idMenuHandler_PDA::InitializeScreens()
+{
+#endif
 
 	//---------------------
 	// Initialize the menus
@@ -690,7 +717,22 @@ idMenuHandler_PDA::Cleanup
 */
 void idMenuHandler_PDA::Cleanup()
 {
+#if defined( DOMINION ) // OLD GUIs - PDA
+	// PDA screens disable automatic deletion. Base cleanup clears their slots, so
+	// retain the pointers until this function explicitly deletes those screens.
+	idMenuScreen *screens[MAX_SCREEN_AREAS];
+	for( int i = 0; i < MAX_SCREEN_AREAS; ++i )
+	{
+		screens[i] = menuScreens[i];
+	}
 	idMenuHandler::Cleanup();
+	for( int i = 0; i < MAX_SCREEN_AREAS; ++i )
+	{
+		menuScreens[i] = screens[i];
+	}
+#else
+	idMenuHandler::Cleanup();
+#endif
 	for( int index = 0; index < MAX_SCREEN_AREAS; ++index )
 	{
 		delete menuScreens[ index ];

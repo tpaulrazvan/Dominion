@@ -87,6 +87,7 @@ public:
 */
 
 typedef int						qhandle_t;
+static_assert( sizeof( qhandle_t ) == 4, "qhandle_t is serialized as a 32-bit renderer/network handle" ); // worth keeping it ?? rename the static assertion if so
 
 class idFile;
 class idVec3;

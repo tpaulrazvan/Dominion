@@ -96,6 +96,10 @@ idCVar net_inviteOnly( "net_inviteOnly", "1", CVAR_BOOL | CVAR_ARCHIVE, "whether
 
 // DG: add cvar for pause
 idCVar com_pause( "com_pause", "0", CVAR_BOOL | CVAR_SYSTEM | CVAR_NOCHEAT, "set to 1 to pause game, to 0 to unpause again" );
+#if defined( DOMINION ) // Background test execution
+// Keep the normal focus-pause policy unless a test instance explicitly opts out.
+idCVar com_pauseOnFocusLoss( "com_pauseOnFocusLoss", "1", CVAR_BOOL | CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_NOCHEAT, "pause when the game loses focus; set to 0 for background testing" );
+#endif
 // DG end
 idCVar com_activeApp( "com_activeApp", "1", CVAR_BOOL | CVAR_SYSTEM | CVAR_NOCHEAT, "this is set to 0 if running in background" );
 
@@ -182,6 +186,9 @@ idCommonLocal::idCommonLocal() :
 	gameDLL = 0;
 
 	loadGUI = NULL;
+#if defined( DOMINION ) // OLD GUIs - Loading screens
+	legacyLoadGUI = NULL;
+#endif
 	nextLoadTip = 0;
 	isHellMap = false;
 	wipeForced = false;
@@ -1535,7 +1542,13 @@ void idCommonLocal::Shutdown()
 
 	printf( "delete loadGUI;\n" );
 	delete loadGUI;
+#if defined( DOMINION ) // OLD GUIs - Loading screens
+	uiManager->DeAlloc( legacyLoadGUI );
+#endif
 	loadGUI = NULL;
+#if defined( DOMINION ) // OLD GUIs - Loading screens
+	legacyLoadGUI = NULL;
+#endif
 
 	printf( "ImGuiHook::Destroy();\n" );
 	ImGuiHook::Destroy();
@@ -1688,6 +1701,11 @@ called on errors and game exits
 void idCommonLocal::Stop( bool resetSession )
 {
 	ClearWipe();
+#if defined( DOMINION ) // OLD GUIs - Loading screens
+	// Stop also handles aborted map loads; do not leave their fullscreen GUI covering the menu.
+	uiManager->DeAlloc( legacyLoadGUI );
+	legacyLoadGUI = NULL;
+#endif
 
 	// clear mapSpawned and demo playing flags
 	UnloadMap();

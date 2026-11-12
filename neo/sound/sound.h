@@ -291,6 +291,10 @@ public:
 
 	// Sends the current playing sound world information to the sound hardware.
 	virtual void			Render() = 0;
+#if defined( DOMINION ) // OLD GUIs - Menu sound clock
+	// Refresh cached wall time before GUI events can start sounds after a load.
+	virtual void			UpdateSoundTime() = 0;
+#endif
 
 	virtual void			MuteBackgroundMusic( bool mute ) = 0;
 
@@ -319,7 +323,11 @@ public:
 	virtual cinData_t		ImageForTime( const int milliseconds, const bool waveform ) = 0;
 
 	// Free all sounds loaded during the last map load
+#if defined( DOMINION ) // Original map reload - retain source assets
+	virtual void			BeginLevelLoad( bool reuseAssets = false ) = 0;
+#else
 	virtual	void			BeginLevelLoad() = 0;
+#endif
 
 	// Load all sounds marked as used this level
 	virtual	void			EndLevelLoad() = 0;

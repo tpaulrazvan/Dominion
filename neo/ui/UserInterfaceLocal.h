@@ -27,12 +27,24 @@ If you have questions concerning this license or the applicable additional terms
 */
 
 class idWindow;
+#if defined( DOMINION ) // OLD GUIs - Shared support
+extern idCVar r_scaleMenusTo43;
+#endif
 
 class idUserInterfaceLocal : public idUserInterface
 {
 	friend class idUserInterfaceManagerLocal;
 public:
 	idUserInterfaceLocal();
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	bool InitMenuFromFile( const char* qpath, const char* gameDirectory );
+	bool InitFullscreenFromFile( const char* qpath, const char* gameDirectory, bool menu = false, bool scaleTo43 = false );
+	bool IsMenuGui() const { return IsFullscreenMenu() && menuGui; }
+	bool IsFullscreenMenu() const { return !menuSourceDirectory.IsEmpty() || fullscreenPresentation; }
+	void SetFullscreenPresentation( bool fullscreen ) { fullscreenPresentation = fullscreen; }
+	idFont* RegisterMenuFont( const char* name ) const;
+	void GetMenuTransform( float& sx, float& sy, float& ox, float& oy ) const;
+#endif
 	virtual						~idUserInterfaceLocal();
 
 	virtual const char* 		Name() const;
@@ -146,6 +158,12 @@ public:
 	};
 
 private:
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	idStr menuSourceDirectory;
+	bool menuGui;
+	bool scaleTo43; // Menus and loading screens may preserve 4:3; HUDs stretch.
+	bool fullscreenPresentation;
+#endif
 	bool						active;
 	bool						loading;
 	bool						interactive;

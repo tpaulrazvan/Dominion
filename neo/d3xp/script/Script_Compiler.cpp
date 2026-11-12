@@ -3236,6 +3236,10 @@ void idCompiler::CompileFile( const char* text, const char* filename, bool toCon
 
 	parser.SetFlags( LEXFL_ALLOWMULTICHARLITERALS );
 	parser.LoadMemory( text, strlen( text ), filename );
+#if defined( DOMINION ) // Original chaingun timing - enable guarded compatibility script data
+	// LoadMemory creates the parser's define table before a local define can be added.
+	parser.AddDefine( "DOMINION 1" );
+#endif
 	parserPtr = &parser;
 
 	// unread tokens to include script defines

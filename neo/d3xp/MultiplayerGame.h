@@ -196,6 +196,10 @@ public:
 	void			ProcessVoiceChat( int clientNum, bool team, int index );
 	bool			HandleGuiEvent( const sysEvent_t* sev );
 	bool			IsScoreboardActive();
+#if defined( DOMINION ) // OLD GUIs - Multiplayer scoreboard
+	// Original scoreboards are overlays; they must not inhibit movement or aiming.
+	bool UsesGuiScoreboard() const { return guiScoreboard != NULL; }
+#endif
 	void			SetScoreboardActive( bool active );
 	void			CleanupScoreboard();
 
@@ -253,6 +257,13 @@ private:
 
 	// guis
 	idMenuHandler_Scoreboard* scoreboardManager;
+#if defined( DOMINION ) // OLD GUIs - Multiplayer scoreboard
+	// GUI-only lifetime/state; multiplayer rules, network state and saves stay in BFG.
+	idUserInterface *guiScoreboard = NULL;
+	bool guiScoreboardActive = false;
+	void InitializeScoreboard();
+	void UpdateGuiScoreboard( idUserInterface *scoreBoard, idPlayer *player );
+#endif
 
 	// chat data
 	mpChatLine_t	chatHistory[ NUM_CHAT_NOTIFY ];
@@ -331,6 +342,10 @@ public:
 
 	const char* 	GetTeamName( int team ) const;
 	const char* 	GetSkinName( int skin ) const;
+#if defined( DOMINION ) // OLD GUIs - Skin buttons
+	// Translate a GUI skin name to BFG's index without assuming the GUI's button order.
+	int GetNumSkins() const { return numSkins; }
+#endif
 	const idVec3& 	GetSkinColor( int skin ) const;
 
 	idItemTeam* 	GetTeamFlag( int team );

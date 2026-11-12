@@ -410,7 +410,11 @@ public:
 	void					RunAllUserCmdsForPlayer( idUserCmdMgr& cmdMgr, const int playerNumber );
 	void					RunSingleUserCmd( usercmd_t& cmd, idPlayer& player );
 	void					RunEntityThink( idEntity& ent, idUserCmdMgr& userCmdMgr );
+#if defined( DOMINION ) // OLD GUIs - Save previews isolate the player's temporal history
+	virtual bool			Draw( int clientNum, bool savePreview = false );
+#else
 	virtual bool			Draw( int clientNum );
+#endif
 	virtual bool			HandlePlayerGuiEvent( const sysEvent_t* ev );
 	virtual void			ServerWriteSnapshot( idSnapShot& ss );
 	virtual void			ProcessReliableMessage( int clientNum, int type, const idBitMsg& msg );

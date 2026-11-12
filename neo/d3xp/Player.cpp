@@ -30,8 +30,14 @@ If you have questions concerning this license or the applicable additional terms
 #pragma hdrstop
 
 #include "Game_local.h"
+
 #include "../framework/Common_local.h"
 #include "PredictedValue_impl.h"
+#if defined( DOMINION ) // OLD GUIs - HUD
+#include "../ui/DeviceContext.h"
+#include "../ui/UserInterfaceLocal.h"
+#include "../ui/Window.h"
+#endif
 
 idCVar flashlight_batteryDrainTimeMS( "flashlight_batteryDrainTimeMS", "30000", CVAR_INTEGER, "amount of time (in MS) it takes for full battery to drain (-1 == no battery drain)" );
 idCVar flashlight_batteryChargeTimeMS( "flashlight_batteryChargeTimeMS", "3000", CVAR_INTEGER, "amount of time (in MS) it takes to fully recharge battery" );
@@ -1049,8 +1055,17 @@ bool idInventory::Give( idPlayer* owner, const idDict& spawnArgs, const char* st
 							{
 								owner->hud->GiveWeapon( owner, i );
 							}
+#if defined( DOMINION ) // OLD GUIs - HUD weapon pickup notifications
+							// Initial inventory and bulk grants must honor updateHud and the native cooldown.
+							if( owner->guiHud != NULL && !( weapons & ( 1 << i ) ) )
+							{
+								owner->guiHud->SetStateInt( "newWeapon", owner->GuiWeaponSlot( i ) );
+								owner->guiHud->HandleNamedEvent( "newWeapon" );
+								}
+#endif
 							lastGiveTime = gameLocal.time;
 						}
+
 
 						weaponPulse = true;
 						weapons |= ( 1 << i );
@@ -1497,10 +1512,19 @@ idPlayer::idPlayer():
 
 	hudManager				= new idMenuHandler_HUD();
 	hud						= NULL;
+#if defined( DOMINION ) // OLD GUIs - HUD
+	guiHud = NULL;
+#endif
 	objectiveSystemOpen		= false;
 	memset( quickSlot, -1, sizeof( quickSlot ) );
 
 	pdaMenu = new( TAG_SWF ) idMenuHandler_PDA();
+#if defined( DOMINION ) // OLD GUIs - PDA
+	objectiveSystem = NULL;
+	guiPdaAudio = NULL;
+	guiPdaVideo = NULL;
+	guiPdaInitialized = false;
+#endif
 	pdaVideoMat				= NULL;
 	mpMessages				= NULL;
 
@@ -2052,7 +2076,11 @@ void idPlayer::Spawn()
 		// load HUD
 		if( hudManager != NULL )
 		{
+#if defined( DOMINION ) // OLD GUIs - HUD
+			InitializeGuiHud();
+#else
 			hudManager->Initialize( "hud", common->SW() );
+#endif
 			hudManager->ActivateMenu( true );
 			hud = hudManager->GetHud();
 		}
@@ -2061,24 +2089,52 @@ void idPlayer::Spawn()
 		if( spawnArgs.GetString( "cursor", "", temp ) )
 		{
 			cursor = uiManager->FindGui( temp, true, common->IsMultiplayer(), common->IsMultiplayer() );
+#if defined( DOMINION ) // OLD GUIs - Initial cursor state
+			// Vanilla initializes these before the first draw; avoid flashing the GUI's Talk default.
+			if( guiHud != NULL && cursor != NULL )
+			{
+				cursor->SetStateInt( "talkcursor", 0 );
+				cursor->SetStateInt( "combatcursor", 1 );
+				cursor->SetStateInt( "itemcursor", 0 );
+				cursor->SetStateInt( "guicursor", 0 );
+			}
+#endif
 		}
 		if( cursor )
 		{
 			cursor->Activate( true, gameLocal.time );
+#if defined( DOMINION ) // OLD GUIs - Initial cursor state
+			// Evaluate the initial flags even while the first game tick is paused.
+			if( guiHud != NULL )
+			{
+				cursor->StateChanged( gameLocal.GetTimeGroupTime( timeGroup ) );
+			}
+#endif
 		}
 
 		if( pdaMenu != NULL )
 		{
+#if defined( DOMINION ) // OLD GUIs - PDA
+			InitializeGuiPDA();
+#else
 			pdaMenu->Initialize( "pda", common->SW() );
+#endif
 		}
 		objectiveSystemOpen = false;
 	}
 
+#if defined( DOMINION ) // OLD GUIs - Multiplayer messages
+	if( common->IsMultiplayer() && IsLocallyControlled() && mpMessages == NULL && guiMPChat == NULL )
+	{
+		InitializeGuiMPMessages();
+	}
+#else
 	if( common->IsMultiplayer() && mpMessages == NULL )
 	{
 		mpMessages = new idSWF( "mp_messages", common->SW() );
 		mpMessages->Activate( true );
 	}
+#endif
 
 	SetLastHitTime( 0 );
 
@@ -2142,14 +2198,29 @@ void idPlayer::Spawn()
 		}
 	}
 
-	if( hud )
+	if( hud
+#if defined( DOMINION ) // OLD GUIs - HUD
+		|| guiHud != NULL
+#endif
+	)
 	{
 		if( weapon_soulcube > 0 && ( inventory.weapons & ( 1 << weapon_soulcube ) ) )
 		{
 			int max_souls = inventory.MaxAmmoForAmmoClass( this, "ammo_souls" );
 			if( inventory.GetInventoryAmmoForType( idWeapon::GetAmmoNumForName( "ammo_souls" ) ) >= max_souls )
 			{
+#if defined( DOMINION ) // OLD GUIs - HUD: restored soul-cube readiness
+				if( guiHud != NULL )
+				{
+					guiHud->HandleNamedEvent( "soulCubeReady" );
+				}
+				if( hud != NULL )
+				{
+					hud->SetShowSoulCubeOnLoad( true );
+				}
+#else
 				hud->SetShowSoulCubeOnLoad( true );
+#endif
 			}
 		}
 	}
@@ -2307,12 +2378,26 @@ idPlayer::~idPlayer()
 		ReturnFlag();
 	}
 
+#if defined( DOMINION ) // OLD GUIs - HUD
+	uiManager->DeAlloc( guiHud );
+	guiHud = NULL;
+#endif
 	delete hudManager;
 	hudManager = NULL;
 
+#if defined( DOMINION ) // OLD GUIs - PDA
+	uiManager->DeAlloc( objectiveSystem );
+	objectiveSystem = NULL;
+#endif
 	delete pdaMenu;
 	pdaMenu = NULL;
 
+#if defined( DOMINION ) // OLD GUIs - Multiplayer messages
+	uiManager->DeAlloc( guiMPChat );
+	uiManager->DeAlloc( guiMPSpectate );
+	uiManager->DeAlloc( guiMPMessageMode );
+	guiMPChat = guiMPSpectate = guiMPMessageMode = NULL;
+#endif
 	delete mpMessages;
 	mpMessages = NULL;
 }
@@ -2529,6 +2614,15 @@ void idPlayer::Save( idSaveGame* savefile ) const
 
 	savefile->WriteFloat( pm_stamina.GetFloat() );
 
+#if defined( DOMINION ) // OLD GUIs - Game saved HUD message
+	// Restore vanilla/dhewm3's existing HUD event; BFG replaced it with a dialog.
+	if( guiHud != NULL )
+	{
+		guiHud->SetStateString( "message", idLocalization::GetString( "#str_02916" ) );
+		guiHud->HandleNamedEvent( "Message" );
+	}
+#endif
+
 	// TODO_SPARTY hook this up with new hud
 	//if ( hud ) {
 	//	hud->SetStateString( "message", idLocalization::GetString( "#str_02916" ) );
@@ -2629,14 +2723,22 @@ void idPlayer::Restore( idRestoreGame* savefile )
 
 	if( hudManager != NULL )
 	{
+#if defined( DOMINION ) // OLD GUIs - HUD
+		InitializeGuiHud();
+#else
 		hudManager->Initialize( "hud", common->SW() );
+#endif
 		hudManager->ActivateMenu( true );
 		hud = hudManager->GetHud();
 	}
 
 	if( pdaMenu != NULL )
 	{
+#if defined( DOMINION ) // OLD GUIs - PDA
+			InitializeGuiPDA();
+#else
 		pdaMenu->Initialize( "pda", common->SW() );
+#endif
 	}
 
 	for( i = 0; i < inventory.emails.Num(); i++ )
@@ -2855,6 +2957,14 @@ void idPlayer::Restore( idRestoreGame* savefile )
 	savefile->ReadFloat( set );
 	pm_stamina.SetFloat( set );
 
+#if defined( DOMINION ) // OLD GUIs - Clear saved HUD notifications on restore
+	// Like dhewm3, do not restore an unfinished save-message animation as a stale label.
+	if( guiHud != NULL )
+	{
+		guiHud->SetStateString( "message", "" );
+	}
+#endif
+
 	// create combat collision hull for exact collision detection
 	SetCombatModel();
 
@@ -2931,17 +3041,42 @@ void idPlayer::Restore( idRestoreGame* savefile )
 	}
 
 	// Update the soul cube HUD indicator
-	if( hud )
+	if( hud
+#if defined( DOMINION ) // OLD GUIs - HUD
+		|| guiHud != NULL
+#endif
+	)
 	{
 		if( weapon_soulcube > 0 && ( inventory.weapons & ( 1 << weapon_soulcube ) ) )
 		{
 			int max_souls = inventory.MaxAmmoForAmmoClass( this, "ammo_souls" );
 			if( inventory.GetInventoryAmmoForType( idWeapon::GetAmmoNumForName( "ammo_souls" ) ) >= max_souls )
 			{
+#if defined( DOMINION ) // OLD GUIs - HUD: restored soul-cube readiness
+				if( guiHud != NULL )
+				{
+					guiHud->HandleNamedEvent( "soulCubeReady" );
+				}
+				if( hud != NULL )
+				{
+					hud->SetShowSoulCubeOnLoad( true );
+				}
+#else
 				hud->SetShowSoulCubeOnLoad( true );
+#endif
 			}
 		}
 	}
+
+#if defined( DOMINION ) // OLD GUIs - HUD savegame restoration
+	// The HUD is recreated before the weapon fields are read. Refresh its selection
+	// after restoration so its scripts show the saved weapon's ammo immediately.
+	if( guiHud != NULL )
+	{
+		UpdateHudWeapon();
+		guiHud->StateChanged( gameLocal.time );
+	}
+#endif
 
 }
 
@@ -3342,6 +3477,13 @@ idPlayer::UpdateHudStats
 */
 void idPlayer::UpdateHudStats( idMenuHandler_HUD* _hudManager )
 {
+#if defined( DOMINION ) // OLD GUIs - HUD
+	if( guiHud != NULL ) {
+		UpdateGuiHudStats( guiHud );
+		return;
+	}
+#endif
+
 
 	if( _hudManager && _hudManager->GetHud() )
 	{
@@ -3378,6 +3520,47 @@ idPlayer::UpdateHudWeapon
 */
 void idPlayer::UpdateHudWeapon( bool flashWeapon )
 {
+#if defined( DOMINION ) // OLD GUIs - HUD
+	idUserInterface* classicHud = NULL;
+	if( guiHud )
+	{
+		classicHud = guiHud;
+	}
+	else
+	{
+		const int localClientNum = gameLocal.GetLocalClientNum();
+		if( localClientNum >= 0 && gameLocal.entities[ localClientNum ] && gameLocal.entities[ localClientNum ]->IsType( idPlayer::Type ) )
+		{
+			idPlayer* localPlayer = static_cast< idPlayer* >( gameLocal.entities[ localClientNum ] );
+			if( localPlayer->guiHud && localPlayer->spectating && localPlayer->spectator == entityNumber )
+			{
+				classicHud = localPlayer->guiHud;
+			}
+		}
+	}
+
+	if( classicHud )
+	{
+		// Reset the original GUI's weapon states, then translate BFG's gameplay slots.
+		for( int i = 0; i < MAX_WEAPONS; ++i )
+		{
+			classicHud->SetStateInt( va( "weapon%d", i ), 0 );
+		}
+		for( int i = 0; i < MAX_WEAPONS; ++i )
+		{
+			if( ( inventory.weapons & ( 1 << i ) ) && spawnArgs.GetString( va( "def_weapon%d", i ) )[0] != '\0' )
+			{
+				classicHud->SetStateInt( va( "weapon%d", GuiWeaponSlot( i ) ), idealWeapon == i ? 2 : 1 );
+			}
+		}
+		if( flashWeapon )
+		{
+			classicHud->HandleNamedEvent( "weaponChange" );
+		}
+		return;
+	}
+#endif
+
 
 	idMenuScreen_HUD* curDisplay = hud;
 	idPlayer* p = this;
@@ -3406,6 +3589,13 @@ idPlayer::UpdateHudWeapon
 */
 void idPlayer::UpdateChattingHud()
 {
+#if defined( DOMINION ) // OLD GUIs - HUD
+	if( guiHud != NULL || ( gameLocal.GetLocalPlayer() != NULL && gameLocal.GetLocalPlayer()->guiHud != NULL ) )
+	{
+		return;
+	}
+#endif
+
 
 	idMenuScreen_HUD* curDisplay = hud;
 	idPlayer* p = this;
@@ -3488,6 +3678,14 @@ idPlayer::UpdateMpMessages
 */
 void idPlayer::AddChatMessage( int index, int alpha, const idStr& message )
 {
+#if defined( DOMINION ) // OLD GUIs - Multiplayer messages
+	if( guiMPChat != NULL )
+	{
+		guiMPChat->SetStateString( va( "chat%d", index ), message );
+		guiMPChat->SetStateInt( va( "alpha%d", index ), alpha );
+		return;
+	}
+#endif
 
 	if( mpMessages == NULL || !mpMessages->IsActive() )
 	{
@@ -3539,6 +3737,13 @@ idPlayer::UpdateMpMessages
 */
 void idPlayer::ClearChatMessage( int index )
 {
+#if defined( DOMINION ) // OLD GUIs - Multiplayer messages
+	if( guiMPChat != NULL )
+	{
+		guiMPChat->SetStateString( va( "chat%d", index ), "" );
+		return;
+	}
+#endif
 
 	if( mpMessages == NULL || !mpMessages->IsActive() )
 	{
@@ -3590,6 +3795,40 @@ void idPlayer::DrawHUD( idMenuHandler_HUD* _hudManager )
 	}
 
 
+#if defined( DOMINION ) // OLD GUIs - HUD
+	idUserInterface* legacyHud = guiHud != NULL ? guiHud : ( localPlayer != NULL ? localPlayer->guiHud : NULL );
+	if( legacyHud != NULL ) {
+		UpdateGuiHudStats( legacyHud );
+		if( spectating ) {
+			return;
+		}
+		legacyHud->SetStateString( "weapicon", weapon.GetEntity()->Icon() );
+		legacyHud->SetStateInt( "s_debug", cvarSystem->GetCVarInteger( "s_showLevelMeter" ) );
+		const bool audioLog = IsSoundChannelPlaying( SND_CHANNEL_PDA_AUDIO );
+		if( audioLog != legacyHud->State().GetBool( "audioLogPlaying" ) ) {
+			legacyHud->SetStateBool( "audioLogPlaying", audioLog );
+			legacyHud->HandleNamedEvent( audioLog ? "audioLogUp" : "audioLogDown" );
+		}
+		// OLD GUIs - HUD animation clock: render callbacks may change the selected global time group.
+		// Use the player's own clock for both state evaluation and drawing, including after closing the PDA.
+		const int hudTime = gameLocal.GetTimeGroupTime( timeGroup );
+		legacyHud->StateChanged( hudTime );
+		weapon.GetEntity()->UpdateGUI();
+		legacyHud->Redraw( hudTime, false );
+		idUserInterface* legacyCursor = localPlayer != NULL ? localPlayer->cursor : cursor;
+		if( !GuiActive() && legacyCursor != NULL && weapon.GetEntity()->ShowCrosshair() && !IsGameStereoRendered() ) {
+			const bool grabber = weapon.GetEntity()->GetGrabberState() == 1 || weapon.GetEntity()->GetGrabberState() == 2;
+			legacyCursor->SetStateBool( "grabbercursor", grabber );
+			legacyCursor->SetStateBool( "combatcursor", !grabber );
+			// Cursor assets also use 640x480; this does not change their cached ownership or save format.
+			idUserInterfaceLocal* cursorLocal = static_cast<idUserInterfaceLocal*>( legacyCursor );
+			cursorLocal->SetFullscreenPresentation( true );
+			legacyCursor->Redraw( hudTime, false );
+			cursorLocal->SetFullscreenPresentation( false );
+		}
+		return;
+	}
+#endif
 	UpdateHudStats( _hudManager );
 
 	if( spectating )
@@ -3661,6 +3900,11 @@ void idPlayer::EnterCinematic()
 	Hide();
 	StopSound( SND_CHANNEL_PDA_AUDIO, false );
 	StopSound( SND_CHANNEL_PDA_VIDEO, false );
+#if defined( DOMINION ) // OLD GUIs - HUD
+	if( guiHud != NULL ) {
+		guiHud->HandleNamedEvent( "radioChatterDown" );
+	}
+#endif
 
 	if( hudManager )
 	{
@@ -3864,6 +4108,9 @@ void idPlayer::FireWeapon()
 			weapon.GetEntity()->BeginAttack();
 			if( ( weapon_soulcube >= 0 ) && ( currentWeapon == weapon_soulcube ) )
 			{
+#if defined( DOMINION ) // OLD GUIs - HUD
+				if( guiHud != NULL ) { guiHud->HandleNamedEvent( "soulCubeNotReady" ); }
+#endif
 				if( hud )
 				{
 					hud->UpdateSoulCube( false );
@@ -4015,6 +4262,15 @@ bool idPlayer::Give( const char* statname, const char* value, unsigned int giveF
 				{
 					health = inventory.maxHealth;
 				}
+#if defined( DOMINION ) // OLD GUIs - Medkit pickup sound
+				// Vanilla flashes the HUD directly for pickups. Its healthPulse flag instead
+				// plays the Soul Cube health-pool sound, in addition to the item's own snd_acquire.
+				if( guiHud != NULL )
+				{
+					guiHud->HandleNamedEvent( "healthPulse" );
+				}
+				else
+#endif
 				healthPulse = true;
 			}
 		}
@@ -4699,6 +4955,12 @@ bool idPlayer::GiveInventoryItem( idDict* item, unsigned int giveFlags )
 		}
 
 		const char* icon = item->GetString( "inv_icon" );
+#if defined( DOMINION ) // OLD GUIs - HUD
+		if( guiHud != NULL ) {
+			guiHud->SetStateString( "itemicon", icon );
+			guiHud->HandleNamedEvent( "invPickup" );
+		}
+#endif
 		if( hud != NULL )
 		{
 			hud->ShowNewItem( itemName, icon );
@@ -4752,6 +5014,16 @@ void idPlayer::GiveObjective( const char* title, const char* text, const idMater
 	info.screenshot = screenshot;
 
 	StartSound( "snd_objectiveup", SND_CHANNEL_ANY, 0, false, NULL );
+#if defined( DOMINION ) // OLD GUIs - HUD
+	if( guiHud != NULL ) {
+		guiHud->SetStateString( "screenshot", screenshot != NULL ? screenshot->GetName() : "" );
+		guiHud->SetStateString( "objective", "1" );
+		guiHud->SetStateString( "objectivetext", text );
+		guiHud->SetStateString( "objectivetitle", title );
+		guiHud->HandleNamedEvent( "newObjective" );
+		objectiveUp = true;
+	}
+#endif
 
 	if( hud )
 	{
@@ -4779,6 +5051,14 @@ void idPlayer::CompleteObjective( const char* title )
 	}
 
 	StartSound( "snd_objectiveup", SND_CHANNEL_ANY, 0, false, NULL );
+#if defined( DOMINION ) // OLD GUIs - HUD
+	if( guiHud != NULL ) {
+		guiHud->SetStateString( "objective", "2" );
+		guiHud->SetStateString( "objectivecompletetitle", title );
+		guiHud->SetStateString( "objectivetitle", title );
+		guiHud->HandleNamedEvent( "newObjectiveComplete" );
+	}
+#endif
 
 	if( hud )
 	{
@@ -4812,6 +5092,11 @@ void idPlayer::GiveVideo( const idDeclVideo* video, const char* itemName )
 	{
 		inventory.pickupItemNames.Append( itemName );
 	}
+#if defined( DOMINION ) // OLD GUIs - HUD
+	if( guiHud != NULL ) {
+		guiHud->HandleNamedEvent( "videoPickup" );
+	}
+#endif
 
 	if( hud )
 	{
@@ -4827,6 +5112,12 @@ idPlayer::GiveSecurity
 void idPlayer::GiveSecurity( const char* security )
 {
 	GetPDA()->SetSecurity( security );
+#if defined( DOMINION ) // OLD GUIs - HUD
+	if( guiHud != NULL ) {
+		guiHud->SetStateString( "pda_security", "1" );
+		guiHud->HandleNamedEvent( "securityPickup" );
+	}
+#endif
 
 	if( hud )
 	{
@@ -4853,6 +5144,11 @@ void idPlayer::GiveEmail( const idDeclEmail* email )
 	//if ( hud ) {
 	//	hud->HandleNamedEvent( "emailPickup" );
 	//}
+#if defined( DOMINION ) // OLD GUIs - HUD
+	if( guiHud != NULL ) {
+		guiHud->HandleNamedEvent( "emailPickup" );
+	}
+#endif
 }
 
 /*
@@ -4921,6 +5217,17 @@ void idPlayer::GivePDA( const idDeclPDA* pda, const char* securityItem )
 	if( gameLocal.GetFrameNum() > 10 )
 	{
 		const char* sec = pda->GetSecurity();
+#if defined( DOMINION ) // OLD GUIs - HUD
+		if( guiHud != NULL ) {
+			// Like vanilla/dhewm3, let the pickup window choose its colour, not the PDA list's colour codes.
+			idStr pdaName = pda->GetPdaName();
+			pdaName.RemoveColors();
+			guiHud->SetStateString( "pda", "1" );
+			guiHud->SetStateString( "pda_text", pdaName );
+			guiHud->SetStateString( "pda_security", sec != NULL && sec[0] != '\0' ? "1" : "0" );
+			guiHud->HandleNamedEvent( "pdaPickup" );
+		}
+#endif
 		if( hud )
 		{
 			hud->DownloadPDA( pda, ( sec != NULL && sec[0] != 0 ) ? true : false );
@@ -4932,6 +5239,13 @@ void idPlayer::GivePDA( const idDeclPDA* pda, const char* securityItem )
 			{
 				TogglePDA();
 			}
+#if defined( DOMINION ) // OLD GUIs - PDA first-pickup tutorial
+			// Vanilla/dhewm3 displays the critical-PDA tutorial inside the PDA desktop.
+			if( objectiveSystem != NULL )
+			{
+				objectiveSystem->HandleNamedEvent( "showPDATip" );
+			}
+#endif
 			//ShowTip( spawnArgs.GetString( "text_infoTitle" ), spawnArgs.GetString( "text_firstPDA" ), true );
 		}
 	}
@@ -5063,6 +5377,47 @@ int idPlayer::SlotForWeapon( const char* weaponName )
 	// not found
 	return -1;
 }
+
+#if defined( DOMINION ) // OLD GUIs - HUD weapon numbers
+/*
+===============
+idPlayer::GuiWeaponSlot
+Original HUD scripts identify weapons by the 2004/RoE slot numbers. Translate
+known weapon names for both selection and pickup events without changing gameplay.
+===============
+*/
+int idPlayer::GuiWeaponSlot( const int weaponSlot ) const
+{
+	static const char *const baseWeapons[] =
+	{
+		"weapon_fists", "weapon_pistol", "weapon_shotgun", "weapon_machinegun",
+		"weapon_chaingun", "weapon_handgrenade", "weapon_plasmagun", "weapon_rocketlauncher",
+		"weapon_bfg", "weapon_soulcube", "weapon_chainsaw", "weapon_flashlight", "weapon_pda"
+	};
+	static const char *const expansionWeapons[] =
+	{
+		"weapon_flashlight", "weapon_fists", "weapon_grabber", "weapon_pistol",
+		"weapon_shotgun", "weapon_shotgun_double", "weapon_machinegun", "weapon_chaingun",
+		"weapon_handgrenade", "weapon_plasmagun", "weapon_rocketlauncher", "weapon_bfg",
+		"weapon_bloodstone_passive", "weapon_bloodstone_active1", "weapon_bloodstone_active2",
+		"weapon_bloodstone_active3", "weapon_pda"
+	};
+	// The GUI's layout can differ from BFG's multiplayer player expansion.
+	const bool expansionHud = guiHud != NULL ? guiExpansionWeaponSlots : GetExpansionType() == GAME_D3XP;
+	const char *const *const guiWeapons = expansionHud ? expansionWeapons : baseWeapons;
+	const int guiWeaponCount = expansionHud ? int( sizeof( expansionWeapons ) / sizeof( expansionWeapons[0] ) ) : int( sizeof( baseWeapons ) / sizeof( baseWeapons[0] ) );
+	const char *const weaponName = spawnArgs.GetString( va( "def_weapon%d", weaponSlot ) );
+	for( int i = 0; i < guiWeaponCount; ++i )
+	{
+		if( idStr::Icmp( weaponName, guiWeapons[i] ) == 0 )
+		{
+			return i;
+		}
+	}
+	// A mod's additional weapon keeps its own slot when it has no stock GUI equivalent.
+	return weaponSlot;
+}
+#endif
 
 /*
 ===============
@@ -5852,7 +6207,13 @@ void idPlayer::Weapon_GUI()
 		{
 			bool updateVisuals = false;
 			sysEvent_t ev = sys->GenerateMouseButtonEvent( 1, isDown );
+#if defined( DOMINION ) // OLD GUIs - Original terminal animation clock
+			const int guiTime = fileSystem->IsDoom2004() && focusGUIent != NULL ?
+				gameLocal.GetTimeGroupTime( focusGUIent->timeGroup ) : gameLocal.time;
+			command = ui->HandleEvent( &ev, guiTime, &updateVisuals );
+#else
 			command = ui->HandleEvent( &ev, gameLocal.time, &updateVisuals );
+#endif
 			if( updateVisuals && focusGUIent && ui == focusUI )
 			{
 				focusGUIent->UpdateVisuals();
@@ -6396,6 +6757,36 @@ bool idPlayer::HandleSingleGuiCommand( idEntity* entityGui, idLexer* src )
 		}
 		return true;
 	}
+#if defined( DOMINION ) // OLD GUIs - PDA
+	if( objectiveSystem != NULL ) {
+		if( token.Icmp( "updatepda" ) == 0 || token.Icmp( "updatepda2" ) == 0 ) {
+			UpdatePDAInfo( token.Icmp( "updatepda" ) == 0 );
+			return true;
+		}
+		if( token.Icmp( "close" ) == 0 && objectiveSystemOpen ) {
+			TogglePDA();
+			return true;
+		}
+		if( token.Icmp( "playpdaaudio" ) == 0 ) {
+			if( objectiveSystemOpen && guiPdaAudio != NULL && guiPdaAudio->GetWave() != NULL ) {
+				PlayAudioLog( guiPdaAudio->GetWave() );
+			}
+			return true;
+		}
+		if( token.Icmp( "stoppdaaudio" ) == 0 ) {
+			EndAudioLog();
+			return true;
+		}
+		if( token.Icmp( "playpdavideo" ) == 0 ) {
+			if( objectiveSystemOpen && guiPdaVideo != NULL ) { PlayVideoDisk( guiPdaVideo ); }
+			return true;
+		}
+		if( token.Icmp( "stoppdavideo" ) == 0 ) {
+			EndVideoDisk();
+			return true;
+		}
+	}
+#endif
 	src->UnreadToken( &token );
 	return false;
 }
@@ -6516,6 +6907,12 @@ void idPlayer::UpdateLocation()
 	{
 		hud->UpdateLocation( this );
 	}
+#if defined( DOMINION ) // OLD GUIs - HUD
+	if( guiHud != NULL ) {
+		idLocationEntity* location = gameLocal.LocationForPoint( GetEyePosition() );
+		guiHud->SetStateString( "location", location != NULL ? location->GetLocation() : idLocalization::GetString( "#str_02911" ) );
+	}
+#endif
 }
 
 /*
@@ -6788,12 +7185,20 @@ void idPlayer::UpdateFocus()
 
 			// clamp the mouse to the corner
 			ev = sys->GenerateMouseMoveEvent( -2000, -2000 );
+#if defined( DOMINION ) // OLD GUIs - Original terminal animation clock
+			command = focusUI->HandleEvent( &ev, fileSystem->IsDoom2004() ? gameLocal.GetTimeGroupTime( focusGUIent->timeGroup ) : gameLocal.time );
+#else
 			command = focusUI->HandleEvent( &ev, gameLocal.time );
+#endif
 			HandleGuiCommands( focusGUIent, command );
 
 			// move to an absolute position
 			ev = sys->GenerateMouseMoveEvent( pt.x * SCREEN_WIDTH, pt.y * SCREEN_HEIGHT );
+#if defined( DOMINION ) // OLD GUIs - Original terminal animation clock
+			command = focusUI->HandleEvent( &ev, fileSystem->IsDoom2004() ? gameLocal.GetTimeGroupTime( focusGUIent->timeGroup ) : gameLocal.time );
+#else
 			command = focusUI->HandleEvent( &ev, gameLocal.time );
+#endif
 			HandleGuiCommands( focusGUIent, command );
 			focusTime = gameLocal.time + FOCUS_GUI_TIME;
 			break;
@@ -6804,7 +7209,11 @@ void idPlayer::UpdateFocus()
 	{
 		if( !oldFocus || oldFocus != focusGUIent )
 		{
+#if defined( DOMINION ) // OLD GUIs - Original terminal animation clock
+			command = focusUI->Activate( true, fileSystem->IsDoom2004() ? gameLocal.GetTimeGroupTime( focusGUIent->timeGroup ) : gameLocal.time );
+#else
 			command = focusUI->Activate( true, gameLocal.time );
+#endif
 			HandleGuiCommands( focusGUIent, command );
 			StartSound( "snd_guienter", SND_CHANNEL_ANY, 0, false, NULL );
 			// HideTip();
@@ -6813,7 +7222,11 @@ void idPlayer::UpdateFocus()
 	}
 	else if( oldFocus && oldUI )
 	{
+#if defined( DOMINION ) // OLD GUIs - Original terminal animation clock
+		command = oldUI->Activate( false, fileSystem->IsDoom2004() ? gameLocal.GetTimeGroupTime( oldFocus->timeGroup ) : gameLocal.time );
+#else
 		command = oldUI->Activate( false, gameLocal.time );
+#endif
 		HandleGuiCommands( oldFocus, command );
 		StartSound( "snd_guiexit", SND_CHANNEL_ANY, 0, false, NULL );
 	}
@@ -6836,6 +7249,18 @@ void idPlayer::UpdateFocus()
 			hud->UpdateCursorState();
 		}
 	}
+#if defined( DOMINION ) // OLD GUIs - HUD
+	if( guiHud != NULL ) {
+		if( cursor != NULL ) {
+			cursor->SetStateInt( "talkcursor", talkCursor );
+		}
+		if( oldChar != focusCharacter ) {
+			guiHud->SetStateString( "npc", focusCharacter != NULL ? focusCharacter->spawnArgs.GetString( "npc_name", "Joe" ) : "" );
+			guiHud->SetStateString( "npc_action", focusCharacter != NULL ? idLocalization::GetString( "#str_02036" ) : "" );
+			guiHud->HandleNamedEvent( focusCharacter != NULL ? "showNPC" : "hideNPC" );
+		}
+	}
+#endif
 }
 
 /*
@@ -7491,6 +7916,14 @@ void idPlayer::UpdateAir()
 		}
 	}
 
+#if defined( DOMINION ) // OLD GUIs - HUD
+	if( guiHud != NULL ) {
+		if( newAirless != airless ) {
+			guiHud->HandleNamedEvent( newAirless ? "noAir" : "Air" );
+		}
+		guiHud->SetStateInt( "player_air", 100 * airMsec / Max( 1, pm_airMsec.GetInteger() ) );
+	}
+#endif
 	airless = newAirless;
 
 	if( hud )
@@ -7501,6 +7934,47 @@ void idPlayer::UpdateAir()
 
 void idPlayer::UpdatePowerupHud()
 {
+#if defined( DOMINION ) // OLD GUIs - HUD
+	if( guiHud != NULL )
+	{
+		if( !guiHud || !IsLocallyControlled() )
+		{
+			return;
+		}
+
+		if( lastHudPowerup != hudPowerup )
+		{
+			if( hudPowerup == -1 )
+			{
+				guiHud->HandleNamedEvent( "noPowerup" );
+			}
+			else
+			{
+				guiHud->HandleNamedEvent( "Powerup" );
+			}
+
+			lastHudPowerup = hudPowerup;
+		}
+
+		if( hudPowerup != -1 && hudPowerup < MAX_POWERUPS )
+		{
+			if( PowerUpActive( hudPowerup ) )
+			{
+				const int remaining = inventory.powerupEndTime[ hudPowerup ] - gameLocal.time;
+				const int filledbar = idMath::ClampInt( 0, hudPowerupDuration, remaining );
+
+				if( hudPowerupDuration > 0 )
+				{
+					guiHud->SetStateInt( "player_powerup", 100 * filledbar / hudPowerupDuration );
+					guiHud->SetStateInt( "player_poweruptime", remaining / 1000 );
+				}
+			}
+		}
+
+		return;
+	}
+#endif
+
 
 	if( health <= 0 )
 	{
@@ -7585,6 +8059,21 @@ idPlayer::TogglePDA
 */
 void idPlayer::TogglePDA()
 {
+#if defined( DOMINION ) // OLD GUIs - PDA
+	// Use the selected original PDA while retaining the existing BFG/SWF path below.
+	if( objectiveSystem != NULL )
+	{
+		ToggleGuiPDA();
+		return;
+	}
+#endif
+#if defined( DOMINION ) // OLD GUIs - HUD
+	if( guiHud != NULL ) {
+		guiHud->HandleNamedEvent( "pdaPickupHide" );
+		guiHud->HandleNamedEvent( "videoPickupHide" );
+	}
+#endif
+
 
 	if( inventory.pdas.Num() == 0 )
 	{
@@ -8708,6 +9197,13 @@ so that we can display a message to the user.
 */
 void idPlayer::ShowRespawnHudMessage()
 {
+#if defined( DOMINION ) // OLD GUIs - HUD respawn messages
+	// The original HUD has no idMenuScreen_HUD; retain server messages for remote players.
+	if( IsLocallyControlled() && hud == NULL )
+	{
+		return;
+	}
+#endif
 	if( IsLocallyControlled() )
 	{
 		hud->ShowRespawnMessage( true );
@@ -8734,6 +9230,13 @@ for example, when a player does respawn.
 */
 void idPlayer::HideRespawnHudMessage()
 {
+#if defined( DOMINION ) // OLD GUIs - HUD respawn messages
+	// Player initialization can clear this message before any SWF screen exists.
+	if( hud == NULL )
+	{
+		return;
+	}
+#endif
 	if( IsLocallyControlled() )
 	{
 		hud->ShowRespawnMessage( false );
@@ -8748,6 +9251,92 @@ idPlayer::UpdateHud
 void idPlayer::UpdateHud()
 {
 	idPlayer* aimed;
+#if defined( DOMINION ) // OLD GUIs - HUD
+	if( guiHud != NULL )
+	{
+		if( !guiHud || !IsLocallyControlled() )
+		{
+			return;
+		}
+
+		int c = inventory.pickupItemNames.Num();
+		if( c > 0 )
+		{
+			if( gameLocal.time > inventory.nextItemPickup )
+			{
+				if( inventory.nextItemPickup && gameLocal.time - inventory.nextItemPickup > 2000 )
+				{
+					inventory.nextItemNum = 1;
+				}
+
+				int count = common->IsMultiplayer() ? 3 : 5;
+				if( count < c )
+				{
+					c = count;
+				}
+
+				for( int i = 0; i < c; ++i )
+				{
+					guiHud->SetStateString( va( "itemtext%i", inventory.nextItemNum ), inventory.pickupItemNames[0] );
+					guiHud->SetStateString( va( "itemicon%i", inventory.nextItemNum ), "" );
+					guiHud->HandleNamedEvent( va( "itemPickup%i", inventory.nextItemNum++ ) );
+					inventory.pickupItemNames.RemoveIndex( 0 );
+					if( inventory.nextItemNum == 1 )
+					{
+						inventory.onePickupTime = gameLocal.time;
+					}
+					else if( inventory.nextItemNum > count )
+					{
+						inventory.nextItemNum = 1;
+						inventory.nextItemPickup = inventory.onePickupTime + 2000;
+					}
+					else
+					{
+						inventory.nextItemPickup = gameLocal.time + 400;
+					}
+				}
+			}
+		}
+
+		if( gameLocal.realClientTime == lastMPAimTime )
+		{
+			if( MPAim != -1 && gameLocal.mpGame.IsGametypeTeamBased()
+					&& gameLocal.entities[ MPAim ] && gameLocal.entities[ MPAim ]->IsType( idPlayer::Type )
+					&& static_cast< idPlayer* >( gameLocal.entities[ MPAim ] )->team == team )
+			{
+				aimed = static_cast< idPlayer* >( gameLocal.entities[ MPAim ] );
+				guiHud->SetStateString( "aim_text", session->GetActingGameStateLobbyBase().GetLobbyUserName( gameLocal.lobbyUserIDs[ MPAim ] ) );
+				guiHud->SetStateFloat( "aim_color", static_cast< float >( aimed->team + 1 ) );
+				guiHud->HandleNamedEvent( "aim_flash" );
+				MPAimHighlight = true;
+				MPAimFadeTime = 0;
+			}
+			else if( MPAimHighlight )
+			{
+				guiHud->HandleNamedEvent( "aim_fade" );
+				MPAimFadeTime = gameLocal.realClientTime;
+				MPAimHighlight = false;
+			}
+		}
+		if( MPAimFadeTime )
+		{
+			assert( !MPAimHighlight );
+			if( gameLocal.realClientTime - MPAimFadeTime > 2000 )
+			{
+				MPAimFadeTime = 0;
+			}
+		}
+
+		if( common->IsMultiplayer() && IsLocallyControlled() )
+		{
+			guiHud->SetStateString( "hudLag", isLagged ? "1" : "0" );
+		guiHud->SetStateInt( "g_showProjectilePct", cvarSystem->GetCVarInteger( "g_showProjectilePct" ) );
+		guiHud->SetStateString( "projectilepct", va( "Hit %% %.1f", numProjectilesFired > 0 ? 100.0f * numProjectileHits / numProjectilesFired : 0.0f ) );
+		}
+
+		return;
+	}
+#endif
 
 	if( !hud )
 	{
@@ -8919,6 +9508,26 @@ idPlayer::HandleGuiEvents
 */
 bool idPlayer::HandleGuiEvents( const sysEvent_t* ev )
 {
+#if defined( DOMINION ) // OLD GUIs - Multiplayer messages
+	if( HandleGuiMessageMode( ev ) )
+	{
+		return true;
+	}
+#endif
+#if defined( DOMINION ) // OLD GUIs - PDA
+	if( objectiveSystem != NULL && objectiveSystemOpen ) {
+		if( ev->evType == SE_KEY && ev->evValue2 && idStr::Icmp( idKeyInput::GetBinding( ev->evValue ), "_impulse19" ) == 0 ) {
+			TogglePDA();
+			return true;
+		}
+		const idStr command = objectiveSystem->HandleEvent( ev, gameLocal.GetTimeGroupTime( timeGroup ), NULL );
+		HandleGuiCommands( this, command );
+		if( ev->evType == SE_KEY && ev->evValue2 && ev->evValue >= K_F1 && ev->evValue <= K_F12 ) {
+			idKeyInput::ExecKeyBinding( ev->evValue );
+		}
+		return true;
+	}
+#endif
 
 	bool handled = false;
 
@@ -10879,6 +11488,9 @@ void idPlayer::AddAIKill()
 		inventory.SetInventoryAmmoForType( ammo_souls, currentSoulAmmo + 1 );
 		if( inventory.GetInventoryAmmoForType( ammo_souls ) >= max_souls )
 		{
+#if defined( DOMINION ) // OLD GUIs - HUD
+			if( guiHud != NULL ) { guiHud->HandleNamedEvent( "soulCubeReady" ); }
+#endif
 
 			if( hud )
 			{
@@ -10943,6 +11555,17 @@ void idPlayer::SetLastHitTime( int time )
 		lastSndHitTime = time;
 		StartSound( "snd_hit_feedback", SND_CHANNEL_ANY, SSF_PRIVATE_SOUND, false, NULL );
 	}
+#if defined( DOMINION ) // OLD GUIs - HUD
+	if( guiHud != NULL ) {
+		if( cursor != NULL ) {
+#if defined( DOMINION ) // OLD GUIs - HUD
+			cursor->HandleNamedEvent( "hitTime" );
+#else
+			cursor->HandleNamedEvent( "onHit" );
+#endif
+		}
+	}
+#endif
 
 	if( hud )
 	{
@@ -12352,6 +12975,16 @@ void idPlayer::ShowTip( const char* title, const char* tip, bool autoHide )
 	{
 		return;
 	}
+#if defined( DOMINION ) // OLD GUIs - HUD
+	if( guiHud != NULL ) {
+		guiHud->SetStateString( "tip", tip );
+		guiHud->SetStateString( "tiptitle", title );
+		guiHud->HandleNamedEvent( "tipWindowUp" );
+		if( autoHide ) {
+			PostEventSec( &EV_Player_HideTip, 5.0f );
+		}
+	}
+#endif
 
 	if( hudManager )
 	{
@@ -12367,6 +13000,11 @@ idPlayer::HideTip
 */
 void idPlayer::HideTip()
 {
+#if defined( DOMINION ) // OLD GUIs - HUD
+	if( guiHud != NULL ) {
+		guiHud->HandleNamedEvent( "tipWindowDown" );
+	}
+#endif
 	if( hudManager )
 	{
 		hudManager->HideTip();
@@ -12393,6 +13031,12 @@ void idPlayer::HideObjective()
 {
 
 	StartSound( "snd_objectivedown", SND_CHANNEL_ANY, 0, false, NULL );
+#if defined( DOMINION ) // OLD GUIs - HUD
+	if( guiHud != NULL ) {
+		guiHud->HandleNamedEvent( "closeObjective" );
+		objectiveUp = false;
+	}
+#endif
 
 	if( hud )
 	{
@@ -12581,6 +13225,13 @@ bool idPlayer::NeedsIcon()
 {
 	// local clients don't render their own icons... they're only info for other clients
 	// always draw icons in CTF games
+#if defined( DOMINION ) // OLD GUIs - Multiplayer chatting indicator
+	const idPlayer *localPlayer = gameLocal.GetLocalPlayer();
+	if( !IsLocallyControlled() && localPlayer != NULL && localPlayer->guiMPChat != NULL && isChatting && !spectating )
+	{
+		return true;
+	}
+#endif
 	return !IsLocallyControlled() && ( ( g_CTFArrows.GetBool() && gameLocal.mpGame.IsGametypeFlagBased() && !IsHidden() && !AI_DEAD ) || ( isLagged ) );
 }
 
@@ -12795,3 +13446,767 @@ gameExpansionType_t idPlayer::GetExpansionType() const
 	}
 	return GAME_UNKNOWN;
 }
+
+#if defined( DOMINION ) // OLD GUIs - HUD
+/*
+===============
+idPlayer::InitializeGuiHud
+===============
+*/
+void idPlayer::InitializeGuiHud()
+{
+	uiManager->DeAlloc( guiHud );
+	guiHud = NULL;
+	hudManager->Cleanup();
+	hud = NULL;
+	idSWF *swf = NULL;
+	const char *guiName = common->IsMultiplayer() ? spawnArgs.GetString( "mphud", "guis/mphud.gui" ) : spawnArgs.GetString( "hud" );
+	UI_LoadFullscreenGui( "hud", guiName, NULL, common->SW(), swf, guiHud );
+	if ( guiHud != NULL )
+	{
+		// BFG uses its RoE player in all MP modes. The unmodified stock Doom 3
+		// desktop starts at fists=0, while the RoE desktop has its extra icon 18.
+		// Recognize those stock MP layouts once; custom layouts retain campaign policy.
+		guiExpansionWeaponSlots = GetExpansionType() == GAME_D3XP;
+		idWindow *const desktop = static_cast<idUserInterfaceLocal *>( guiHud )->GetDesktop();
+		if( common->IsMultiplayer() && desktop != NULL && desktop->FindChildByName( "WeapIcon0" ) != NULL )
+		{
+			guiExpansionWeaponSlots = desktop->FindChildByName( "WeapIcon18" ) != NULL;
+		}
+		guiHud->Activate( true, gameLocal.time );
+		guiHud->HandleNamedEvent( "aim_clear" );
+		guiHud->HandleNamedEvent( "itemPickup" );
+		UpdateHudWeapon( false );
+	}
+	else if ( swf != NULL )
+	{
+		hudManager->Initialize( swf );
+	}
+}
+#endif
+#if defined( DOMINION ) // OLD GUIs - HUD
+/*
+===============
+idPlayer::UpdateGuiHudAmmo
+===============
+*/
+void idPlayer::UpdateGuiHudAmmo( idUserInterface *_hud )
+{
+	int inclip;
+	int ammoamount;
+
+	assert( weapon.GetEntity() );
+	assert( _hud );
+
+	inclip		= weapon.GetEntity()->AmmoInClip();
+	ammoamount	= weapon.GetEntity()->AmmoAvailable();
+	if ( ammoamount < 0 || !weapon.GetEntity()->IsReady() )
+	{
+		// show infinite ammo
+		_hud->SetStateString( "player_ammo", "" );
+		_hud->SetStateString( "player_totalammo", "" );
+	}
+	else
+	{
+		// show remaining ammo
+		_hud->SetStateString( "player_totalammo", va( "%i", ammoamount ) );
+		_hud->SetStateString( "player_ammo", weapon.GetEntity()->ClipSize() ? va( "%i", inclip ) : "--" );		// how much in the current clip
+		_hud->SetStateString( "player_clips", weapon.GetEntity()->ClipSize() ? va( "%i", ammoamount / weapon.GetEntity()->ClipSize() ) : "--" );
+		_hud->SetStateString( "player_allammo", va( "%i/%i", inclip, ammoamount ) );
+	}
+
+	_hud->SetStateBool( "player_ammo_empty", ( ammoamount == 0 ) );
+	_hud->SetStateBool( "player_clip_empty", ( weapon.GetEntity()->ClipSize() ? inclip == 0 : false ) );
+	_hud->SetStateBool( "player_clip_low", ( weapon.GetEntity()->ClipSize() ? inclip <= weapon.GetEntity()->LowAmmo() : false ) );
+
+	// Resurrection of Evil's original HUD also consumes these ammo states.
+	_hud->SetStateInt( "player_ammo_count", weapon.GetEntity()->AmmoCount() );
+	if ( weapon_bloodstone >= 0 )
+	{
+		int required;
+		const ammo_t ammo = inventory.AmmoIndexForWeaponClass( "weapon_bloodstone_passive", &required );
+		const int charges = inventory.HasAmmo( ammo, required );
+		_hud->SetStateInt( "player_bloodstone_ammo", charges );
+		_hud->HandleNamedEvent( "bloodstoneAmmoUpdate" );
+		if ( charges > 0 && !_hud->State().GetBool( "bloodstoneReady" ) )
+		{
+			_hud->HandleNamedEvent( "bloodstoneReady" );
+		}
+		_hud->SetStateBool( "bloodstoneReady", charges > 0 );
+		if ( currentWeapon == weapon_bloodstone )
+		{
+			_hud->SetStateString( "player_ammo", "" );
+			_hud->SetStateString( "player_totalammo", "" );
+			_hud->SetStateBool( "player_ammo_empty", false );
+			_hud->SetStateBool( "player_clip_empty", false );
+			_hud->SetStateBool( "player_clip_low", false );
+		}
+	}
+	_hud->HandleNamedEvent( "updateAmmo" );
+}
+
+/*
+===============
+idPlayer::UpdateGuiHudStats
+===============
+*/
+void idPlayer::UpdateGuiHudStats( idUserInterface *_hud )
+{
+	int staminapercentage;
+	float max_stamina;
+
+	assert( _hud );
+
+	max_stamina = pm_stamina.GetFloat();
+	if ( !max_stamina )
+	{
+		// stamina disabled, so show full stamina bar
+		staminapercentage = 100.0f;
+	}
+	else
+	{
+		staminapercentage = idMath::Ftoi( 100.0f * stamina / max_stamina );
+	}
+
+	_hud->SetStateInt( "player_health", health );
+	_hud->SetStateInt( "player_stamina", staminapercentage );
+	_hud->SetStateInt( "player_armor", inventory.armor );
+	_hud->SetStateInt( "player_hr", heartRate );
+	_hud->SetStateInt( "player_nostamina", ( max_stamina == 0 ) ? 1 : 0 );
+
+	_hud->HandleNamedEvent( "updateArmorHealthAir" );
+
+	if ( healthPulse )
+	{
+		_hud->HandleNamedEvent( "healthPulse" );
+		StartSound( "snd_healthpulse", SND_CHANNEL_ITEM, 0, false, NULL );
+		healthPulse = false;
+	}
+
+	if ( healthTake )
+	{
+		_hud->HandleNamedEvent( "healthPulse" );
+		StartSound( "snd_healthtake", SND_CHANNEL_ITEM, 0, false, NULL );
+		healthTake = false;
+	}
+
+	if ( inventory.ammoPulse )
+	{
+		_hud->HandleNamedEvent( "ammoPulse" );
+		inventory.ammoPulse = false;
+	}
+	if ( inventory.weaponPulse )
+	{
+		// We need to update the weapon hud manually, but not
+		// the armor/ammo/health because they are updated every
+		// frame no matter what
+		UpdateHudWeapon();
+		_hud->HandleNamedEvent( "weaponPulse" );
+		inventory.weaponPulse = false;
+	}
+	if ( inventory.armorPulse )
+	{
+		_hud->HandleNamedEvent( "armorPulse" );
+		inventory.armorPulse = false;
+	}
+
+	UpdateGuiHudAmmo( _hud );
+}
+#endif
+
+#if defined( DOMINION ) // OLD GUIs - PDA
+/*
+========================
+idPlayer::InitializeGuiPDA
+Select the original PDA or inherit the directory-selected SWF without changing save data.
+========================
+*/
+void idPlayer::InitializeGuiPDA()
+{
+	uiManager->DeAlloc( objectiveSystem );
+	objectiveSystem = NULL;
+	guiPdaAudio = NULL;
+	guiPdaVideo = NULL;
+	guiPdaInitialized = false;
+	objectiveSystemOpen = false;
+	pdaMenu->Cleanup();
+	idSWF *swf = NULL;
+	UI_LoadFullscreenGui( "pda", common->IsMultiplayer() ? NULL : "guis/pda.gui", NULL, common->SW(), swf, objectiveSystem, true );
+	if( ( fileSystem->IsDoom2004() || objectiveSystem != NULL ) && !cvarSystem->GetCVarBool( "g_useOldPDAStrings" ) )
+	{
+		// Original Doom 3/RoE content and PDA GUIs use the declaration text. Reparse cached
+		// content once after changing policy; refresh leaf declarations before PDAs.
+		cvarSystem->SetCVarBool( "g_useOldPDAStrings", true );
+		const declType_t types[] = { DECL_EMAIL, DECL_AUDIO, DECL_VIDEO, DECL_PDA };
+		for( const declType_t type : types )
+		{
+			const int count = declManager->GetNumDecls( type );
+			for( int index = 0; index < count; ++index )
+			{
+				idDecl *decl = const_cast<idDecl *>( declManager->DeclByIndex( type, index, false ) );
+				if( decl->GetState() != DS_UNPARSED )
+				{
+					decl->Invalidate();
+					decl->EnsureNotPurged();
+				}
+			}
+		}
+	}
+	if( swf != NULL )
+	{
+		pdaMenu->Initialize( swf );
+	}
+}
+
+/*
+========================
+idPlayer::UpdateGuiPDA
+Run original PDA timeline commands and redraw its fullscreen desktop.
+========================
+*/
+void idPlayer::UpdateGuiPDA()
+{
+	if( objectiveSystem == NULL || !objectiveSystemOpen )
+	{
+		return;
+	}
+	sysEvent_t event = {};
+	event.evType = SE_NONE;
+	// OLD GUIs - PDA animation clock: input and redraw must use the same explicit player clock.
+	const int guiTime = gameLocal.GetTimeGroupTime( timeGroup );
+	const idStr command = objectiveSystem->HandleEvent( &event, guiTime, NULL );
+	HandleGuiCommands( this, command );
+	if( !objectiveSystemOpen )
+	{
+		return;
+	}
+	objectiveSystem->Redraw( guiTime, false );
+	// Redraw already draws the desktop cursor with the same aspect transform.
+}
+/*
+========================
+idPlayer::AddGuiPDAData
+Populate the original email/audio/video list state from BFG inventory declarations.
+========================
+*/
+int idPlayer::AddGuiPDAData( const declType_t dataType, const char *listName, const idDeclPDA *src, idUserInterface *gui )
+{
+	int c, i;
+	idStr work;
+	if ( dataType == DECL_EMAIL )
+	{
+		c = src->GetNumEmails();
+		for ( i = 0; i < c; ++i )
+		{
+			const idDeclEmail *email = src->GetEmailByIndex( i );
+			if ( email == NULL )
+			{
+				work = va( "-\tEmail %d not found\t-", i );
+			}
+			else
+			{
+				work = email->GetFrom();
+				work += "\t";
+				work += email->GetSubject();
+				work += "\t";
+				work += email->GetDate();
+			}
+			gui->SetStateString( va( "%s_item_%i", listName, i ), work );
+		}
+		return c;
+	}
+	else if ( dataType == DECL_AUDIO )
+	{
+		c = src->GetNumAudios();
+		for ( i = 0; i < c; ++i )
+		{
+			const idDeclAudio *audio = src->GetAudioByIndex( i );
+			if ( audio == NULL )
+			{
+				work = va( "Audio Log %d not found", i );
+			}
+			else
+			{
+				work = audio->GetAudioName();
+			}
+			gui->SetStateString( va( "%s_item_%i", listName, i ), work );
+		}
+		return c;
+	}
+	else if ( dataType == DECL_VIDEO )
+	{
+		c = inventory.videos.Num();
+		for ( i = 0; i < c; ++i )
+		{
+			const idDeclVideo *video = GetVideo( i );
+			if ( video == NULL )
+			{
+				work = va( "Video CD %s not found", "<missing>" );
+			}
+			else
+			{
+				work = video->GetVideoName();
+			}
+			gui->SetStateString( va( "%s_item_%i", listName, i ), work );
+		}
+		return c;
+	}
+	return 0;
+}
+
+/*
+========================
+idPlayer::UpdateObjectiveInfo
+Publish objective titles, text and screenshots using the original GUI state names.
+========================
+*/
+void idPlayer::UpdateObjectiveInfo( void )
+{
+	if ( objectiveSystem == NULL )
+	{
+		return;
+	}
+	objectiveSystem->SetStateString( "objective1", "" );
+	objectiveSystem->SetStateString( "objective2", "" );
+	objectiveSystem->SetStateString( "objective3", "" );
+	for ( int i = 0; i < inventory.objectiveNames.Num(); ++i )
+	{
+		objectiveSystem->SetStateString( va( "objective%i", i + 1 ), "1" );
+		objectiveSystem->SetStateString( va( "objectivetitle%i", i + 1 ), inventory.objectiveNames[i].title.c_str() );
+		objectiveSystem->SetStateString( va( "objectivetext%i", i + 1 ), inventory.objectiveNames[i].text.c_str() );
+		objectiveSystem->SetStateString( va( "objectiveshot%i", i + 1 ), inventory.objectiveNames[i].screenshot != NULL ? inventory.objectiveNames[i].screenshot->GetName() : "" );
+	}
+	objectiveSystem->StateChanged( gameLocal.GetTimeGroupTime( timeGroup ) );
+}
+
+/*
+========================
+idPlayer::UpdatePDAInfo
+Retain vanilla PDA ordering, selection, read markers and named events.
+========================
+*/
+void idPlayer::UpdatePDAInfo( bool updatePDASel )
+{
+	int j, sel;
+
+	if ( objectiveSystem == NULL )
+	{
+		return;
+	}
+
+
+
+	int currentPDA = objectiveSystem->State().GetInt( "listPDA_sel_0", "0" );
+	if ( currentPDA == -1 )
+	{
+		currentPDA = 0;
+	}
+
+	if ( updatePDASel )
+	{
+		objectiveSystem->SetStateInt( "listPDAVideo_sel_0", 0 );
+		objectiveSystem->SetStateInt( "listPDAEmail_sel_0", 0 );
+		objectiveSystem->SetStateInt( "listPDAAudio_sel_0", 0 );
+	}
+
+	if ( currentPDA > 0 )
+	{
+		currentPDA = inventory.pdas.Num() - currentPDA;
+	}
+
+	currentPDA = idMath::ClampInt( 0, Max( 0, inventory.pdas.Num() - 1 ), currentPDA );
+	if( currentPDA < MAX_PLAYER_PDA )
+	{
+		pdaHasBeenRead[currentPDA] = true;
+	}
+	// Mark in the bit array that this pda has been read
+	if ( currentPDA < 128 )
+	{
+		inventory.pdasViewed[currentPDA >> 5] |= 1u << ( currentPDA & 31 );
+	}
+
+	guiPdaAudio = NULL;
+	guiPdaVideo = NULL;
+	idStr name, data;
+	for ( j = 0; j < 64; ++j )
+	{
+		objectiveSystem->SetStateString( va( "listPDA_item_%i", j ), "" );
+	}
+	for ( j = 0; j < 128; ++j )
+	{
+		objectiveSystem->SetStateString( va( "listPDAVideo_item_%i", j ), "" );
+		objectiveSystem->SetStateString( va( "listPDAAudio_item_%i", j ), "" );
+		objectiveSystem->SetStateString( va( "listPDAEmail_item_%i", j ), "" );
+		objectiveSystem->SetStateString( va( "listPDASecurity_item_%i", j ), "" );
+	}
+	for ( j = 0; j < inventory.pdas.Num(); ++j )
+	{
+
+		const idDeclPDA *pda = inventory.pdas[j];
+
+		if ( pda == NULL )
+		{
+			continue;
+		}
+
+		int index = inventory.pdas.Num() - j;
+		if ( j == 0 )
+		{
+			// Special case for the first PDA
+			index = 0;
+		}
+
+		if ( j != currentPDA && j < 128 && inventory.pdasViewed[j >> 5] & ( 1u << ( j & 31 ) ) )
+		{
+			// This pda has been read already, mark in gray
+			objectiveSystem->SetStateString( va( "listPDA_item_%i", index ), va( S_COLOR_GRAY "%s", pda->GetPdaName() ) );
+		}
+		else
+		{
+			// This pda has not been read yet
+			objectiveSystem->SetStateString( va( "listPDA_item_%i", index ), pda->GetPdaName() );
+		}
+
+		const char *security = pda->GetSecurity();
+		if ( j == currentPDA || ( currentPDA == 0 && security && *security ) )
+		{
+			if ( *security == '\0' )
+			{
+				security = idLocalization::GetString( "#str_00066" );
+			}
+			objectiveSystem->SetStateString( "PDASecurityClearance", security );
+		}
+
+		if ( j == currentPDA )
+		{
+
+			objectiveSystem->SetStateString( "pda_icon", pda->GetIcon() );
+			objectiveSystem->SetStateString( "pda_id", pda->GetID() );
+			objectiveSystem->SetStateString( "pda_title", pda->GetTitle() );
+
+			if ( j == 0 )
+			{
+				// Selected, personal pda
+				// Add videos
+				if ( updatePDASel || !guiPdaInitialized )
+				{
+					objectiveSystem->HandleNamedEvent( "playerPDAActive" );
+					objectiveSystem->SetStateString( "pda_personal", "1" );
+					inventory.pdaOpened = true;
+				}
+				objectiveSystem->SetStateString( "pda_location", ( gameLocal.LocationForPoint( GetEyePosition() ) != NULL ? gameLocal.LocationForPoint( GetEyePosition() )->GetLocation() : idLocalization::GetString( "#str_02911" ) ) );
+				objectiveSystem->SetStateString( "pda_name", session->GetActingGameStateLobbyBase().GetLobbyUserName( gameLocal.lobbyUserIDs[entityNumber] ) );
+				AddGuiPDAData( DECL_VIDEO, "listPDAVideo", pda, objectiveSystem );
+				sel = objectiveSystem->State().GetInt( "listPDAVideo_sel_0", "0" );
+				const idDeclVideo *vid = NULL;
+				if ( sel >= 0 && sel < inventory.videos.Num() )
+				{
+					vid = inventory.videos[sel];
+				}
+				if ( vid )
+				{
+					guiPdaVideo = vid;
+					objectiveSystem->SetStateString( "PDAVideoTitle", vid->GetVideoName() );
+					objectiveSystem->SetStateString( "PDAVideoVid", vid->GetRoq() != NULL ? vid->GetRoq()->GetName() : "" );
+					objectiveSystem->SetStateString( "PDAVideoIcon", vid->GetPreview() != NULL ? vid->GetPreview()->GetName() : "" );
+					objectiveSystem->SetStateString( "PDAVideoInfo", vid->GetInfo() );
+				}
+				else
+				{
+					//FIXME: need to precache these in the player def
+					objectiveSystem->SetStateString( "PDAVideoVid", "sound/vo/video/welcome.tga" );
+					objectiveSystem->SetStateString( "PDAVideoIcon", "sound/vo/video/welcome.tga" );
+					objectiveSystem->SetStateString( "PDAVideoTitle", "" );
+					objectiveSystem->SetStateString( "PDAVideoInfo", "" );
+				}
+			}
+			else
+			{
+				// Selected, non-personal pda
+				// Add audio logs
+				if ( updatePDASel || !guiPdaInitialized )
+				{
+					objectiveSystem->HandleNamedEvent( "playerPDANotActive" );
+					objectiveSystem->SetStateString( "pda_personal", "0" );
+					inventory.pdaOpened = true;
+				}
+				objectiveSystem->SetStateString( "pda_location", pda->GetPost() );
+				objectiveSystem->SetStateString( "pda_name", pda->GetFullName() );
+				int audioCount = AddGuiPDAData( DECL_AUDIO, "listPDAAudio", pda, objectiveSystem );
+				objectiveSystem->SetStateInt( "audioLogCount", audioCount );
+				sel = objectiveSystem->State().GetInt( "listPDAAudio_sel_0", "0" );
+				const idDeclAudio *aud = NULL;
+				if ( sel >= 0 )
+				{
+					aud = pda->GetAudioByIndex( sel );
+				}
+				if ( aud )
+				{
+					guiPdaAudio = aud;
+					objectiveSystem->SetStateString( "PDAAudioTitle", aud->GetAudioName() );
+					objectiveSystem->SetStateString( "PDAAudioIcon", "sound/vo/video/welcome.tga" );
+					objectiveSystem->SetStateString( "PDAAudioInfo", aud->GetInfo() );
+				}
+				else
+				{
+					objectiveSystem->SetStateString( "PDAAudioIcon", "sound/vo/video/welcome.tga" );
+					objectiveSystem->SetStateString( "PDAAudioTitle", "" );
+					objectiveSystem->SetStateString( "PDAAudioInfo", "" );
+				}
+			}
+			// add emails
+			name = "";
+			data = "";
+			int numEmails = pda->GetNumEmails();
+			if ( numEmails > 0 )
+			{
+				AddGuiPDAData( DECL_EMAIL, "listPDAEmail", pda, objectiveSystem );
+				sel = objectiveSystem->State().GetInt( "listPDAEmail_sel_0", "-1" );
+				if ( sel >= 0 && sel < numEmails )
+				{
+					const idDeclEmail *email = pda->GetEmailByIndex( sel );
+					name = email->GetSubject();
+					data = email->GetBody();
+				}
+			}
+			objectiveSystem->SetStateString( "PDAEmailTitle", name );
+			objectiveSystem->SetStateString( "PDAEmailText", data );
+		}
+	}
+	if ( objectiveSystem->State().GetInt( "listPDA_sel_0", "-1" ) == -1 )
+	{
+		objectiveSystem->SetStateInt( "listPDA_sel_0", 0 );
+	}
+	guiPdaInitialized = true;
+	objectiveSystem->StateChanged( gameLocal.GetTimeGroupTime( timeGroup ) );
+}
+
+/*
+========================
+idPlayer::ToggleGuiPDA
+Open or close the original PDA and preserve its inventory/list selections.
+========================
+*/
+void idPlayer::ToggleGuiPDA( void )
+{
+	if ( objectiveSystem == NULL )
+	{
+		return;
+	}
+
+	if ( inventory.pdas.Num() == 0 )
+	{
+		ShowTip( spawnArgs.GetString( "text_infoTitle" ), spawnArgs.GetString( "text_noPDA" ), true );
+		return;
+	}
+
+
+
+	if ( !objectiveSystemOpen )
+	{
+		int j, c = inventory.items.Num();
+		objectiveSystem->SetStateInt( "inv_count", c );
+		for ( j = 0; j < MAX_INVENTORY_ITEMS; ++j )
+		{
+			objectiveSystem->SetStateString( va( "inv_name_%i", j ), "" );
+			objectiveSystem->SetStateString( va( "inv_icon_%i", j ), "" );
+			objectiveSystem->SetStateString( va( "inv_text_%i", j ), "" );
+		}
+		for ( j = 0; j < c; ++j )
+		{
+			idDict *item = inventory.items[j];
+			if ( !item->GetBool( "inv_pda" ) )
+			{
+				const char *iname = item->GetString( "inv_name" );
+				const char *iicon = item->GetString( "inv_icon" );
+				const char *itext = item->GetString( "inv_text" );
+				objectiveSystem->SetStateString( va( "inv_name_%i", j ), iname );
+				objectiveSystem->SetStateString( va( "inv_icon_%i", j ), iicon );
+				objectiveSystem->SetStateString( va( "inv_text_%i", j ), itext );
+				const idKeyValue *kv = item->MatchPrefix( "inv_id", NULL );
+				if ( kv )
+				{
+					objectiveSystem->SetStateString( va( "inv_id_%i", j ), kv->GetValue() );
+				}
+			}
+		}
+
+		for ( j = 0; j < MAX_WEAPONS; ++j )
+		{
+			const char *weapnum = va( "def_weapon%d", j );
+			const char *hudWeap = va( "weapon%d", GuiWeaponSlot( j ) );
+			int weapstate = 0;
+			if ( inventory.weapons & ( 1 << j ) )
+			{
+				const char *weap = spawnArgs.GetString( weapnum );
+				if ( weap && *weap )
+				{
+					weapstate++;
+				}
+			}
+			objectiveSystem->SetStateInt( hudWeap, weapstate );
+		}
+
+		objectiveSystem->SetStateInt( "listPDA_sel_0", inventory.selPDA );
+		objectiveSystem->SetStateInt( "listPDAVideo_sel_0", inventory.selVideo );
+		objectiveSystem->SetStateInt( "listPDAAudio_sel_0", inventory.selAudio );
+		objectiveSystem->SetStateInt( "listPDAEmail_sel_0", inventory.selEMail );
+		UpdatePDAInfo( false );
+		UpdateObjectiveInfo();
+		objectiveSystem->Activate( true, gameLocal.GetTimeGroupTime( timeGroup ) );
+#if defined( DOMINION ) // OLD GUIs - PDA
+		if( guiHud != NULL )
+		{
+			guiHud->HandleNamedEvent( "pdaPickupHide" );
+			guiHud->HandleNamedEvent( "videoPickupHide" );
+		}
+#endif
+		if( hud != NULL )
+		{
+			hud->ClearNewPDAInfo();
+		}
+	}
+	else
+	{
+		inventory.selPDA = objectiveSystem->State().GetInt( "listPDA_sel_0" );
+		inventory.selVideo = objectiveSystem->State().GetInt( "listPDAVideo_sel_0" );
+		inventory.selAudio = objectiveSystem->State().GetInt( "listPDAAudio_sel_0" );
+		inventory.selEMail = objectiveSystem->State().GetInt( "listPDAEmail_sel_0" );
+		// A video closes with the PDA; audio logs may continue outside it.
+		EndVideoDisk();
+		objectiveSystem->Activate( false, gameLocal.GetTimeGroupTime( timeGroup ) );
+	}
+	objectiveSystemOpen ^= 1;
+}
+#endif // DOMINION: legacy fullscreen GUI support
+
+#if defined( DOMINION ) // OLD GUIs - Multiplayer messages
+/*
+========================
+LoadGuiMPDesktop
+The selected classic message UI inherits its companion spectator/input desktops.
+========================
+*/
+static idUserInterface *LoadGuiMPDesktop( const char *name )
+{
+	idUserInterfaceLocal *gui = new( TAG_OLD_UI ) idUserInterfaceLocal();
+	if( gui->InitFullscreenFromFile( name, NULL ) )
+	{
+		return gui;
+	}
+	delete gui;
+	return NULL;
+}
+
+/*
+========================
+idPlayer::InitializeGuiMPMessages
+Choose one message presentation; original GUIs use their native shared state keys.
+========================
+*/
+void idPlayer::InitializeGuiMPMessages()
+{
+	UI_LoadFullscreenGui( "mp_messages", "guis/chat.gui", NULL, common->SW(), mpMessages, guiMPChat );
+	if( mpMessages != NULL )
+	{
+		mpMessages->Activate( true );
+	}
+	else if( guiMPChat != NULL )
+	{
+		guiMPSpectate = LoadGuiMPDesktop( "guis/spectate.gui" );
+		guiMPMessageMode = LoadGuiMPDesktop( "guis/mpmsgmode.gui" );
+	}
+}
+
+/*
+========================
+idPlayer::BeginGuiMessageMode
+Open the original focused edit control while preserving BFG's replicated chatting flag.
+========================
+*/
+void idPlayer::BeginGuiMessageMode( bool team )
+{
+	if( guiMPMessageMode != NULL )
+	{
+		// A binding is dispatched before its character event. Consume that opener
+		// through key-up so T/Y (or a rebound printable key) does not enter chat.
+		guiMPChatOpeningKey = K_NONE;
+		guiMPChatOpeningChar = 0;
+		for( int key = K_ESCAPE; key < K_LAST_KEY; ++key )
+		{
+			if( !idKeyInput::IsDown( key ) )
+			{
+				continue;
+			}
+			idCmdArgs binding;
+			binding.TokenizeString( idKeyInput::GetBinding( key ), false );
+			if( idStr::Icmp( binding.Argv( 0 ), "clientMessageMode" ) == 0 )
+			{
+				guiMPChatOpeningKey = key;
+				const char *const keyName = idKeyInput::KeyNumToString( static_cast<keyNum_t>( key ) );
+				guiMPChatOpeningChar = keyName[0] != '\0' && keyName[1] == '\0' ? -1 : key == K_ENTER ? '\r' : 0;
+				break;
+			}
+		}
+		guiMPMessageMode->SetStateInt( "messagemode", team ? 1 : 0 );
+		guiMPMessageMode->SetStateString( "chattext", "" );
+		guiMPMessageMode->SetStateInt( "chatcursor", 0 );
+		guiMPMessageMode->Activate( true, gameLocal.time );
+	}
+}
+
+/*
+========================
+idPlayer::HandleGuiMessageMode
+Use the native chatmessage/close commands; submit text as arguments, not console code.
+========================
+*/
+bool idPlayer::HandleGuiMessageMode( const sysEvent_t *event )
+{
+	if( guiMPMessageMode == NULL || isChatting == 0 )
+	{
+		return false;
+	}
+	if( guiMPChatOpeningKey != K_NONE )
+	{
+		if( event->evType == SE_KEY && event->evValue == guiMPChatOpeningKey )
+		{
+			if( !event->evValue2 )
+			{
+				guiMPChatOpeningKey = K_NONE;
+			}
+			return true;
+		}
+		if( event->evType == SE_CHAR && guiMPChatOpeningChar != 0 )
+		{
+			if( guiMPChatOpeningChar < 0 )
+			{
+				guiMPChatOpeningChar = event->evValue;
+			}
+			if( event->evValue == guiMPChatOpeningChar )
+			{
+				return true;
+			}
+		}
+	}
+	const idStr command = guiMPMessageMode->HandleEvent( event, gameLocal.time, NULL );
+	idCmdArgs commands;
+	commands.TokenizeString( command, false );
+	const bool send = idStr::Icmp( commands.Argv( 0 ), "chatmessage" ) == 0;
+	const bool close = send || idStr::Icmp( commands.Argv( 0 ), "close" ) == 0 ||
+		( event->evType == SE_KEY && event->evValue2 && event->evValue == K_ESCAPE );
+	if( send )
+	{
+		idCmdArgs args;
+		args.AppendArg( isChatting == 2 ? "sayTeam" : "say" );
+		args.AppendArg( guiMPMessageMode->State().GetString( "chattext" ) );
+		cmdSystem->BufferCommandArgs( CMD_EXEC_APPEND, args );
+	}
+	if( close )
+	{
+		guiMPMessageMode->Activate( false, gameLocal.time );
+		isChatting = 0;
+	}
+	return true;
+}
+#endif

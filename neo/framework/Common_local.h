@@ -654,6 +654,13 @@ private:
 	idList<mpMap_t>		mpGameMaps;
 
 	idSWF* 				loadGUI;
+#if defined( DOMINION ) // OLD GUIs - Loading screens
+	idUserInterface* legacyLoadGUI;
+	// Track completed loading stages separately from a stage's image counter.
+	float legacyLoadProgressBase = 0.0f;
+	float legacyLoadProgressSpan = 0.0f;
+	void SetLegacyLoadProgress( float completed, float span = 0.0f );
+#endif
 	int					nextLoadTip;
 	bool				isHellMap;
 	bool				defaultLoadscreen;

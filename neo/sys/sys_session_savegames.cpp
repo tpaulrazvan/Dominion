@@ -674,6 +674,13 @@ void idSessionLocal::OnDeleteCompleted( idSaveLoadParms* parms )
 
 	if( parms->GetError() == SAVEGAME_E_NONE )
 	{
+#if defined( DOMINION ) // OLD GUIs - Remove a deleted save's loose preview
+		// Delete the matching sidecar only after the save processor reports success.
+		if( fileSystem->IsDoom2004() )
+		{
+			fileSystem->RemoveFile( "savegames/" + parms->description.slotName + ".tga" );
+		}
+#endif
 		// Update the enumerated list
 		saveGameDetailsList_t& details = session->GetSaveGameManager().GetEnumeratedSavegamesNonConst();
 		details.Remove( parms->description );

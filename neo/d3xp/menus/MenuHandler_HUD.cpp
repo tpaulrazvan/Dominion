@@ -132,6 +132,33 @@ idMenuHandler_HUD::Initialize
 void idMenuHandler_HUD::Initialize( const char* swfFile, idSoundWorld* sw )
 {
 	idMenuHandler::Initialize( swfFile, sw );
+#if defined( DOMINION ) // OLD GUIs - HUD
+	InitializeScreens();
+}
+
+/*
+========================
+idMenuHandler_HUD::Initialize
+Adopt the SWF selected by per-directory format lookup, then use the normal HUD.
+========================
+*/
+void idMenuHandler_HUD::Initialize( idSWF *selectedGui )
+{
+	Cleanup();
+	gui = selectedGui;
+	platform = 2;
+	InitializeScreens();
+}
+
+/*
+========================
+idMenuHandler_HUD::InitializeScreens
+Share screen construction between ordinary and explicitly selected SWFs.
+========================
+*/
+void idMenuHandler_HUD::InitializeScreens()
+{
+#endif
 
 	//---------------------
 	// Initialize the menus

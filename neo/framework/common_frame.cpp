@@ -34,6 +34,10 @@ If you have questions concerning this license or the applicable additional terms
 #include "Common_local.h"
 #include "../renderer/Image.h"
 
+#if defined( DOMINION ) // Background testing - preserve simulation time across focus changes
+extern idCVar com_pauseOnFocusLoss;
+#endif
+
 // RB begin
 #if defined(USE_DOOMCLASSIC)
 	#include "../../doomclassic/doom/doomlib.h"
@@ -285,11 +289,25 @@ void idCommonLocal::Draw()
 		{
 			loadGUI->Render( renderSystem, Sys_Milliseconds() );
 		}
+#if defined( DOMINION ) // OLD GUIs - Loading screens
+		else if( legacyLoadGUI != NULL ) {
+			legacyLoadGUI->Redraw( Sys_Milliseconds(), false );
+		}
+#endif
 
 		// draw general progress bar
+#if defined( DOMINION ) // OLD GUIs - Loading screens
+		// Classic loading GUIs draw their own progress indicator from map_loading.
+		if( legacyLoadGUI == NULL )
+#endif
 		DrawLoadPacifierProgressbar();
 
+#if defined( DOMINION ) // OLD GUIs - Loading screens
+		// Keep the RBDOOM cache-generation overlay out of the classic loading screen too.
+		if( loadPacifierBinarizeActive && legacyLoadGUI == NULL )
+#else
 		if( loadPacifierBinarizeActive )
+#endif
 		{
 			// update our progress estimates
 			int time = Sys_Milliseconds();
@@ -328,6 +346,13 @@ void idCommonLocal::Draw()
 			renderSystem->DrawSmallStringExt( 0, renderSystem->GetVirtualHeight() - 16, text, idVec4( 1.0f, 1.0f, 1.0f, 1.0f ), true );
 		}
 	}
+#if defined( DOMINION ) // OLD GUIs - Loading screens
+	else if( legacyLoadGUI != NULL ) {
+		renderSystem->SetColor( colorBlack );
+		renderSystem->DrawStretchPic( 0, 0, renderSystem->GetVirtualWidth(), renderSystem->GetVirtualHeight(), 0, 0, 1, 1, whiteMaterial );
+		legacyLoadGUI->Redraw( Sys_Milliseconds(), false );
+	}
+#endif
 	else if( loadGUI != NULL )
 	{
 		// foresthale 2014-05-30: showing a black background looks better than flickering in widescreen
@@ -428,7 +453,11 @@ void idCommonLocal::Draw()
 		// draw the wipe material on top of this if it hasn't completed yet
 		DrawWipeModel();
 
-		Dialog().Render( loadGUI != NULL );
+		Dialog().Render( loadGUI != NULL
+#if defined( DOMINION ) // OLD GUIs - Loading screens
+			|| legacyLoadGUI != NULL
+#endif
+		);
 
 		// draw the half console / notify console on top of everything
 		console->Draw( false );
@@ -575,6 +604,14 @@ void idCommonLocal::Frame()
 		// RB end
 
 		// pump all the events
+#if defined( DOMINION ) // OLD GUIs - Menu sound clock
+		// Startup/loading can leave the last audio-render time seconds behind.
+		// Stamp menu input/timeline sounds now so their end times are not already aged.
+		if( !mapSpawned || ( game != NULL && game->Shell_IsActive() ) )
+		{
+			soundSystem->UpdateSoundTime();
+		}
+#endif
 		Sys_GenerateEvents();
 
 		// write config file if anything changed
@@ -664,7 +701,14 @@ void idCommonLocal::Frame()
 		frameTiming.finishSyncTime = Sys_Microseconds();
 
 		// RB: slow down engine in background so it does not eat up so many resources along other 3D tools
+#if defined( DOMINION ) // Background testing - preserve simulation time across focus changes
+		// FRAME_TO_MSEC converts the total frame count at this rate. Switching a running game
+		// to 15 Hz jumps its fast clock; switching back rewinds it. Keep the normal rate when
+		// background simulation is explicitly enabled, including classic HUD/PDA animations.
+		if( !com_activeApp.GetBool() && !IsServer() && com_pauseOnFocusLoss.GetBool() )
+#else
 		if( !com_activeApp.GetBool() && !IsServer() /* and not VR */ )
+#endif
 		{
 			const float backgroundEngineHz = 15.0f;
 			com_engineHz_denominator = 100LL * backgroundEngineHz;
@@ -1060,6 +1104,10 @@ void idCommonLocal::Frame()
 		// kill loading gui
 		delete loadGUI;
 		loadGUI = NULL;
+#if defined( DOMINION ) // OLD GUIs - Loading screens
+		uiManager->DeAlloc( legacyLoadGUI );
+		legacyLoadGUI = NULL;
+#endif
 
 		// drop back to main menu
 		LeaveGame();

@@ -72,6 +72,10 @@ private:
 	void ComputeExposure( nvrhi::ICommandList* commandList, const ToneMappingParameters& params );
 
 	bool                            isLoaded;
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+	// Seed a deterministic exposure before the first auxiliary camera reads the shared buffer.
+	bool                            exposureInitialized = false;
+#endif
 	idImage*                        colorLut;
 	int                             colorLutSize;
 	CommonRenderPasses*             commonPasses;

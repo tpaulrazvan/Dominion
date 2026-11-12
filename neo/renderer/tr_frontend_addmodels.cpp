@@ -218,6 +218,12 @@ idRenderModel* R_EntityDefDynamicModel( idRenderEntityLocal* def )
 		R_TransformModelToClip( def->parms.origin, tr.viewDef->worldSpace.modelViewMatrix, tr.viewDef->projectionMatrix, eye, clip );
 		R_TransformClipToDevice( clip, ndc );
 		def->parms.modelDepthHack = model->DepthHack() * ( 1.0f - ndc.z );
+#if defined( DOMINION ) // Particle depth-hack notes
+		// Deferred: a large commoutside cloud remains visible as its emitter crosses W=0,
+		// making this legacy depth bias singular and then negative. BFG/dhewm3 share it.
+		// dhewm3's soft-particle path skips modelDepthHack and fades against scene depth.
+		// Port that complete path later; merely clamping this value changes the artwork.
+#endif
 	}
 	else
 	{
@@ -937,7 +943,15 @@ void R_AddSingleModel( viewEntity_t* vEntity )
 
 			// check for a static interaction
 			surfaceInteraction_t* surfInter = NULL;
-			if( interaction > INTERACTION_EMPTY && interaction->staticInteraction )
+			if( interaction > INTERACTION_EMPTY && interaction->staticInteraction
+#if defined( DOMINION ) // Stencil shadow fixes and notes
+				// Cached world interactions can omit shadows supplied by a compiled prelight.
+				// When testing without prelights, use the existing runtime generation path
+				// instead. This makes r_skipPrelightShadows reversible without a map reload.
+				&& !( r_skipPrelightShadows.GetBool() && lightDef->parms.prelightModel != NULL &&
+					entityDef->parms.hModel->IsStaticWorldModel() )
+#endif
+			  )
 			{
 				// we have a static interaction that was calculated accurately
 				assert( model->NumSurfaces() == interaction->numSurfaces );
@@ -1257,6 +1271,14 @@ void R_AddSingleModel( viewEntity_t* vEntity )
 #if 1 //  fix for GPU-skinned models loaded after the level may lack a shadow cache
 						if( gpuSkinned )
 						{
+#if defined( DOMINION ) // Stencil shadow fixes and notes
+							// Late-loaded models lack the level-load static cache. Keep their fallback
+							// in the same skinned format: CPU skinning here disagrees slightly with
+							// the visible GPU-skinned surface and makes its shadow caps self-fight.
+							tri->shadowCache = vertexCache.AllocVertex( NULL, tri->numVerts * 2, sizeof( idShadowVertSkinned ) );
+							idShadowVertSkinned *shadowVerts = ( idShadowVertSkinned* )vertexCache.MappedVertexBuffer( tri->shadowCache );
+							idShadowVertSkinned::CreateShadowCache( shadowVerts, tri->verts, tri->numVerts );
+#else
 							// CPU-skin this per-frame fallback to match the positions used by the
 							// shadow job. The visible surface still uses GPU skinning; models
 							// with a static skinned shadow cache keep the original GPU path.
@@ -1269,6 +1291,7 @@ void R_AddSingleModel( viewEntity_t* vEntity )
 								shadowVerts[vertexIndex * 2 + 0].xyzw.Set( position.x, position.y, position.z, 1.0f );
 								shadowVerts[vertexIndex * 2 + 1].xyzw.Set( position.x, position.y, position.z, 0.0f );
 							}
+#endif
 						}
 						else
 						{
@@ -1369,7 +1392,10 @@ void R_AddSingleModel( viewEntity_t* vEntity )
 				shadowDrawSurf->sort = 0.0f;
 				shadowDrawSurf->shaderRegisters = NULL;
 
-#if 1 // fix for late-loaded skinned shadow volumes: the dynamic fallback is already CPU-skinned
+#if defined( DOMINION ) // Stencil shadow fixes and notes
+				// Static and per-frame skinned caches now share the same vertex layout and shader.
+				R_SetupDrawSurfJoints( shadowDrawSurf, tri, NULL );
+#elif 1 // fix for late-loaded skinned shadow volumes: the dynamic fallback is already CPU-skinned
 				if( gpuSkinned && !vertexCache.CacheIsStatic( shadowDrawSurf->shadowCache ) )
 				{
 					// Use the unskinned shadow shader and its 16-byte vertex stride.

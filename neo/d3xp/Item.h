@@ -162,9 +162,20 @@ public:
 
 	void					Spawn();
 
+#if defined( DOMINION ) // OLD GUIs - Objective camera pictures
+	static void RenderPendingPictures();
+#endif
+
 private:
 	idVec3					playerPos;
 	const idMaterial* 		screenshot;
+
+#if defined( DOMINION ) // OLD GUIs - Objective camera pictures
+	// Intrusive nodes automatically unlink when their objective is destroyed on a map change.
+	idLinkList<idObjective> cameraShotNode;
+	void Event_CamShot();
+	void CapturePicture();
+#endif
 
 	void					Event_Trigger( idEntity* activator );
 	void					Event_HideObjective( idEntity* e );

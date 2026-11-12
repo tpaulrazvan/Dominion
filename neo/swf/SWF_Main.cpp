@@ -48,9 +48,16 @@ extern idCVar in_useJoystick;
 idSWF::idSWF
 ===================
 */
-idSWF::idSWF( const char* filename_, idSoundWorld* soundWorld_, bool exportJSON, bool exportSWF )
+idSWF::idSWF( const char* filename_, idSoundWorld* soundWorld_, bool exportJSON, bool exportSWF
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	, const char* gameDirectory
+#endif
+)
 {
 
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	sourceGameDirectory = gameDirectory != NULL ? gameDirectory : "";
+#endif
 	atlasMaterial = NULL;
 
 	swfScale = 1.0f;
@@ -126,7 +133,12 @@ idSWF::idSWF( const char* filename_, idSoundWorld* soundWorld_, bool exportJSON,
 	filename.BackSlashesToSlashes();
 	filename.SetFileExtension( ".swf" );
 
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	idFileLocal sourceFile( fileSystem->OpenFileRead( filename, false, sourceGameDirectory ) );
+	timestamp = sourceFile != NULL ? sourceFile->Timestamp() : FILE_NOT_FOUND_TIMESTAMP;
+#else
 	timestamp = fileSystem->GetTimestamp( filename );
+#endif
 
 	mainsprite = new( TAG_SWF ) idSWFSprite( this );
 	mainspriteInstance = NULL;
@@ -138,10 +150,19 @@ idSWF::idSWF( const char* filename_, idSoundWorld* soundWorld_, bool exportJSON,
 	// RB: add JSON alternative
 	idStr jsonFileName = filename;
 	jsonFileName.SetFileExtension( ".json" );
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	idFileLocal jsonSourceFile( fileSystem->OpenFileRead( jsonFileName, false, sourceGameDirectory ) );
+	ID_TIME_T jsonSourceTime = jsonSourceFile != NULL ? jsonSourceFile->Timestamp() : FILE_NOT_FOUND_TIMESTAMP;
+#else
 	ID_TIME_T jsonSourceTime = fileSystem->GetTimestamp( jsonFileName );
+#endif
 
 	bool loadedFromJSON = false;
+#if defined( DOMINION ) // Original assets - binary cache policy
+	if( fileSystem->UseBinaryAssets( swf_loadBinary.GetBool() ) )
+#else
 	if( swf_loadBinary.GetBool() )
+#endif
 	{
 		if( timestamp == FILE_NOT_FOUND_TIMESTAMP )
 		{
@@ -154,10 +175,16 @@ idSWF::idSWF( const char* filename_, idSoundWorld* soundWorld_, bool exportJSON,
 			{
 				loadedFromJSON = true;
 
+#if defined( DOMINION ) // OLD GUIs - Shared support
+				if( sourceGameDirectory.IsEmpty() )
+#endif
 				WriteBinary( binaryFileName );
 			}
 			else if( LoadSWF( filename ) )
 			{
+#if defined( DOMINION ) // OLD GUIs - Shared support
+				if( sourceGameDirectory.IsEmpty() )
+#endif
 				WriteBinary( binaryFileName );
 			}
 		}

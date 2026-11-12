@@ -263,7 +263,12 @@ void idCommonLocal::StartPlayingRenderDemo( idStr demoName )
 	}
 
 	readDemo->ReadInt( demoVersion );
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+	// Version 3 uses the unchanged legacy opcodes; retain playback of existing recordings.
+	if( demoVersion != RENDERDEMO_VERSION && demoVersion != 3 )
+#else
 	if( demoVersion != RENDERDEMO_VERSION )
+#endif
 	{
 		common->Printf( "StartPlayingRenderDemo got version %d, expected version %d\n", demoVersion, RENDERDEMO_VERSION );
 		readDemo->Close();

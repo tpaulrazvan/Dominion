@@ -862,6 +862,14 @@ int idDeviceContext::DrawText( const char* text, float textScale, int textAlign,
 		{
 			textBuffer.AppendUTF8Char( textChar );
 			textChar = drawText.UTF8Char( charIndex );
+#if defined( DOMINION ) // OLD GUIs - Text ending in a color code
+			// Consuming a final color digit reaches the end after the earlier line-end
+			// check. Flush this line too (for example ^5Personal^0 in the original PDA).
+			if( charIndex == drawText.Length() )
+			{
+				lineBreak = true;
+			}
+#endif
 		}
 
 		// If the character isn't a new line then add it to the text buffer.

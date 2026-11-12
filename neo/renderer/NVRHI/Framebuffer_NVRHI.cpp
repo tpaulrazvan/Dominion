@@ -214,6 +214,12 @@ void Framebuffer::ResizeFramebuffers( bool reloadImages )
 			nvrhi::FramebufferDesc()
 			.addColorAttachment( globalImages->accumImage->texture ) );
 
+#if defined( DOMINION ) // Portal sky fix
+	globalFramebuffers.ssrFBO = new Framebuffer( "_ssr",
+			nvrhi::FramebufferDesc()
+			.addColorAttachment( globalImages->ssrRenderImage->texture ) );
+#endif
+
 	Framebuffer::Unbind();
 }
 
@@ -250,6 +256,11 @@ void Framebuffer::ReloadImages()
 	}
 	globalImages->guiEdit->Reload( false, backEnd.commandList );
 	globalImages->accumImage->Reload( false, backEnd.commandList );
+
+#if defined( DOMINION ) // Portal sky fix
+	globalImages->ssrRenderImage->Reload( false, backEnd.commandList );
+#endif
+
 	backEnd.commandList->close();
 	deviceManager->GetDevice()->executeCommandList( backEnd.commandList );
 }

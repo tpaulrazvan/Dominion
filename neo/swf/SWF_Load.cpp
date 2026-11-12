@@ -51,7 +51,11 @@ idSWF::LoadSWF
 bool idSWF::LoadSWF( const char* fullpath )
 {
 
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	idFile* rawfile = fileSystem->OpenFileRead( fullpath, false, sourceGameDirectory );
+#else
 	idFile* rawfile = fileSystem->OpenFileRead( fullpath );
+#endif
 	if( rawfile == NULL )
 	{
 		idLib::Printf( "SWF File not found %s\n", fullpath );
@@ -404,7 +408,11 @@ idSWF::LoadBinary
 */
 bool idSWF::LoadBinary( const char* bfilename, ID_TIME_T sourceTimeStamp )
 {
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	idFile* f = fileSystem->OpenFileReadMemory( bfilename, false, sourceGameDirectory );
+#else
 	idFile* f = fileSystem->OpenFileReadMemory( bfilename );
+#endif
 	if( f == NULL || f->Length() <= 0 )
 	{
 		return false;
@@ -833,21 +841,40 @@ idSWF::LoadJSON
 */
 bool idSWF::LoadJSON( const char* filename )
 {
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	idFile* f = fileSystem->OpenFileReadMemory( filename, false, sourceGameDirectory );
+#else
 	idFile* f = fileSystem->OpenFileReadMemory( filename );
+#endif
 	if( f == NULL || f->Length() <= 0 )
 	{
 		return false;
 	}
 
 	int fileLength = f->Length();
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	char* fileData = ( char* )Mem_Alloc( fileLength + 1, TAG_SWF );
+	const int fileSize = f->Read( fileData, fileLength );
+	fileData[fileSize] = '\0';
+	delete f;
+	rapidjson::Document d;
+	d.Parse( fileData );
+	Mem_Free( fileData );
+	if( fileSize != fileLength || d.HasParseError() || !d.IsObject() ||
+		!d.HasMember( "frameWidth" ) || !d["frameWidth"].IsNumber() ||
+		!d.HasMember( "frameHeight" ) || !d["frameHeight"].IsNumber() ||
+		!d.HasMember( "frameRate" ) || !d["frameRate"].IsUint() ||
+		!d.HasMember( "dict" ) || !d["dict"].IsArray() ) {
+		return false;
+	}
+#else
 	const char* fileData = ( const char* )Mem_Alloc( fileLength, TAG_SWF );
 	size_t fileSize = f->Read( ( byte* ) fileData, fileLength );
 	delete f;
-
 	rapidjson::Document d;
 	d.Parse( fileData );
-
 	assert( d.IsObject() );
+#endif
 
 
 	if( d.HasMember( "version" ) )

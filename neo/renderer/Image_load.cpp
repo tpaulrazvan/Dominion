@@ -68,6 +68,9 @@ int BitsForFormat( textureFormat_t format )
 			return 8;
 		case FMT_DXT1:
 			return 4;
+#if defined( DOMINION ) // Original assets - DDS BC2 storage size
+		case FMT_DXT3:
+#endif
 		case FMT_DXT5:
 			return 8;
 		// RB: added ETC compression
@@ -116,6 +119,9 @@ int BlockSizeForFormat( const textureFormat_t& format )
 			return 0;
 		case FMT_DXT1:
 			return 8;
+#if defined( DOMINION ) // Original assets - DDS BC2 storage size
+		case FMT_DXT3:
+#endif
 		case FMT_DXT5:
 			return 16;
 		case FMT_BC6H:
@@ -135,7 +141,11 @@ Returns the row bytes for the given image.
 */
 int GetRowPitch( const textureFormat_t& format, int width )
 {
+#if defined( DOMINION ) // Original assets - DDS BC2 block rows
+	bool bc = ( format == FMT_DXT1 || format == FMT_DXT3 || format == FMT_DXT5 || format == FMT_BC6H || format == FMT_BC7 );
+#else
 	bool bc = ( format == FMT_DXT1 || format == FMT_DXT5 || format == FMT_BC6H || format == FMT_BC7 );
+#endif
 
 	if( bc )
 	{
@@ -253,6 +263,10 @@ void idImage::PrepareBinaryImageForUpload( idBinaryImage& image )
 	{
 		case FMT_DXT1:
 			nativeFormat = nvrhi::Format::BC1_UNORM;
+			break;
+		// DDS DXT3 has the same alignment rules, with its own native format query.
+		case FMT_DXT3:
+			nativeFormat = nvrhi::Format::BC2_UNORM;
 			break;
 		case FMT_DXT5:
 			nativeFormat = nvrhi::Format::BC3_UNORM;
@@ -716,6 +730,9 @@ On exit, the idImage will have a valid OpenGL texture number that can be bound
 */
 void idImage::ActuallyLoadImage( bool fromBackEnd, nvrhi::ICommandList* commandList )
 {
+#if defined( DOMINION ) // Original assets - source images without disk caches
+	const bool useBinaryImages = fileSystem->UseBinaryAssets( binaryLoadImages.GetBool() );
+#endif
 	// RB: might have been called doubled by nested LoadDeferredImages
 	if( isLoaded )
 	{
@@ -742,7 +759,11 @@ void idImage::ActuallyLoadImage( bool fromBackEnd, nvrhi::ICommandList* commandL
 	// RB: the following does not load the source images from disk because pic is NULL
 	// but it tries to get the timestamp to see if we have a newer file than the one in the compressed .bimage
 
+#if defined( DOMINION ) // Original assets - source timestamps in production mode too
+	if( com_productionMode.GetInteger() != 0 && useBinaryImages )
+#else
 	if( com_productionMode.GetInteger() != 0 )
+#endif
 	{
 		sourceFileTime = FILE_NOT_FOUND_TIMESTAMP;
 		if( cubeFiles != CF_2D )
@@ -796,6 +817,18 @@ void idImage::ActuallyLoadImage( bool fromBackEnd, nvrhi::ICommandList* commandL
 	//int c = 1;
 	//}
 
+#if defined( DOMINION ) // Original assets - lossless in-memory upload
+	if( !useBinaryImages && ( opts.format == FMT_DXT1 || opts.format == FMT_DXT5 || opts.format == FMT_BC7 || opts.format == FMT_RGB565 ) )
+	{
+		// Keep the logical source format for reloadImages and later cache-policy changes.
+		uploadSourceFormat = opts.format;
+		opts.format = FMT_RGBA8;
+	}
+#endif
+
+#if defined( DOMINION ) && !defined( DMAP ) // Original assets - DDS reload format
+	const textureFormat_t derivedFormat = uploadSourceFormat != FMT_NONE ? uploadSourceFormat : opts.format;
+#endif
 	// RB: try to load the .bimage and skip if sourceFileTime is newer
 	idBinaryImage im( generatedName );
 	binaryFileTime = im.LoadFromGeneratedFile( sourceFileTime );
@@ -843,9 +876,20 @@ void idImage::ActuallyLoadImage( bool fromBackEnd, nvrhi::ICommandList* commandL
 			}
 		}
 	}
+#if defined( DOMINION ) && !defined( DMAP ) // Original assets - dhewm3 DDS lookup before source regeneration
+	// Prefer a source TGA/PNG/JPEG/image program; DDS is the fallback when it is absent.
+	// An explicitly named DDS remains a direct DDS request.
+	const bool loadedDDS = binaryFileTime == FILE_NOT_FOUND_TIMESTAMP && cubeFiles == CF_2D &&
+		( sourceFileTime == FILE_NOT_FOUND_TIMESTAMP || imgName.CheckExtension( ".dds" ) ) &&
+		im.LoadFromDDS( GetName(), usage, sourceFileTime );
+#endif
 	const bimageFile_t& header = im.GetFileHeader();
 
-	if( ( fileSystem->InProductionMode() && binaryFileTime != FILE_NOT_FOUND_TIMESTAMP ) || ( ( binaryFileTime != FILE_NOT_FOUND_TIMESTAMP )
+	if(
+#if defined( DOMINION ) && !defined( DMAP ) // Original assets - DDS already supplied the upload chain
+		loadedDDS ||
+#endif
+		( fileSystem->InProductionMode() && binaryFileTime != FILE_NOT_FOUND_TIMESTAMP ) || ( ( binaryFileTime != FILE_NOT_FOUND_TIMESTAMP )
 			&& ( header.colorFormat == opts.colorFormat )
 			// SRS: handle case when image read is cached and RGB565 format conversion is already done
 			// RB: allow R11G11B10 instead of BC6
@@ -860,6 +904,12 @@ void idImage::ActuallyLoadImage( bool fromBackEnd, nvrhi::ICommandList* commandL
 		opts.format = ( textureFormat_t )header.format;
 		//	opts.format = ( textureFormat_t )header.format;
 		opts.textureType = ( textureType_t )header.textureType;
+#if defined( DOMINION ) && !defined( DMAP ) // Original assets - restore derived format before a later reload
+		if( loadedDDS )
+		{
+			uploadSourceFormat = derivedFormat;
+		}
+#endif
 
 		if( cvarSystem->GetCVarBool( "fs_buildresources" ) )
 		{
@@ -910,7 +960,11 @@ void idImage::ActuallyLoadImage( bool fromBackEnd, nvrhi::ICommandList* commandL
 			DeriveOpts();
 
 			// foresthale 2014-05-30: give a nice progress display when binarizing
+#if defined( DOMINION ) // Original assets - source uploads are not disk binarization
+			if( useBinaryImages && !globalImages->cacheImages )
+#else
 			if( !globalImages->cacheImages )
+#endif
 			{
 				commonLocal.LoadPacifierBinarizeFilename( generatedName.c_str(), binarizeReason.c_str() );
 			}
@@ -1015,7 +1069,11 @@ void idImage::ActuallyLoadImage( bool fromBackEnd, nvrhi::ICommandList* commandL
 			// RB: convert to compressed DXT or whatever choosen target format
 			if( cubeFiles == CF_2D_PACKED_MIPCHAIN )
 			{
-				if( !globalImages->cacheImages )
+	#if defined( DOMINION ) // Original assets - source uploads are not disk binarization
+			if( useBinaryImages && !globalImages->cacheImages )
+#else
+			if( !globalImages->cacheImages )
+#endif
 				{
 					commonLocal.LoadPacifierBinarizeFilename( generatedName.c_str(), binarizeReason.c_str() );
 				}
@@ -1025,7 +1083,11 @@ void idImage::ActuallyLoadImage( bool fromBackEnd, nvrhi::ICommandList* commandL
 			}
 			else
 			{
-				if( !globalImages->cacheImages )
+	#if defined( DOMINION ) // Original assets - source uploads are not disk binarization
+			if( useBinaryImages && !globalImages->cacheImages )
+#else
+			if( !globalImages->cacheImages )
+#endif
 				{
 					commonLocal.LoadPacifierBinarizeFilename( generatedName.c_str(), binarizeReason.c_str() );
 				}
@@ -1362,6 +1424,15 @@ void idImage::Reload( bool force, nvrhi::ICommandList* commandList )
 		generatorFunction( this, commandList );
 		return;
 	}
+
+#if defined( DOMINION ) // OLD GUIs - Objective camera pictures
+	// Captured render targets have no source file. Keep their contents when reloading disk images;
+	// procedural render targets above still run their normal generator.
+	if( opts.isRenderTarget && IsLoaded() )
+	{
+		return;
+	}
+#endif
 
 	// check file times
 	if( !force )

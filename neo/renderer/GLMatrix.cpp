@@ -422,7 +422,12 @@ void R_SetupProjectionMatrix( viewDef_t* viewDef, bool doJitter )
 	// for motion blurred anti-aliasing
 	float jitterx, jittery;
 
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+	// A view rendered without temporal resolve must also be rendered without temporal jitter.
+	if( R_UseTemporalAAForView( viewDef ) && doJitter )
+#else
 	if( R_UseTemporalAA() && doJitter && !( viewDef->renderView.rdflags & RDF_IRRADIANCE ) )
+#endif
 	{
 		idVec2 jitter = backEnd.GetCurrentPixelOffset( viewDef->taaFrameCount );
 		jitterx = jitter.x;

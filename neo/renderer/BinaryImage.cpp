@@ -43,8 +43,15 @@ If you have questions concerning this license or the applicable additional terms
 #include "RenderCommon.h"
 #include "DXT/DXTCodec.h"
 #include "Color/ColorSpace.h"
+#if defined( DOMINION ) // Original assets - dhewm3 DDS layout
+#include "Image_DDS.h"
+#endif
 
 #include "../libs/mesa/format_r11g11b10f.h"
+
+#if defined( DOMINION ) // Original assets - binary image cache
+idCVar binaryLoadImages( "binaryLoadImages", "1", CVAR_RENDERER | CVAR_BOOL, "enable generated image cache reads/writes; 0 uploads source images uncompressed" );
+#endif
 
 idCVar image_highQualityCompression( "image_highQualityCompression", "0", CVAR_BOOL, "Use high quality (slow) compression" );
 
@@ -58,6 +65,20 @@ Replicate the nearest valid texel into complete compression blocks, keeping padd
 */
 static void PadCompressedImage( const byte* source, const int width, const int height, byte* destination, const int paddedWidth, const int paddedHeight )
 {
+#if defined( DOMINION ) // Blue texture border notes
+	// Legacy YCoCg bimages can contain a faint blue border inside their valid edge texels:
+	// zero padding influenced the shared BC block palette when those files were compressed.
+	// Correct logical GPU dimensions hide storage padding, but cannot undo that colour loss.
+	// Rebuilding from the original source with this edge replication is the reliable remedy.
+	// Without a source, an optional decoder could borrow neighbouring chroma while retaining Y;
+	// that is only an approximation, can alter artwork, and needs RGBA upload or recompression.
+	// Do not silently rewrite shipped caches or apply that heuristic to normals/HDR textures.
+	// For further mitigation, first compare decoded edge blocks with an original source image.
+	// Rebuild affected mips from that source when available. Without it, a per-asset opt-in
+	// chroma repair could preserve luminance, but cannot distinguish blue artwork from lost colour.
+	// Cropping or insetting UVs only hides damaged texels by discarding valid edge detail;
+	// it is not a general correction and can introduce seams on repeating materials.
+#endif
 	for( int y = 0; y < paddedHeight; ++y )
 	{
 		const byte* sourceRow = source + Min( y, height - 1 ) * width * 4;
@@ -82,7 +103,7 @@ NOTE: Did not add BC6H / BC7 support here because BFG .bimages were not encoded 
 */
 bool idBinaryImage::ConvertNonBlockAlignedDXT()
 {
-	if( ( fileData.format != FMT_DXT1 && fileData.format != FMT_DXT5 ) ||
+	if( ( fileData.format != FMT_DXT1 && fileData.format != FMT_DXT3 && fileData.format != FMT_DXT5 ) ||
 			( ( fileData.width & 3 ) == 0 && ( fileData.height & 3 ) == 0 ) )
 	{
 		return false;
@@ -122,6 +143,10 @@ bool idBinaryImage::ConvertNonBlockAlignedDXT()
 		if( fileData.format == FMT_DXT1 )
 		{
 			decoder.DecompressImageDXT1( img.data, decoded.Ptr(), paddedWidth, paddedHeight );
+		}
+		else if( fileData.format == FMT_DXT3 )
+		{
+			decoder.DecompressImageDXT3( img.data, decoded.Ptr(), paddedWidth, paddedHeight );
 		}
 		else
 		{
@@ -167,7 +192,11 @@ void idBinaryImage::Load2DFromMemory( int width, int height, const byte* pic_con
 	else if( colorFormat == CFM_NORMAL_DXT5 )
 	{
 		// Blah, HQ swizzles automatically, Fast doesn't
+#if defined( DOMINION ) // Original assets - uncompressed normals still need shader channel packing
+		if( textureFormat != FMT_DXT5 || !image_highQualityCompression.GetBool() )
+#else
 		if( !image_highQualityCompression.GetBool() )
+#endif
 		{
 			for( int i = 0; i < width * height; i++ )
 			{
@@ -464,7 +493,11 @@ void idBinaryImage::Load2DAtlasMipchainFromMemory( int width, int height, const 
 	else if( colorFormat == CFM_NORMAL_DXT5 )
 	{
 		// Blah, HQ swizzles automatically, Fast doesn't
+#if defined( DOMINION ) // Original assets - uncompressed normals still need shader channel packing
+		if( textureFormat != FMT_DXT5 || !image_highQualityCompression.GetBool() )
+#else
 		if( !image_highQualityCompression.GetBool() )
+#endif
 		{
 			for( int i = 0; i < width * height; i++ )
 			{
@@ -986,6 +1019,12 @@ idBinaryImage::WriteGeneratedFile
 */
 ID_TIME_T idBinaryImage::WriteGeneratedFile( ID_TIME_T sourceFileTime )
 {
+#if defined( DOMINION ) // Original assets - binary image cache
+	if( !fileSystem->UseBinaryAssets( binaryLoadImages.GetBool() ) )
+	{
+		return FILE_NOT_FOUND_TIMESTAMP;
+	}
+#endif
 	idStr binaryFileName;
 	MakeGeneratedFileName( binaryFileName );
 	idFileLocal file( fileSystem->OpenFileWrite( binaryFileName, "fs_basepath" ) );
@@ -1030,6 +1069,12 @@ Load the preprocessed image from the generated folder.
 */
 ID_TIME_T idBinaryImage::LoadFromGeneratedFile( ID_TIME_T sourceFileTime )
 {
+#if defined( DOMINION ) // Original assets - binary image cache
+	if( !fileSystem->UseBinaryAssets( binaryLoadImages.GetBool() ) )
+	{
+		return FILE_NOT_FOUND_TIMESTAMP;
+	}
+#endif
 	idStr binaryFileName;
 	MakeGeneratedFileName( binaryFileName );
 	idFileLocal bFile = fileSystem->OpenFileRead( binaryFileName );
@@ -1053,6 +1098,12 @@ Load the preprocessed image from the generated folder.
 */
 bool idBinaryImage::LoadFromGeneratedFile( idFile* bFile, ID_TIME_T sourceTimeStamp )
 {
+#if defined( DOMINION ) // Original assets - apply the image policy to direct/preload reads too
+	if( !fileSystem->UseBinaryAssets( binaryLoadImages.GetBool() ) )
+	{
+		return false;
+	}
+#endif
 #if defined( DOMINION ) // Blue Textures Fix
 	if( bFile->Read( &fileData, sizeof( fileData ) ) != sizeof( fileData ) )
 #else
@@ -1079,7 +1130,7 @@ bool idBinaryImage::LoadFromGeneratedFile( idFile* bFile, ID_TIME_T sourceTimeSt
 #if defined( DOMINION ) // Blue Textures Fix
 	// Validate the cache's allocation-driving fields in release builds too. A mip chain cannot
 	// contain more levels than its base dimensions allow; current bimages store 2D images or cubes.
-	if( ( fileData.textureType != DTT_2D && fileData.textureType != DTT_CUBIC ) || fileData.format <= FMT_NONE || fileData.format > FMT_RGBA16S ||
+	if( ( fileData.textureType != DTT_2D && fileData.textureType != DTT_CUBIC ) || fileData.format <= FMT_NONE || fileData.format > FMT_DXT3 ||
 			fileData.colorFormat < CFM_DEFAULT || fileData.colorFormat > CFM_GREEN_ALPHA || fileData.width < 1 || fileData.height < 1 || fileData.numLevels < 1 || fileData.numLevels > 31 ||
 			( fileData.textureType == DTT_CUBIC && fileData.width != fileData.height ) )
 	{
@@ -1294,4 +1345,260 @@ void idBinaryImage::GetGeneratedFileName( idStr& gfn, const char* name )
 	gfn.Replace( " ", "" );
 }
 
+
+
+#if defined( DOMINION ) && !defined( DMAP ) // Original assets - native DDS loading
+/*
+========================
+DDSImageProgramName
+Use dhewm3's image-program-to-dds filename mapping, including its four-directory limit.
+========================
+*/
+static idStr DDSImageProgramName( const char *imageProgram )
+{
+	idStr name = "dds/";
+	int depth = 0;
+	for( const char *s = imageProgram; *s != '\0'; ++s )
+	{
+		if( *s == '/' || *s == '\\' || *s == '(' )
+		{
+			name += depth++ < 4 ? '/' : ' ';
+		}
+		else if( strchr( "<>:|\".", *s ) != NULL )
+		{
+			name += '_';
+		}
+		else if( !( *s == ' ' && name[name.Length() - 1] == '/' ) && *s != ')' && *s != ',' )
+		{
+			name += *s;
+		}
+	}
+	name += ".dds";
+	return name;
+}
+
+/*
+========================
+DDSChannel
+Expand an uncompressed DDS channel mask without assuming Windows byte ordering.
+========================
+*/
+static byte DDSChannel( uint32 value, uint32 mask, const byte missing )
+{
+	if( mask == 0 )
+	{
+		return missing;
+	}
+	while( ( mask & 1 ) == 0 )
+	{
+		mask >>= 1;
+		value >>= 1;
+	}
+	return byte( ( uint64( value & mask ) * 255 + mask / 2 ) / mask );
+}
+
+/*
+========================
+idBinaryImage::LoadFromDDS
+dhewm3 CheckPrecompressedImage/UploadPrecompressedImage provide filename selection,
+header layout, RXGB identification and independently rounded mip spans. Validate the
+whole 2D chain before allocating. Preserve BC1/BC2/BC3 blocks and original mips when
+their channels already match Dominion. Diffuse requires YCoCg, and coverage/font
+requires green alpha: decode these into RGBA in memory, never recompress or save DDS.
+sourcePixels returns ordinary RGBA for image programs, including undoing RXGB packing.
+========================
+*/
+bool idBinaryImage::LoadFromDDS( const char *imageProgram, const textureUsage_t usage,
+	const ID_TIME_T sourceTime, const bool sourcePixels )
+{
+	idStr filename = imageProgram;
+	if( !filename.CheckExtension( ".dds" ) )
+	{
+		filename = DDSImageProgramName( imageProgram );
+	}
+	idFile *sourceFile = fileSystem->OpenFileReadMemory( filename );
+	if( sourceFile == NULL && filename.CheckExtension( ".dds" ) && filename.Icmpn( "dds/", 4 ) != 0 )
+	{
+		filename.Insert( "dds/", 0 );
+		sourceFile = fileSystem->OpenFileReadMemory( filename );
+	}
+	idFileLocal file( sourceFile );
+	if( file == NULL || file->Length() < 128 || file->Length() > 256 * 1024 * 1024 ||
+		( sourceTime != FILE_NOT_FOUND_TIMESTAMP && file->Timestamp() < sourceTime ) )
+	{
+		return false;
+	}
+	char magic[4];
+	ddsFileHeader_t header;
+	if( file->Read( magic, 4 ) != 4 || memcmp( magic, "DDS ", 4 ) != 0 ||
+		file->Read( &header, sizeof( header ) ) != sizeof( header ) )
+	{
+		return false;
+	}
+	LittleRevBytes( &header, sizeof( uint32 ), sizeof( header ) / sizeof( uint32 ) );
+	const uint32 width = header.dwWidth;
+	const uint32 height = header.dwHeight;
+	const uint32 levels = header.dwFlags & DDSF_MIPMAPCOUNT ? header.dwMipMapCount : 1;
+	const uint32 flags = header.ddspf.dwFlags;
+	const uint32 fourCC = header.ddspf.dwFourCC;
+	const uint32 bits = header.ddspf.dwRGBBitCount;
+	const bool dxt1 = fourCC == DDS_MAKEFOURCC( 'D', 'X', 'T', '1' );
+	const bool dxt3 = fourCC == DDS_MAKEFOURCC( 'D', 'X', 'T', '3' );
+	const bool rxgb = fourCC == DDS_MAKEFOURCC( 'R', 'X', 'G', 'B' );
+	const bool dxt5 = fourCC == DDS_MAKEFOURCC( 'D', 'X', 'T', '5' ) || rxgb;
+	const bool compressed = ( flags & DDSF_FOURCC ) != 0;
+	const bool alphaOnly = !compressed && !( flags & DDSF_RGB ) && bits == 8;
+	if( header.dwSize != 124 || header.ddspf.dwSize != 32 || width == 0 || height == 0 ||
+		width > 16384 || height > 16384 || levels == 0 || levels > 15 || header.dwDepth > 1 ||
+		( header.dwCaps2 & ( 0xfe00 | 0x200000 ) ) || ( flags & DDSF_ID_INDEXCOLOR ) ||
+		( compressed ? !( dxt1 || dxt3 || dxt5 ) : !( ( ( flags & DDSF_RGB ) && ( bits == 24 || bits == 32 ) ) || alphaOnly ) ) )
+	{
+		common->Warning( "Unsupported original DDS: %s", filename.c_str() );
+		return false;
+	}
+	uint32 maxLevels = 1;
+	for( uint32 size = Max( width, height ); size > 1; size >>= 1 )
+	{
+		++maxLevels;
+	}
+	if( levels > maxLevels )
+	{
+		return false;
+	}
+	// Honor a declared uncompressed top-level row pitch; Doom's smaller mips are tightly packed.
+	uint64 total = 128;
+	for( uint32 level = 0; level < levels; ++level )
+	{
+		const uint32 w = Max( 1U, width >> level );
+		const uint32 h = Max( 1U, height >> level );
+		const uint32 pitch = !compressed && level == 0 && ( header.dwFlags & DDSF_PITCH ) ? header.dwPitchOrLinearSize : w * ( bits / 8 );
+		if( !compressed && pitch < w * ( bits / 8 ) )
+		{
+			return false;
+		}
+		total += compressed ? uint64( ( w + 3 ) / 4 ) * ( ( h + 3 ) / 4 ) * ( dxt1 ? 8 : 16 ) : uint64( pitch ) * h;
+		if( total > uint64( file->Length() ) )
+		{
+			common->Warning( "Truncated DDS mip chain: %s", filename.c_str() );
+			return false;
+		}
+	}
+	const bool diffuse = !sourcePixels && usage == TD_DIFFUSE;
+	const bool normal = !sourcePixels && usage == TD_BUMP;
+	const bool coverage = !sourcePixels && ( usage == TD_COVERAGE || usage == TD_FONT );
+	const bool decode = sourcePixels || !compressed || diffuse || coverage || ( normal && !dxt5 );
+	memset( &fileData, 0, sizeof( fileData ) );
+	fileData.sourceFileTime = file->Timestamp();
+	fileData.textureType = DTT_2D;
+	fileData.width = width;
+	fileData.height = height;
+	fileData.numLevels = sourcePixels ? 1 : levels;
+	fileData.format = decode ? FMT_RGBA8 : dxt1 ? FMT_DXT1 : dxt3 ? FMT_DXT3 : FMT_DXT5;
+	fileData.colorFormat = diffuse ? CFM_YCOCG_DXT5 : normal ? CFM_NORMAL_DXT5 : coverage ? CFM_GREEN_ALPHA : CFM_DEFAULT;
+	images.SetNum( fileData.numLevels );
+	for( int level = 0; level < images.Num(); ++level )
+	{
+		const int w = Max( 1, int( width ) >> level );
+		const int h = Max( 1, int( height ) >> level );
+		const int paddedWidth = ( w + 3 ) & ~3;
+		const int paddedHeight = ( h + 3 ) & ~3;
+		const int pitch = !compressed && level == 0 && ( header.dwFlags & DDSF_PITCH ) ? header.dwPitchOrLinearSize : w * ( bits / 8 );
+		const int size = compressed ? paddedWidth * paddedHeight / 16 * ( dxt1 ? 8 : 16 ) : pitch * h;
+		idBinaryImageData &img = images[level];
+		img.level = level;
+		img.destZ = 0;
+		img.width = w;
+		img.height = h;
+		img.Alloc( decode ? w * h * 4 : size );
+		if( !decode )
+		{
+			if( file->Read( img.data, size ) != size )
+			{
+				return false;
+			}
+			continue;
+		}
+		idTempArray<byte> payload( size );
+		if( file->Read( payload.Ptr(), size ) != size )
+		{
+			return false;
+		}
+		if( compressed )
+		{
+			idTempArray<byte> rgba( paddedWidth * paddedHeight * 4 );
+			idDxtDecoder decoder;
+			if( dxt1 )
+			{
+				decoder.DecompressImageDXT1( payload.Ptr(), rgba.Ptr(), paddedWidth, paddedHeight );
+			}
+			else if( dxt3 )
+			{
+				decoder.DecompressImageDXT3( payload.Ptr(), rgba.Ptr(), paddedWidth, paddedHeight );
+			}
+			else
+			{
+				decoder.DecompressImageDXT5( payload.Ptr(), rgba.Ptr(), paddedWidth, paddedHeight );
+			}
+			for( int y = 0; y < h; ++y )
+			{
+				memcpy( img.data + y * w * 4, rgba.Ptr() + y * paddedWidth * 4, w * 4 );
+			}
+		}
+		else
+		{
+			const uint32 masks[] = { header.ddspf.dwRBitMask, header.ddspf.dwGBitMask, header.ddspf.dwBBitMask, header.ddspf.dwABitMask };
+			for( int y = 0; y < h; ++y )
+			{
+				for( int x = 0; x < w; ++x )
+				{
+					uint32 value = 0;
+					for( uint32 b = 0; b < bits / 8; ++b )
+					{
+						value |= uint32( payload[y * pitch + x * ( bits / 8 ) + b] ) << ( b * 8 );
+					}
+					byte *out = img.data + ( y * w + x ) * 4;
+					for( int c = 0; c < 4; ++c )
+					{
+						out[c] = DDSChannel( value, masks[c], c == 3 || alphaOnly ? 255 : 0 );
+					}
+					if( alphaOnly )
+					{
+						out[3] = byte( value );
+					}
+				}
+			}
+		}
+		if( sourcePixels && rxgb )
+		{
+			for( int pixel = 0; pixel < w * h; ++pixel )
+			{
+				img.data[pixel * 4] = img.data[pixel * 4 + 3];
+				img.data[pixel * 4 + 3] = 255;
+			}
+		}
+		else if( diffuse )
+		{
+			idColorSpace::ConvertRGBToCoCg_Y( img.data, img.data, w, h );
+		}
+		else if( normal || coverage )
+		{
+			for( int pixel = 0; pixel < w * h; ++pixel )
+			{
+				byte *out = img.data + pixel * 4;
+				if( normal )
+				{
+					out[3] = out[0];
+				}
+				else
+				{
+					out[1] = out[3];
+					out[3] = 0;
+				}
+				out[0] = out[2] = 0;
+			}
+		}
+	}
+	return true;
+}
+#endif
 

@@ -193,6 +193,10 @@ idSoundDecoder_Vorbis::~idSoundDecoder_Vorbis()
 
 	if( vorbisFile )
 	{
+#if defined( DOMINION ) // Original sound assets - release Vorbis allocations
+		// Deleting the wrapper alone leaks the decoder's internal buffers on every load.
+		ov_clear( vorbisFile );
+#endif
 		delete vorbisFile;
 	}
 
@@ -302,6 +306,13 @@ idSoundDecoder_Vorbis::Open
 */
 bool idSoundDecoder_Vorbis::Open( const char* fileName )
 {
+#if defined( DOMINION ) // Original sound assets - release Vorbis state before reopening
+	// Clear while the old source file is still valid; CloseFile below owns that file.
+	if( vorbisFile != nullptr )
+	{
+		ov_clear( vorbisFile );
+	}
+#endif
 	if( mhmmio )
 	{
 		fileSystem->CloseFile( mhmmio );
@@ -326,6 +337,11 @@ bool idSoundDecoder_Vorbis::Open( const char* fileName )
 	{
 		delete vorbisFile;
 		fileSystem->CloseFile( mhmmio );
+#if defined( DOMINION ) // Original sound assets - safe failed-open cleanup
+		// The decoder can be destroyed while a fatal error unwinds this load.
+		vorbisFile = nullptr;
+		mhmmio = nullptr;
+#endif
 		common->FatalError( "ov_openFile failed" );
 		return false;
 	}

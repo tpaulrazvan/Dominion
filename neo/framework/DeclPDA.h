@@ -217,15 +217,30 @@ public:
 	}
 	virtual const idDeclVideo* GetVideoByIndex( int index ) const
 	{
+#if defined( DOMINION ) // OLD GUIs - PDA list bounds
+		// Match vanilla/dhewm3: count is past the last entry, including index zero in an empty list.
+		return ( index < 0 || index >= videos.Num() ? NULL : videos[index] );
+#else
 		return ( index < 0 || index > videos.Num() ? NULL : videos[index] );
+#endif
 	}
 	virtual const idDeclAudio* GetAudioByIndex( int index ) const
 	{
+#if defined( DOMINION ) // OLD GUIs - PDA list bounds
+		// Match vanilla/dhewm3: count is past the last entry, including index zero in an empty list.
+		return ( index < 0 || index >= audios.Num() ? NULL : audios[index] );
+#else
 		return ( index < 0 || index > audios.Num() ? NULL : audios[index] );
+#endif
 	}
 	virtual const idDeclEmail* GetEmailByIndex( int index ) const
 	{
+#if defined( DOMINION ) // OLD GUIs - PDA list bounds
+		// Match vanilla/dhewm3: count is past the last entry, including index zero in an empty list.
+		return ( index < 0 || index >= emails.Num() ? NULL : emails[index] );
+#else
 		return ( index < 0 || index > emails.Num() ? NULL : emails[index] );
+#endif
 	}
 
 	virtual void			SetSecurity( const char* sec ) const;

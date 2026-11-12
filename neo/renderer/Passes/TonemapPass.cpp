@@ -337,9 +337,23 @@ void TonemapPass::Render(
 void TonemapPass::SimpleRender( nvrhi::ICommandList* commandList, const ToneMappingParameters& params, const viewDef_t* viewDef, nvrhi::ITexture* sourceTexture, nvrhi::FramebufferHandle _fbHandle )
 {
 	commandList->beginMarker( "ToneMapping" );
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+	// Auxiliary cameras reuse the player's exposure without adapting it to another scene.
+	// The first portal camera can precede the first player view, so initialize the buffer once.
+	if( !exposureInitialized )
+	{
+		ResetExposure( commandList, params.minAdaptedLuminance );
+		exposureInitialized = true;
+	}
+	if( !R_IsAuxiliaryView( viewDef ) )
+	{
+#endif
 	ResetHistogram( commandList );
 	AddFrameToHistogram( commandList, viewDef, sourceTexture );
 	ComputeExposure( commandList, params );
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+	}
+#endif
 	Render( commandList, params, viewDef, sourceTexture, _fbHandle );
 	commandList->endMarker();
 }

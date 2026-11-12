@@ -126,6 +126,12 @@ idSoundSample_OpenAL::WriteAllSamples
 */
 void idSoundSample_OpenAL::WriteAllSamples( const idStr& sampleName )
 {
+#if defined( DOMINION ) // Original assets - binary sound cache
+	if( !fileSystem->UseBinaryAssets() )
+	{
+		return;
+	}
+#endif
 	idSoundSample_OpenAL* samplePC = new idSoundSample_OpenAL();
 	{
 		idStrStatic< MAX_OSPATH > inName = sampleName;
@@ -154,6 +160,12 @@ idSoundSample_OpenAL::LoadGeneratedSound
 */
 bool idSoundSample_OpenAL::LoadGeneratedSample( const idStr& filename )
 {
+#if defined( DOMINION ) // Original assets - binary sound cache
+	if( !fileSystem->UseBinaryAssets() )
+	{
+		return false;
+	}
+#endif
 #if 1
 	idFileLocal fileIn( fileSystem->OpenFileReadMemory( filename ) );
 	if( fileIn != NULL )

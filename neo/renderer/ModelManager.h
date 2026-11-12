@@ -120,7 +120,11 @@ public:
 	virtual	void			Shutdown() = 0;
 
 	// called only by renderer::BeginLevelLoad
+#if defined( DOMINION ) // Original map reload - retain source assets
+	virtual void			BeginLevelLoad( bool reuseAssets = false ) = 0;
+#else
 	virtual void			BeginLevelLoad() = 0;
+#endif
 
 	// called only by renderer::EndLevelLoad
 	virtual void			EndLevelLoad() = 0;

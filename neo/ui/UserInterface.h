@@ -169,4 +169,11 @@ public:
 
 extern idUserInterfaceManager* 	uiManager;
 
+#if defined( DOMINION ) // OLD GUIs - HUD
+class idSWF;
+class idSoundWorld;
+bool UI_LoadFullscreenGui( const char* swfName, const char* guiName, const char* fallbackGuiName,
+	idSoundWorld* soundWorld, idSWF*& swf, idUserInterface*& gui, bool scaleTo43 = false );
+#endif
+
 #endif /* !__USERINTERFACE_H__ */

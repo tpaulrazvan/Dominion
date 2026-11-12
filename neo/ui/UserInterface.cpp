@@ -33,6 +33,9 @@ If you have questions concerning this license or the applicable additional terms
 #include "DeviceContext.h"
 #include "Window.h"
 #include "UserInterfaceLocal.h"
+#if defined( DOMINION ) // OLD GUIs - HUD
+#include "../swf/SWF.h"
+#endif
 
 extern idCVar r_skipGuiShaders;		// 1 = don't render any gui elements on surfaces
 
@@ -44,6 +47,7 @@ idUserInterfaceManager* 	uiManager = &uiManagerLocal;
 idDeviceContext* dc;
 
 idCVar g_useNewGuiCode(	"g_useNewGuiCode",	"1", CVAR_GAME | CVAR_INTEGER, "use optimized device context code, 2 = toggle on/off every frame" );
+
 idCVar binaryLoadGuis( "binaryLoadGuis", "1", CVAR_NEW, "enable binary load/write of particle decls" );
 
 extern idCVar sys_lang;
@@ -125,7 +129,11 @@ void idUserInterfaceManagerLocal::SetSize( float width, float height )
 void idUserInterfaceManagerLocal::Preload( const char* mapName )
 {
 	// RB: allow skipping binary preloading so modders can add new .gui files
+#if defined( DOMINION ) // Original assets - binary cache policy
+	if( !fileSystem->UseBinaryAssets( binaryLoadGuis.GetBool() ) )
+#else
 	if( !binaryLoadGuis.GetBool() )
+#endif
 	{
 		return;
 	}
@@ -136,10 +144,135 @@ void idUserInterfaceManagerLocal::Preload( const char* mapName )
 	}
 }
 
+#if defined( DOMINION ) // OLD GUIs - Shared support
+#if defined( DOMINION ) // OLD GUIs - Shared support
+idCVar r_scaleMenusTo43( "r_scaleMenusTo43", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL,
+	"preserve the 4:3 aspect ratio of original fullscreen menus, loading screens and PDA" );
+#endif
+
+bool idUserInterfaceLocal::InitMenuFromFile( const char* qpath, const char* gameDirectory ) {
+	return InitFullscreenFromFile( qpath, gameDirectory, true );
+}
+
+bool idUserInterfaceLocal::InitFullscreenFromFile( const char* qpath, const char* gameDirectory, bool menu, bool preserve43 ) {
+	// The top-level menu is selected within one mod. Includes and materials still
+	// use normal inheritance, so a mod only needs to supply the files it replaces.
+	idStr selectedDirectory = gameDirectory;
+	idStr selectedSource = qpath;
+	idStr localized = qpath;
+	localized.Replace( "guis/", va( "guis/%s/", sys_lang.GetString() ) );
+	idFile* openedFile = fileSystem->OpenFileReadMemory( localized, false, selectedDirectory );
+	if( openedFile != NULL ) {
+		selectedSource = localized;
+	} else {
+		openedFile = fileSystem->OpenFileReadMemory( qpath, false, selectedDirectory );
+	}
+	idFileLocal file( openedFile );
+	if( file == NULL || file->Length() <= 0 ) {
+		return false;
+	}
+	idTempArray<char> text( file->Length() + 1 );
+	const int length = file->Length();
+	if( file->Read( text.Ptr(), length ) != length ) {
+		return false;
+	}
+	text[length] = '\0';
+	idParser parser( LEXFL_NOFATALERRORS | LEXFL_NOSTRINGCONCAT | LEXFL_ALLOWMULTICHARLITERALS | LEXFL_ALLOWBACKSLASHSTRINGCONCAT );
+	if( !parser.LoadMemory( text.Ptr(), length, selectedSource ) ) {
+		return false;
+	}
+	// A private token parser prevents a cached base GUI from replacing mod source.
+	idTokenParser tokens;
+	tokens.LoadFromParser( parser, selectedSource );
+	if( !tokens.StartParsing( selectedSource ) ) {
+		return false;
+	}
+	loading = true;
+	menuGui = menu;
+	scaleTo43 = menu || preserve43;
+	menuSourceDirectory = selectedDirectory;
+	source = qpath;
+	delete desktop;
+	desktop = new( TAG_OLD_UI ) idWindow( this );
+	// Keep runtime GUI variables when reloading this desktop, as the original GUI
+	// loader does. A newly allocated GUI already has an empty state dictionary.
+	idToken token;
+	bool parsed = false;
+	while( tokens.ReadToken( &token ) ) {
+		if( token.Icmp( "windowDef" ) == 0 ) {
+			// A malformed mod GUI must not leave a partial desktop or scan its remaining
+			// child windows as new desktops. Let the caller continue the fallback search.
+			if( !desktop->Parse( &tokens, true ) ) {
+				parsed = false;
+				break;
+			}
+			desktop->SetFlag( WIN_DESKTOP );
+			desktop->FixupParms();
+			parsed = true;
+		}
+	}
+	tokens.DoneParsing();
+	loading = false;
+	if( !parsed ) {
+		common->Warning( "Couldn't parse menu GUI: %s/%s", selectedDirectory.c_str(), qpath );
+		return false;
+	}
+	menuSourceDirectory = selectedDirectory;
+	source = qpath;
+	timeStamp = file->Timestamp();
+	state.Set( "name", qpath );
+	interactive = desktop->Interactive();
+	uiManagerLocal.guis.AddUnique( this );
+	return true;
+}
+
+idFont* idUserInterfaceLocal::RegisterMenuFont( const char* fontName ) const {
+	idStr name = fontName;
+	if ( name.Icmp( "fonts" ) == 0 ) {
+		name.Clear();
+	} else {
+		name.StripLeading( "fonts/" );
+	}
+	idStr lang = sys_lang.GetString();
+	if ( lang == "french" || lang == "german" || lang == "spanish" || lang == "italian" ) {
+		lang = "english";
+	}
+	idStr path = lang + ( name.IsEmpty() ? idStr( "" ) : "/" + name );
+	idFileLocal file( fileSystem->OpenFileRead( "fonts/" + path + "/fontImage_12.dat" ) );
+	if ( file == NULL ) {
+		path = "english" + ( name.IsEmpty() ? idStr( "" ) : "/" + name );
+	}
+	return renderSystem->RegisterFont( "oldgui/" + path );
+}
+
+void idUserInterfaceLocal::GetMenuTransform( float& sx, float& sy, float& ox, float& oy ) const {
+	const float width = Max( 1, renderSystem->GetVirtualWidth() );
+	const float height = Max( 1, renderSystem->GetVirtualHeight() );
+	sx = width / 640.0f;
+	sy = height / 480.0f;
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	if( scaleTo43 && r_scaleMenusTo43.GetBool() ) {
+		const float pixelWidth = Max( 1, renderSystem->GetWidth() );
+		const float pixelHeight = Max( 1, renderSystem->GetHeight() );
+		const float scale = Min( pixelWidth / 640.0f, pixelHeight / 480.0f );
+		sx = scale * width / pixelWidth;
+		sy = scale * height / pixelHeight;
+	}
+#endif
+	ox = ( width - 640.0f * sx ) * 0.5f;
+	oy = ( height - 480.0f * sy ) * 0.5f;
+}
+#endif
+
 void idUserInterfaceManagerLocal::BeginLevelLoad()
 {
 	for( int i = 0; i < guis.Num(); i++ )
 	{
+#if defined( DOMINION ) // OLD GUIs - Shared support
+		if( !guis[i]->menuSourceDirectory.IsEmpty() ) {
+			continue;
+		}
+#endif
 		guis[ i ]->ClearRefs();
 	}
 }
@@ -174,7 +307,11 @@ void idUserInterfaceManagerLocal::EndLevelLoad( const char* mapName )
 		}
 		common->UpdateLevelLoadPacifier();
 	}
+#if defined( DOMINION ) // Original assets - binary GUI cache
+	if( fileSystem->UseBinaryAssets( binaryLoadGuis.GetBool() ) && cvarSystem->GetCVarBool( "fs_buildresources" ) && mapName != NULL && mapName[ 0 ] != '\0' )
+#else
 	if( cvarSystem->GetCVarBool( "fs_buildresources" ) && mapName != NULL && mapName[ 0 ] != '\0' )
+#endif
 	{
 		mapParser.WriteToFile( va( "generated/guis/%s.bgui", mapName ) );
 		idFile* f = fileSystem->OpenFileRead( va( "generated/guis/%s.bgui", mapName ) );
@@ -201,6 +338,11 @@ void idUserInterfaceManagerLocal::Reload( bool all )
 			}
 		}
 
+#if defined( DOMINION ) // OLD GUIs - Shared support
+		if( !guis[i]->menuSourceDirectory.IsEmpty() ) {
+			guis[i]->InitFullscreenFromFile( guis[i]->GetSourceFile(), guis[i]->menuSourceDirectory, guis[i]->menuGui, guis[i]->scaleTo43 );
+		} else
+#endif
 		guis[i]->InitFromFile( guis[i]->GetSourceFile() );
 		common->Printf( "reloading %s.\n", guis[i]->GetSourceFile() );
 	}
@@ -352,6 +494,11 @@ idUserInterfaceLocal::idUserInterfaceLocal()
 	//so the reg eval in gui parsing doesn't get bogus values
 	time = 0;
 	refs = 1;
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	menuGui = false;
+	scaleTo43 = false;
+	fullscreenPresentation = false;
+#endif
 }
 
 idUserInterfaceLocal::~idUserInterfaceLocal()
@@ -423,7 +570,11 @@ bool idUserInterfaceLocal::InitFromFile( const char* qpath, bool rebuild, bool c
 	state.Set( "text", "Test Text!" );
 
 	idTokenParser& bsrc = uiManagerLocal.GetBinaryParser();
+#if defined( DOMINION ) // Original assets - binary cache policy
+	if( !bsrc.IsLoaded() || !bsrc.StartParsing( source ) || !fileSystem->UseBinaryAssets( binaryLoadGuis.GetBool() ) )
+#else
 	if( !bsrc.IsLoaded() || !bsrc.StartParsing( source ) || !binaryLoadGuis.GetBool() )
+#endif
 	{
 		idParser src( LEXFL_NOFATALERRORS | LEXFL_NOSTRINGCONCAT | LEXFL_ALLOWMULTICHARLITERALS | LEXFL_ALLOWBACKSLASHSTRINGCONCAT );
 		src.LoadFile( source );
@@ -488,6 +639,34 @@ const char* idUserInterfaceLocal::HandleEvent( const sysEvent_t* event, int _tim
 		return ret;
 	}
 
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	if( IsFullscreenMenu() && ( event->evType == SE_MOUSE_ABSOLUTE || event->evType == SE_MOUSE ) ) {
+		const float oldCursorX = cursorX;
+		const float oldCursorY = cursorY;
+		float sx, sy, ox, oy;
+		GetMenuTransform( sx, sy, ox, oy );
+		const float vx = (float)Max( 1, renderSystem->GetVirtualWidth() ) / Max( 1, renderSystem->GetWidth() );
+		const float vy = (float)Max( 1, renderSystem->GetVirtualHeight() ) / Max( 1, renderSystem->GetHeight() );
+		if( event->evType == SE_MOUSE_ABSOLUTE ) {
+			cursorX = ( event->evValue * vx - ox ) / sx;
+			cursorY = ( event->evValue2 * vy - oy ) / sy;
+		} else {
+			cursorX += event->evValue * vx / sx;
+			cursorY += event->evValue2 * vy / sy;
+		}
+		cursorX = idMath::ClampFloat( 0, 640, cursorX );
+		cursorY = idMath::ClampFloat( 0, 480, cursorY );
+		if( event->evType == SE_MOUSE_ABSOLUTE && desktop != NULL ) {
+			// BFG emits absolute Windows mouse events; original GUI widgets expect a
+			// mouse event with deltas. Route it too, so hover/drag works without raw input.
+			sysEvent_t mouseEvent = *event;
+			mouseEvent.evType = SE_MOUSE;
+			mouseEvent.evValue = idMath::Ftoi( cursorX - oldCursorX );
+			mouseEvent.evValue2 = idMath::Ftoi( cursorY - oldCursorY );
+			return desktop->HandleEvent( &mouseEvent, updateVisuals );
+		}
+	} else
+#endif
 	if( event->evType == SE_MOUSE )
 	{
 		cursorX += event->evValue;
@@ -840,4 +1019,66 @@ void idUserInterfaceLocal::SetCursor( float x, float y )
 	cursorX = x;
 	cursorY = y;
 }
+
+#if defined( DOMINION ) // OLD GUIs - HUD
+/*
+========================
+UI_LoadFullscreenGui
+Select SWF before GUI inside each directory, then inherit from the next parent.
+========================
+*/
+bool UI_LoadFullscreenGui( const char *swfName, const char *guiName, const char *fallbackGuiName,
+	idSoundWorld *soundWorld, idSWF *&swf, idUserInterface *&gui, bool scaleTo43 )
+{
+	swf = NULL;
+	gui = NULL;
+	idStrList directories;
+	fileSystem->GetGameDirectories( directories );
+	idStr source = swfName;
+	if( source.Icmpn( "swf/", 4 ) != 0 )
+	{
+		source = "swf/" + source;
+	}
+	source.SetFileExtension( ".swf" );
+	idStr binary = "generated/" + source;
+	binary.SetFileExtension( ".bswf" );
+	idStr json = source;
+	json.SetFileExtension( ".json" );
+	for( int i = 0; i < directories.Num(); ++i )
+	{
+		const char *directory = directories[i];
+		idFileLocal sourceFile( fileSystem->OpenFileRead( source, false, directory ) );
+		idFileLocal binaryFile( fileSystem->OpenFileRead( binary, false, directory ) );
+		idFileLocal jsonFile( fileSystem->OpenFileRead( json, false, directory ) );
+		if( sourceFile != NULL || binaryFile != NULL || jsonFile != NULL )
+		{
+			swf = new idSWF( swfName, soundWorld, false, false, directory );
+			if( swf->IsLoaded() )
+			{
+				common->Printf( "Fullscreen SWF: %s/%s\n", directory, source.c_str() );
+				return true;
+			}
+			delete swf;
+			swf = NULL;
+		}
+		const char *candidates[] = { guiName, fallbackGuiName };
+		for( int j = 0; j < 2; ++j )
+		{
+			if( candidates[j] == NULL || candidates[j][0] == '\0' )
+			{
+				continue;
+			}
+			idUserInterfaceLocal *candidate = new( TAG_OLD_UI ) idUserInterfaceLocal();
+			if( candidate->InitFullscreenFromFile( candidates[j], directory, false, scaleTo43 ) )
+			{
+				gui = candidate;
+				common->Printf( "Fullscreen GUI: %s/%s\n", directory, candidates[j] );
+				return true;
+			}
+			delete candidate;
+		}
+	}
+	return false;
+}
+#endif
 

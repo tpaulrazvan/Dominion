@@ -141,6 +141,11 @@ void Script_LocalSound( idWindow* window, idList<idGSWinVar, TAG_OLD_UI>* src )
 	idWinStr* parm = dynamic_cast<idWinStr*>( ( *src )[0].var );
 	if( parm )
 	{
+#if defined( DOMINION ) // OLD GUIs - Shared support
+		if( window->GetGui()->IsMenuGui() && !common->IsMultiplayer() ) {
+			common->MenuSW()->PlayShaderDirectly( *parm );
+		} else
+#endif
 		common->SW()->PlayShaderDirectly( *parm );
 	}
 }
@@ -427,6 +432,10 @@ bool idGuiScript::Parse( idTokenParser* src )
 	if( handler == NULL )
 	{
 		src->Error( "Uknown script call %s", token.c_str() );
+#if defined( DOMINION ) // OLD GUIs - Reject malformed scripts
+		// Do not keep parsing event/window declarations as script arguments.
+		return false;
+#endif
 	}
 	// now read parms til ;
 	// all parms are read as idWinStr's but will be fixed up later
@@ -463,6 +472,10 @@ bool idGuiScript::Parse( idTokenParser* src )
 	if( handler && ( parms.Num() < commandList[i].mMinParms || parms.Num() > commandList[i].mMaxParms ) )
 	{
 		src->Error( "incorrect number of parameters for script %s", commandList[i].name );
+#if defined( DOMINION ) // OLD GUIs - Reject malformed scripts
+		// Script handlers and parameter fixups require this argument count.
+		return false;
+#endif
 	}
 	//
 

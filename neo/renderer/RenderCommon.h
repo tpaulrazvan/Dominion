@@ -78,6 +78,11 @@ enum demoCommand_t
 	DC_CACHE_SKINS,
 	DC_CACHE_PARTICLES,
 	DC_CACHE_MATERIALS,
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+	// Append to preserve every existing opcode; this capture also discards its source colour.
+	DC_CAPTURE_RENDER_CLEAR,
+	DC_RENDERVIEW_FLAGS, // Preserve auxiliary-camera identity and other render-view flags.
+#endif
 };
 #endif
 
@@ -746,6 +751,9 @@ enum renderCommand_t
 	RC_COPY_RENDER,
 	RC_POST_PROCESS,		// postfx after scene rendering is done but before GUI rendering
 	RC_CRT_POST_PROCESS,	// CRT simulation after everything has been rendered on the final swapchain image
+#if defined( DOMINION ) // OLD GUIs - Objective picture TGA cache
+	RC_WRITE_RENDER_IMAGE,
+#endif
 };
 
 struct emptyCommand_t
@@ -787,6 +795,19 @@ struct postProcessCommand_t
 	renderCommand_t* 	next;
 	viewDef_t* 			viewDef;
 };
+
+#if defined( DOMINION ) // OLD GUIs - Objective picture TGA cache
+// Renderer commands own the filename until submission; the readback takes its own pixel copy.
+struct writeRenderImageCommand_t
+{
+	renderCommand_t commandId;
+	renderCommand_t *next;
+	idImage *image;
+	char fileName[MAX_OSPATH];
+	// OLD GUIs - Save previews use the save root; objective pictures use the mod asset root.
+	char basePath[MAX_OSPATH];
+};
+#endif
 
 struct crtPostProcessCommand_t
 {
@@ -996,7 +1017,11 @@ public:
 	virtual float			GetPhysicalScreenWidthInCentimeters() const;
 	virtual idRenderWorld* 	AllocRenderWorld();
 	virtual void			FreeRenderWorld( idRenderWorld* rw );
+#if defined( DOMINION ) // Original map reload - retain source assets
+	virtual void			BeginLevelLoad( bool reuseAssets = false );
+#else
 	virtual void			BeginLevelLoad();
+#endif
 	virtual void			EndLevelLoad();
 	virtual void			LoadLevelImages();
 	virtual void			Preload( const idPreloadManifest& manifest, const char* mapName );
@@ -1044,6 +1069,9 @@ public:
 	virtual void			CropRenderSize( int width, int height );
 	virtual void            CropRenderSize( int x, int y, int width, int height, bool topLeftAncor );
 	virtual void			CaptureRenderToImage( const char* imageName, bool clearColorAfterCopy = false );
+#if defined( DOMINION ) // OLD GUIs - Objective picture TGA cache
+	virtual void WriteRenderImageToFile( const char *imageName, const char *fileName, const char *basePath = "fs_basepath" );
+#endif
 	virtual void			UnCrop();
 	virtual bool			UploadImage( const char* imageName, const byte* data, int width, int height );
 
@@ -1458,6 +1486,28 @@ INITIALIZATION
 bool R_UsePixelatedLook();
 
 bool R_UseTemporalAA();
+
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+// Independent auxiliary cameras must not overwrite or consume the player's screen-space history.
+ID_INLINE bool R_IsAuxiliaryView( const viewDef_t *view )
+{
+	return view->isSubview
+#if defined( DOMINION ) // Portal sky fix
+		|| ( view->renderView.rdflags & RDF_PORTALSKY ) != 0
+#endif
+#if defined( DOMINION ) // OLD GUIs - Objective camera pictures
+		|| ( view->renderView.rdflags & RDF_OBJECTIVE ) != 0
+#endif
+		;
+}
+
+// Use one eligibility rule for projection jitter, TAA generation and TAA consumption.
+ID_INLINE bool R_UseTemporalAAForView( const viewDef_t *view )
+{
+	return R_UseTemporalAA() && !view->is2Dgui && !R_IsAuxiliaryView( view ) &&
+		!( view->renderView.rdflags & ( RDF_NOAMBIENT | RDF_IRRADIANCE ) );
+}
+#endif
 
 bool R_UseHiZ();
 

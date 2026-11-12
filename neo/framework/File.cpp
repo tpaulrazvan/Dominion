@@ -959,7 +959,12 @@ idFile_Memory::Timestamp
 */
 ID_TIME_T idFile_Memory::Timestamp() const
 {
+#if defined( DOMINION ) // OLD GUIs - Packed image cache validation
+	// PK4 buffers retain the same timestamp as their streaming file; other buffers keep zero.
+	return sourceTimestamp;
+#else
 	return 0;
+#endif
 }
 
 /*
@@ -1813,7 +1818,12 @@ idFile_InZip::Timestamp
 */
 ID_TIME_T idFile_InZip::Timestamp() const
 {
+#if defined( DOMINION ) // OLD GUIs - Packed image cache validation
+	// A real timestamp lets a packed original image invalidate unrelated BFG cached artwork.
+	return sourceTimestamp;
+#else
 	return 0;
+#endif
 }
 
 /*

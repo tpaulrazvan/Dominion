@@ -43,6 +43,15 @@ void idChoiceWindow::InitVars()
 {
 	if( cvarStr.Length() )
 	{
+#if defined( DOMINION ) // OLD GUIs - Shared support
+		if ( gui->IsFullscreenMenu() && !idStr::Icmp( cvarStr, "r_shadows" ) ) {
+			cvar = cvarSystem->Find( "gui_legacyShadows" );
+		} else if ( gui->IsFullscreenMenu() && !idStr::Icmp( cvarStr, "r_fullscreen" ) ) {
+			cvar = cvarSystem->Find( "gui_legacyFullscreen" );
+		} else if ( gui->IsFullscreenMenu() && !idStr::Icmp( cvarStr, "r_swapInterval" ) ) {
+			cvar = cvarSystem->Find( "gui_legacyVsync" );
+		} else
+#endif
 		cvar = cvarSystem->Find( cvarStr );
 		if( !cvar )
 		{

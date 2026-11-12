@@ -49,6 +49,7 @@ const float	idMath::M_SEC2MS		= 1000.0f;
 const float	idMath::M_MS2SEC		= 0.001f;
 const float	idMath::INFINITUM		= 1e30f;
 const float idMath::FLOAT_EPSILON		= 1.192092896e-07f;
+const float idMath::DBL_EPSILON = 2.2204460492503131E-16; // REVELATION!
 const float idMath::FLT_SMALLEST_NON_DENORMAL	= * reinterpret_cast< const float* >( & SMALLEST_NON_DENORMAL );	// 1.1754944e-038f
 
 #if defined(USE_INTRINSICS_SSE)

@@ -214,6 +214,20 @@ idFile_InZip* idZipContainer::OpenFile( const idZipCacheEntry& rt, const char* r
 	file->fullPath = fileName + "/" + relativePath;
 	file->zipFilePos = rt.offset;
 	file->fileSize = file_info.uncompressed_size;
+#if defined( DOMINION ) // OLD GUIs - Packed image cache validation
+	// ZIP dates use local time, like loose-file timestamps. Preserve the entry date so
+	// source images in PK4s take part in the existing bimage timestamp validation.
+	struct tm entryTime = {};
+	entryTime.tm_sec = file_info.tmu_date.tm_sec;
+	entryTime.tm_min = file_info.tmu_date.tm_min;
+	entryTime.tm_hour = file_info.tmu_date.tm_hour;
+	entryTime.tm_mday = file_info.tmu_date.tm_mday;
+	entryTime.tm_mon = file_info.tmu_date.tm_mon;
+	entryTime.tm_year = file_info.tmu_date.tm_year - 1900;
+	entryTime.tm_isdst = -1;
+	const time_t entryTimestamp = mktime( &entryTime );
+	file->sourceTimestamp = entryTimestamp >= 0 ? entryTimestamp : 0;
+#endif
 
 	return file;
 }

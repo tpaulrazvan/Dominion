@@ -333,6 +333,15 @@ void idRenderBackend::BindVariableStageImage( const textureStage_t* texture, con
 	{
 		if( texture->image != NULL )
 		{
+#if defined( DOMINION ) // OLD GUIs - Menu model image loading
+			// GUI previews can be drawn before a level precaches their material stages.
+			// Like dhewm3's image bind, load on demand before checking the fallback.
+			if( viewDef->renderView.guiWidth > 0 && viewDef->renderView.guiHeight > 0 &&
+				!texture->image->IsLoaded() && !texture->image->IsDefaulted() )
+			{
+				texture->image->ActuallyLoadImage( true, commandList );
+			}
+#endif
 			if( texture->image->IsLoaded() && !texture->image->IsDefaulted() )
 			{
 				texture->image->Bind();
@@ -480,7 +489,11 @@ void idRenderBackend::PrepareStageTexturing( const shaderStage_t* pStage,  const
 			bumpStage->texture.image->Bind();
 
 			GL_SelectTexture( 1 );
+#if defined( DOMINION ) // Portal sky fix
+			globalImages->ssrRenderImage->Bind();
+#else
 			globalImages->currentRenderImage->Bind();
+#endif
 
 			GL_SelectTexture( 2 );
 			globalImages->gbufferNormalsRoughnessImage->Bind();
@@ -1261,7 +1274,12 @@ void idRenderBackend::DrawSingleInteraction( drawInteraction_t* din, bool useFas
 		globalImages->brdfLutImage->Bind();
 
 		GL_SelectTexture( INTERACTION_TEXUNIT_PROJECTION );
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+		// SSAO does not work through those FIX me. Auxiliary cameras must not sample the player AO.
+		if( !r_useSSAO.GetBool() || R_IsAuxiliaryView( viewDef ) || ( viewDef->renderView.rdflags & ( RDF_NOAMBIENT | RDF_IRRADIANCE ) ) )
+#else
 		if( !r_useSSAO.GetBool() || ( viewDef->renderView.rdflags & ( RDF_NOAMBIENT | RDF_IRRADIANCE ) ) )
+#endif
 		{
 			globalImages->whiteImage->Bind();
 		}
@@ -1339,7 +1357,12 @@ void idRenderBackend::DrawSingleInteraction( drawInteraction_t* din, bool useFas
 		globalImages->brdfLutImage->Bind();
 
 		GL_SelectTexture( INTERACTION_TEXUNIT_PROJECTION );
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+		// SSAO does not work through those FIX me. Auxiliary cameras must not sample the player AO.
+		if( !r_useSSAO.GetBool() || R_IsAuxiliaryView( viewDef ) || ( viewDef->renderView.rdflags & ( RDF_NOAMBIENT | RDF_IRRADIANCE ) ) )
+#else
 		if( !r_useSSAO.GetBool() || ( viewDef->renderView.rdflags & ( RDF_NOAMBIENT | RDF_IRRADIANCE ) ) )
+#endif
 		{
 			globalImages->whiteImage->Bind();
 		}
@@ -1360,6 +1383,12 @@ void idRenderBackend::DrawSingleInteraction( drawInteraction_t* din, bool useFas
 		GL_SelectTexture( INTERACTION_TEXUNIT_SPECULAR_CUBE3 );
 		viewDef->radianceImages[2]->Bind();
 	}
+#if defined( DOMINION ) // OLD GUIs - Menu
+	else if( setInteractionShader && viewDef->renderView.guiWidth > 0 && viewDef->renderView.guiHeight > 0 )
+	{
+		renderProgManager.BindShader_InteractionOldGui( din->surf->jointCache != 0 );
+	}
+#endif
 	else if( setInteractionShader )
 	{
 		// TODO extra paths for foliage, terrain and skin
@@ -1855,7 +1884,12 @@ void idRenderBackend::RenderInteractions( const drawSurf_t* surfList, const view
 	}
 	// RB end
 
+#if defined( DOMINION ) // OLD GUIs - Menu model lighting
+	// Original GUI model previews render directly into the display canvas.
+	const float lightScale = viewDef->renderView.guiWidth > 0 && viewDef->renderView.guiHeight > 0 ? 2.0f : r_lightScale.GetFloat();
+#else
 	const float lightScale = r_lightScale.GetFloat();
+#endif
 
 	for( int lightStageNum = 0; lightStageNum < lightShader->GetNumStages(); lightStageNum++ )
 	{
@@ -2254,7 +2288,11 @@ void idRenderBackend::AmbientPass( const drawSurf_t* const* drawSurfs, int numDr
 	}
 
 	// RB: TODO remove this
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+	if( !fillGbuffer && r_useSSAO.GetBool() && !R_IsAuxiliaryView( viewDef ) && !( viewDef->renderView.rdflags & ( RDF_NOAMBIENT | RDF_IRRADIANCE ) ) && r_ssaoDebug.GetBool() )
+#else
 	if( !fillGbuffer && r_useSSAO.GetBool() && r_ssaoDebug.GetBool() )
+#endif
 	{
 		GL_State( GLS_DEPTHMASK | GLS_DEPTHFUNC_ALWAYS | GLS_CULL_TWOSIDED );
 
@@ -2345,7 +2383,11 @@ void idRenderBackend::AmbientPass( const drawSurf_t* const* drawSurfs, int numDr
 	}
 	else
 	{
+#if defined( DOMINION ) // OLD GUIs - Menu model lighting
+		const float lightScale = viewDef->renderView.guiWidth > 0 && viewDef->renderView.guiHeight > 0 ? 2.0f : r_lightScale.GetFloat();
+#else
 		const float lightScale = r_lightScale.GetFloat();
+#endif
 		const idVec4 lightColor = colorWhite * lightScale;
 
 		// apply the world-global overbright and tune down specular a bit so we have less fresnel overglow
@@ -2371,6 +2413,13 @@ void idRenderBackend::AmbientPass( const drawSurf_t* const* drawSurfs, int numDr
 	{
 		const drawSurf_t* drawSurf = drawSurfs[i];
 		const idMaterial* surfaceMaterial = drawSurf->material;
+
+#if defined( DOMINION ) // X-ray rendering fix
+		if( !fillGbuffer && viewDef->isXraySubview && drawSurf->space->entityDef && drawSurf->space->entityDef->parms.xrayIndex != 2 )
+		{
+			continue;
+		}
+#endif
 
 		// translucent surfaces don't put anything in the depth buffer and don't
 		// test against it, which makes them fail the mirror clip plane operation
@@ -2735,6 +2784,11 @@ void idRenderBackend::StencilShadowPass( const drawSurf_t* drawSurfs, const view
 		glState = GLS_DEPTHMASK | GLS_COLORMASK | GLS_ALPHAMASK | GLS_DEPTHFUNC_LESS;
 	}
 
+#if defined( DOMINION ) // Stencil shadow fixes and notes
+	// Phobos1 prelight caps can disagree with the receiver depth after the NVRHI port.
+	// Slope bias removes the tested triangles, but a global bias can leak light elsewhere.
+	// Keep the existing defaults until cap/receiver precision and triangulation are matched.
+#endif
 	GL_PolygonOffset( r_shadowPolygonFactor.GetFloat(), -r_shadowPolygonOffset.GetFloat() );
 
 	// the actual stencil func will be set in the draw code, but we need to make sure it isn't
@@ -4476,6 +4530,12 @@ int idRenderBackend::DrawShaderPasses( const drawSurf_t* const* const drawSurfs,
 		const drawSurf_t* surf = drawSurfs[i];
 		const idMaterial* shader = surf->material;
 
+#if defined( DOMINION ) // Portal sky fix
+		// Legacy sky materials name _currentRender; only their world stages use the
+		// independent portal capture. Fullscreen PlayerView materials keep their image.
+		const bool isPortalSkySurface = !viewDef->is2Dgui && !surf->space->isGuiSurface && shader->GetSort() == float( SS_PORTAL_SKY );
+#endif
+
 		if( !shader->HasAmbient() )
 		{
 			continue;
@@ -4632,6 +4692,13 @@ int idRenderBackend::DrawShaderPasses( const drawSurf_t* const* const drawSurfs,
 			{
 				stageGLState |= pStage->drawStateBits;
 			}
+#if defined( DOMINION ) // OLD GUIs - Menu
+			if( viewDef->is2Dgui && surf->space->isGuiSurface && ( surfGLState & GLS_OVERRIDE ) == 0 ) {
+				// Opaque video materials carry DEPTHFUNC_EQUAL. Merging it with
+				// the GUI's ALWAYS bits otherwise retains EQUAL and discards the movie.
+				stageGLState = ( stageGLState & ~GLS_DEPTHFUNC_BITS ) | GLS_DEPTHFUNC_ALWAYS;
+			}
+#endif
 
 			// skip if the stage is ( GL_ZERO, GL_ONE ), which is used for some alpha masks
 			if( ( stageGLState & ( GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS ) ) == ( GLS_SRCBLEND_ZERO | GLS_DSTBLEND_ONE ) )
@@ -4725,6 +4792,13 @@ int idRenderBackend::DrawShaderPasses( const drawSurf_t* const* const drawSurfs,
 				for( int j = 0; j < newStage->numFragmentProgramImages; j++ )
 				{
 					idImage* image = newStage->fragmentProgramImages[j];
+#if defined( DOMINION ) // Portal sky fix
+					// Custom-program sky stages use the same capture/fallback as legacy screen stages.
+					if( isPortalSkySurface && image == globalImages->currentRenderImage )
+					{
+						image = portalSkyAvailable ? globalImages->portalSkyImage : globalImages->blackImage;
+					}
+#endif
 					if( image != NULL )
 					{
 						GL_SelectTexture( j );
@@ -4853,7 +4927,17 @@ int idRenderBackend::DrawShaderPasses( const drawSurf_t* const* const drawSurfs,
 			RB_SetVertexColorParms( svc );
 
 			// bind the texture
-			BindVariableStageImage( &pStage->texture, regs, commandList );
+#if defined( DOMINION ) // Portal sky fix
+			if( isPortalSkySurface && pStage->texture.image == globalImages->currentRenderImage )
+			{
+				// No capture means the visibility test skipped the portal camera this frame.
+				( portalSkyAvailable ? globalImages->portalSkyImage : globalImages->blackImage )->Bind();
+			}
+			else
+#endif
+			{
+				BindVariableStageImage( &pStage->texture, regs, commandList );
+			}
 
 			// set privatePolygonOffset if necessary
 			if( pStage->privatePolygonOffset )
@@ -5268,7 +5352,12 @@ void idRenderBackend::DrawMotionVectors()
 		return;
 	}
 
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+	// Portal sky is auxiliary too, despite arriving through a separate RenderScene.
+	if( R_IsAuxiliaryView( viewDef ) )
+#else
 	if( viewDef->isSubview )
+#endif
 	{
 		return;
 	}
@@ -5427,7 +5516,12 @@ void idRenderBackend::TemporalAAPass( const viewDef_t* _viewDef )
 		return;
 	}
 
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+	// Portal sky is auxiliary too, despite arriving through a separate RenderScene.
+	if( R_IsAuxiliaryView( viewDef ) )
+#else
 	if( viewDef->isSubview )
+#endif
 	{
 		return;
 	}
@@ -5603,7 +5697,12 @@ void idRenderBackend::DrawScreenSpaceAmbientOcclusion( const viewDef_t* _viewDef
 	}
 
 	// skip this in subviews because it is very expensive
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+	// Keep the auxiliary camera out of shared player depth/AO resources.
+	if( R_IsAuxiliaryView( _viewDef ) )
+#else
 	if( _viewDef->isSubview )
+#endif
 	{
 		return;
 	}
@@ -5825,7 +5924,12 @@ void idRenderBackend::DrawScreenSpaceAmbientOcclusion2( const viewDef_t* _viewDe
 	}
 
 	// skip this in subviews because it is very expensive
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+	// Keep the auxiliary camera out of shared player depth/AO resources.
+	if( R_IsAuxiliaryView( _viewDef ) )
+#else
 	if( _viewDef->isSubview )
+#endif
 	{
 		return;
 	}
@@ -5882,6 +5986,19 @@ void idRenderBackend::ExecuteBackEndCommands( const emptyCommand_t* cmds )
 	int c_setBuffers = 0;
 	int c_copyRenders = 0;
 
+#if defined( DOMINION ) // OLD GUIs - Objective picture TGA cache
+	// Copy at the write command's position, before another camera can overwrite its source.
+	// Readback and disk I/O happen only after GL_EndFrame submits those GPU copies.
+	struct captureFile_t
+	{
+		nvrhi::StagingTextureHandle pixels;
+		idStr fileName;
+		idStr basePath;	// OLD GUIs - Save previews share deferred readback, but use fs_savepath.
+		int width, height;
+	};
+	idList<captureFile_t> captureFiles;
+#endif
+
 	resolutionScale.SetCurrentGPUFrameTime( commonLocal.GetRendererGPUMicroseconds() );
 
 	// make sure the swapchains and rendertargets have the size requested
@@ -5909,6 +6026,16 @@ void idRenderBackend::ExecuteBackEndCommands( const emptyCommand_t* cmds )
 	// SRS - Save glConfig.timerQueryAvailable state so it can be disabled for RC_DRAW_VIEW_GUI then restored after it is finished
 	const bool timerQueryAvailable = glConfig.timerQueryAvailable;
 	drawView3D = false;
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+	// Reset the completed-output contract each command list, including its resource reference.
+	captureSource = globalImages->ldrImage->GetTextureHandle();
+	captureFlipY = false;
+	captureAuxiliary = false;
+#endif
+#if defined( DOMINION ) // Portal sky fix
+	// Portal visibility is evaluated each frame; a stale capture is not a valid fallback.
+	portalSkyAvailable = false;
+#endif
 
 	for( ; cmds != NULL; cmds = ( const emptyCommand_t* )cmds->next )
 	{
@@ -5956,6 +6083,34 @@ void idRenderBackend::ExecuteBackEndCommands( const emptyCommand_t* cmds )
 				c_copyRenders++;
 				break;
 
+#if defined( DOMINION ) // OLD GUIs - Objective picture TGA cache
+			case RC_WRITE_RENDER_IMAGE:
+			{
+				const writeRenderImageCommand_t *cmd = ( const writeRenderImageCommand_t * )cmds;
+				nvrhi::TextureHandle image = cmd->image->GetTextureHandle();
+				if( !image || r_skipCopyTexture.GetBool() )
+				{
+					break;
+				}
+				const nvrhi::TextureDesc &desc = image->getDesc();
+				if( !desc.isRenderTarget || desc.sampleCount != 1 ||
+					( desc.format != nvrhi::Format::RGBA8_UNORM && desc.format != nvrhi::Format::SRGBA8_UNORM ) )
+				{
+					common->Warning( "Cannot write uncaptured/non-RGBA8 image %s", cmd->fileName );
+					break;
+				}
+				captureFile_t capture;
+				capture.fileName = cmd->fileName;
+				capture.basePath = cmd->basePath;
+				capture.width = desc.width;
+				capture.height = desc.height;
+				capture.pixels = deviceManager->GetDevice()->createStagingTexture( desc, nvrhi::CpuAccessMode::Read );
+				commandList->copyTexture( capture.pixels, nvrhi::TextureSlice(), image, nvrhi::TextureSlice() );
+				captureFiles.Append( capture );
+				break;
+			}
+#endif
+
 			case RC_POST_PROCESS:
 			{
 				// apply optional post processing
@@ -5981,6 +6136,40 @@ void idRenderBackend::ExecuteBackEndCommands( const emptyCommand_t* cmds )
 
 	// SRS - capture backend timing before GL_EndFrame() since it can block when r_mvkSynchronousQueueSubmits is enabled on macOS/MoltenVK
 	GL_EndFrame();
+
+#if defined( DOMINION ) // OLD GUIs - Objective picture TGA cache
+	// Mapping waits for the submitted copy, never for the game thread. Pack padded GPU
+	// rows and save an opaque, top-origin TGA beside the active mod/game's other loose assets.
+	for( int i = 0; i < captureFiles.Num(); ++i )
+	{
+		const captureFile_t &capture = captureFiles[i];
+		size_t rowPitch = 0;
+		const byte *mapped = ( const byte * )deviceManager->GetDevice()->mapStagingTexture(
+			capture.pixels, nvrhi::TextureSlice(), nvrhi::CpuAccessMode::Read, &rowPitch );
+		if( mapped == NULL )
+		{
+			common->Warning( "Could not read captured picture %s", capture.fileName.c_str() );
+			continue;
+		}
+		idTempArray<byte> pixels( capture.width * capture.height * 4 );
+		for( int row = 0; row < capture.height; ++row )
+		{
+			byte *destination = pixels.Ptr() + row * capture.width * 4;
+			memcpy( destination, mapped + row * rowPitch, capture.width * 4 );
+			for( int column = 0; column < capture.width; ++column )
+			{
+				destination[column * 4 + 3] = 255;
+			}
+		}
+		R_WriteTGA( capture.fileName, pixels.Ptr(), capture.width, capture.height, false, capture.basePath );
+		deviceManager->GetDevice()->unmapStagingTexture( capture.pixels );
+	}
+#endif
+
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+	// Capture state belongs to this command list; release its image reference before device shutdown.
+	captureSource = nullptr;
+#endif
 
 	if( r_debugRenderToTexture.GetInteger() == 1 )
 	{
@@ -6009,6 +6198,13 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 	//OPTICK_GPU_EVENT( "DrawView" );	// SRS - now in DrawView() for 3D vs. GUI
 
 	bool is3D = _viewDef->viewEntitys && !_viewDef->is2Dgui;
+#if defined( DOMINION ) // OLD GUIs - Menu model rendering
+	// GUI model previews share the LDR canvas and must not alter gameplay histories.
+	const bool isMenuRenderDef = _viewDef->renderView.guiWidth > 0 && _viewDef->renderView.guiHeight > 0;
+	const bool useSceneEffects = is3D && !isMenuRenderDef;
+#else
+	const bool useSceneEffects = is3D;
+#endif
 
 	// ugly but still faster than building the string
 	if( !is3D )
@@ -6083,14 +6279,29 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 	// ensures that depth writes are enabled for the depth clear
 	GL_State( GLS_DEFAULT | GLS_CULL_FRONTSIDED, true );
 
+#if defined( DOMINION ) // Portal sky fix
+	// A separate portal camera must start without the previous player frame's colour.
+	// Clipping can leave pixels uncovered; clearing after capture alone is too late.
+	// Direct subviews retain their existing underlay and are not cleared here.
+	bool clearColor = !_viewDef->isSubview && ( _viewDef->renderView.rdflags & RDF_PORTALSKY ) != 0;
+#if defined( DOMINION ) // OLD GUIs - Objective camera pictures
+	// Snapshot cameras must not inherit colour from another objective or the player.
+	clearColor |= ( _viewDef->renderView.rdflags & RDF_OBJECTIVE ) != 0;
+#endif
+#else
 	bool clearColor = false;
+#endif
 
 	if( _viewDef->renderView.rdflags & RDF_IRRADIANCE )
 	{
 		globalFramebuffers.envprobeFBO->Bind();
 		clearColor = true;
 	}
+#if defined( DOMINION ) // OLD GUIs - Menu model rendering
+	else if( useSceneEffects )
+#else
 	else if( is3D )
+#endif
 	{
 		globalFramebuffers.hdrFBO->Bind();
 	}
@@ -6102,6 +6313,11 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 	{
 		globalFramebuffers.ldrFBO->Bind();
 	}
+
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+	// Start with the actual colour attachment; tonemapping below changes the completed output.
+	nvrhi::TextureHandle completedColour = currentFrameBuffer->GetApiObject()->getDesc().colorAttachments[0].texture;
+#endif
 
 	// Clear the depth buffer and clear the stencil to 128 for gui masking
 	{
@@ -6186,7 +6402,11 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 	//-------------------------------------------------
 	// build hierarchical depth buffer
 	//-------------------------------------------------
+#if defined( DOMINION ) // OLD GUIs - Menu model rendering
+	if( R_UseHiZ() && useSceneEffects )
+#else
 	if( R_UseHiZ() && is3D )
+#endif
 	{
 		OPTICK_GPU_EVENT( "Render_HiZ" );
 		renderLog.OpenMainBlock( MRB_FILL_HIZ_BUFFER );
@@ -6211,7 +6431,11 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 	//
 	// fill the geometric buffer with normals and roughness
 	//-------------------------------------------------
+#if defined( DOMINION ) // OLD GUIs - Menu model rendering
+	if( useSceneEffects )
+#else
 	if( is3D )
+#endif
 	{
 		//OPTICK_EVENT( "Render_GeometryBuffer" );
 		OPTICK_GPU_EVENT( "Render_GeometryBuffer" );
@@ -6222,6 +6446,19 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 	//-------------------------------------------------
 	// build hierarchical depth buffer and SSAO render target
 	//-------------------------------------------------
+#if defined( DOMINION ) // OLD GUIs - Menu model history isolation
+	if( !isMenuRenderDef )
+	{
+		if( r_useNewSsaoPass.GetBool() )
+		{
+			DrawScreenSpaceAmbientOcclusion2( _viewDef );
+		}
+		else
+		{
+			DrawScreenSpaceAmbientOcclusion( _viewDef );
+		}
+	}
+#else
 	if( r_useNewSsaoPass.GetBool() )
 	{
 		DrawScreenSpaceAmbientOcclusion2( _viewDef );
@@ -6230,11 +6467,16 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 	{
 		DrawScreenSpaceAmbientOcclusion( _viewDef );
 	}
+#endif
 
 	//-------------------------------------------------
 	// render static lighting and consider SSAO results
 	//-------------------------------------------------
+#if defined( DOMINION ) // OLD GUIs - Menu model rendering
+	if( useSceneEffects )
+#else
 	if( is3D )
+#endif
 	{
 		//OPTICK_EVENT( "Render_AmbientPass" );
 		OPTICK_GPU_EVENT( "Render_AmbientPass" );
@@ -6255,10 +6497,31 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 	//-------------------------------------------------
 	// resolve the screen for SSR
 	//-------------------------------------------------
+#if defined( DOMINION ) // OLD GUIs - Menu model rendering
+	if( useSceneEffects && r_useSSR.GetBool() && R_UseHiZ() )
+#else
 	if( is3D && r_useSSR.GetBool() && R_UseHiZ() )
+#endif
 	{
 		OPTICK_GPU_EVENT( "Resolve_Screen4SSR" );
 
+#if defined( DOMINION ) // Portal sky fix
+		// ambient sky stages have not drawn yet
+		// overwriting _currentRender here replaces their portal capture with this main view.
+		renderLog.OpenBlock( "Capture SSR color" );
+		if( R_GetMSAASamples() > 1 )
+		{
+			commandList->resolveTexture( globalImages->ssrRenderImage->GetTextureHandle(), nvrhi::AllSubresources, globalImages->currentRenderHDRImage->GetTextureHandle(), nvrhi::AllSubresources );
+		}
+		else
+		{
+			BlitParameters blitParms;
+			blitParms.sourceTexture = currentFrameBuffer->GetApiObject()->getDesc().colorAttachments[0].texture;
+			blitParms.targetFramebuffer = globalFramebuffers.ssrFBO->GetApiObject();
+			blitParms.targetViewport = nvrhi::Viewport( renderSystem->GetWidth(), renderSystem->GetHeight() );
+			commonPasses.BlitTexture( commandList, blitParms, &bindingCache );
+		}
+#else
 		if( R_GetMSAASamples() > 1 )
 		{
 			renderLog.OpenBlock( "Resolve to _currentRender" );
@@ -6276,7 +6539,7 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 			blitParms.targetViewport = nvrhi::Viewport( renderSystem->GetWidth(), renderSystem->GetHeight() );
 			commonPasses.BlitTexture( commandList, blitParms, &bindingCache );
 		}
-
+#endif
 		renderLog.CloseBlock();
 	}
 
@@ -6385,7 +6648,14 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 	//-------------------------------------------------
 	// motion vectors are useful for TAA and motion blur
 	//-------------------------------------------------
+#if defined( DOMINION ) // OLD GUIs - Menu model history isolation
+	if( !isMenuRenderDef )
+	{
+		DrawMotionVectors();
+	}
+#else
 	DrawMotionVectors();
+#endif
 
 	//-------------------------------------------------
 	// resolve of HDR target using temporal anti aliasing before any tonemapping and post processing
@@ -6393,13 +6663,24 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 	// use this to eat all stochastic noise like from volumetric light sampling or SSAO
 	// runs at full resolution
 	//-------------------------------------------------
+#if defined( DOMINION ) // OLD GUIs - Menu model history isolation
+	if( !isMenuRenderDef )
+	{
+		TemporalAAPass( _viewDef );
+	}
+#else
 	TemporalAAPass( _viewDef );
+#endif
 
 	//-------------------------------------------------
 	// tonemapping: convert back from HDR to LDR range
 	//-------------------------------------------------
 
+#if defined( DOMINION ) // OLD GUIs - Menu model rendering
+	if( useSceneEffects && !( _viewDef->renderView.rdflags & RDF_IRRADIANCE ) && !_viewDef->targetRender )
+#else
 	if( is3D && !( _viewDef->renderView.rdflags & RDF_IRRADIANCE ) && !_viewDef->targetRender )
+#endif
 	{
 		OPTICK_GPU_EVENT( "Render_ToneMapPass" );
 
@@ -6407,7 +6688,12 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 		renderLog.OpenBlock( "Render_ToneMapPass", colorBlue );
 
 		ToneMappingParameters parms;
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+		// Consume a resolved history only for the same views which generated that history.
+		if( R_UseTemporalAAForView( viewDef ) )
+#else
 		if( R_UseTemporalAA() )
+#endif
 		{
 			toneMapPass->SimpleRender( commandList, parms, viewDef, globalImages->taaResolvedImage->GetTextureHandle(), globalFramebuffers.ldrFBO->GetApiObject() );
 		}
@@ -6425,9 +6711,27 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 			}
 		}
 
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+		completedColour = globalImages->ldrImage->GetTextureHandle();
+#endif
 		renderLog.CloseBlock();
 		renderLog.CloseMainBlock();
 	}
+
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+	// World-camera materials keep legacy Y orientation; fullscreen PlayerView/GUI captures do not.
+	// Store only durable resources and values, never a pointer into the front-end frame arena.
+	captureSource = completedColour;
+	captureAuxiliary = is3D && R_IsAuxiliaryView( _viewDef );
+	captureFlipY = captureAuxiliary;
+#if defined( DOMINION ) // OLD GUIs - Objective camera pictures
+	// Objective pictures are consumed by a fullscreen GUI, using its ordinary image orientation.
+	if( _viewDef->renderView.rdflags & RDF_OBJECTIVE )
+	{
+		captureFlipY = false;
+	}
+#endif
+#endif
 
 	//-------------------------------------------------
 	// bloom post processing
@@ -6538,7 +6842,12 @@ void idRenderBackend::MotionBlur()
 	{
 		return;
 	}
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+	// Portal sky is auxiliary too, despite arriving through a separate RenderScene.
+	if( R_IsAuxiliaryView( viewDef ) )
+#else
 	if( viewDef->isSubview )
+#endif
 	{
 		return;
 	}
@@ -6661,6 +6970,25 @@ void idRenderBackend::DrawView( const void* data, const int stereoEye )
 	// if there aren't any drawsurfs, do nothing
 	if( !viewDef->numDrawSurfs )
 	{
+#if defined( DOMINION ) // Portal sky fix
+		// An empty portal still produces a capture. Publish black rather than retaining
+		// the preceding player's output and feeding it back into the next sky image.
+#if defined( DOMINION ) // OLD GUIs - Objective camera pictures
+		if( !viewDef->isSubview && ( viewDef->renderView.rdflags & ( RDF_PORTALSKY | RDF_OBJECTIVE ) ) != 0 )
+#else
+		if( !viewDef->isSubview && ( viewDef->renderView.rdflags & RDF_PORTALSKY ) != 0 )
+#endif
+		{
+			nvrhi::utils::ClearColorAttachment( commandList, globalFramebuffers.hdrFBO->GetApiObject(), 0, nvrhi::Color( 0.f ) );
+			nvrhi::utils::ClearColorAttachment( commandList, globalFramebuffers.ldrFBO->GetApiObject(), 0, nvrhi::Color( 0.f ) );
+			captureSource = globalImages->ldrImage->GetTextureHandle();
+			captureAuxiliary = true;
+			captureFlipY = true;
+#if defined( DOMINION ) // OLD GUIs - Objective camera pictures
+			captureFlipY = ( viewDef->renderView.rdflags & RDF_OBJECTIVE ) == 0;
+#endif
+		}
+#endif
 		if( viewDef->renderView.rdflags & RDF_IRRADIANCE )
 		{
 			nvrhi::utils::ClearColorAttachment( commandList, globalFramebuffers.envprobeFBO->GetApiObject(), 0, nvrhi::Color( 0.f ) );
@@ -6750,6 +7078,22 @@ void idRenderBackend::CopyRender( const void* data )
 	{
 		renderLog.OpenBlock( cmd->image->GetName() );
 
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+		if( !cmd->image->CopyFramebufferFrom( captureSource, cmd->x, cmd->y, cmd->imageWidth, cmd->imageHeight, captureFlipY ) )
+		{
+			// A rejected copy must not erase the source which the caller still needs.
+			renderLog.CloseBlock();
+			renderLog.CloseBlock();
+			return;
+		}
+#if defined( DOMINION ) // Portal sky fix
+		// Publish availability only after a successful capture of the independent sky image.
+		if( cmd->image == globalImages->portalSkyImage )
+		{
+			portalSkyAvailable = true;
+		}
+#endif
+#else
 		BlitParameters blitParms;
 		blitParms.sourceTexture = ( nvrhi::ITexture* )globalImages->ldrImage->GetTextureID();
 		nvrhi::IFramebuffer* framebuffer = globalFramebuffers.postProcFBO->GetApiObject();
@@ -6762,18 +7106,41 @@ void idRenderBackend::CopyRender( const void* data )
 		commonPasses.BlitTexture( commandList, blitParms, &bindingCache );
 
 		cmd->image->CopyFramebuffer( cmd->x, cmd->y, cmd->imageWidth, cmd->imageHeight );
-
+#endif
 		renderLog.CloseBlock();
 	}
 
 	if( cmd->clearColorAfterCopy )
 	{
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+		nvrhi::FramebufferHandle clearFramebuffer = deviceManager->GetDevice()->createFramebuffer(
+					nvrhi::FramebufferDesc().addColorAttachment( captureSource ) );
+		BlitParameters clearParms;
+		clearParms.sourceTexture = globalImages->blackImage->GetTextureHandle();
+		clearParms.targetFramebuffer = clearFramebuffer;
+		clearParms.targetViewport = nvrhi::Viewport( float( cmd->x ), float( cmd->x + cmd->imageWidth ),
+									float( cmd->y ), float( cmd->y + cmd->imageHeight ), 0.0f, 1.0f );
+		commonPasses.BlitTexture( commandList, clearParms, &bindingCache );
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+		// Tonemapping does not discard the HDR working image. Leaving auxiliary colour there
+		// leaks it into uncovered pixels of the following main view. Clear only explicit
+		// discard requests; direct mirror underlays do not request this operation.
+		if( captureAuxiliary && captureSource != globalImages->currentRenderHDRImage->GetTextureHandle() )
+		{
+			nvrhi::FramebufferHandle clearHDR = deviceManager->GetDevice()->createFramebuffer(
+				nvrhi::FramebufferDesc().addColorAttachment( globalImages->currentRenderHDRImage->GetTextureHandle() ) );
+			clearParms.targetFramebuffer = clearHDR;
+			commonPasses.BlitTexture( commandList, clearParms, &bindingCache );
+		}
+#endif
+#else
 		nvrhi::IFramebuffer* framebuffer = globalFramebuffers.postProcFBO->GetApiObject();
 		if( cmd->image == globalImages->accumImage )
 		{
 			framebuffer = globalFramebuffers.accumFBO->GetApiObject();
 		}
 		nvrhi::utils::ClearColorAttachment( commandList, framebuffer, 0, nvrhi::Color( 0.f ) );
+#endif
 	}
 
 	renderLog.CloseBlock();

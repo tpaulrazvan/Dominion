@@ -422,6 +422,16 @@ public:
 	{
 		return commonPasses;
 	}
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+	// The completed pass owns this state; image copying never reaches back into frame-arena views.
+	nvrhi::TextureHandle captureSource;
+	bool captureFlipY = false;
+	bool captureAuxiliary = false;
+#endif
+#if defined( DOMINION ) // Portal sky fix
+	// Outside valid portal visibility areas, sky surfaces must not reuse a previous view.
+	bool portalSkyAvailable = false;
+#endif
 };
 
 #endif

@@ -193,6 +193,9 @@ void idMenuHandler::Cleanup()
 		if( menuScreens[ index ] != NULL )
 		{
 			menuScreens[ index ]->Release();
+#if defined( DOMINION ) // OLD GUIs - Menu
+			menuScreens[ index ] = NULL;
+#endif
 		}
 	}
 

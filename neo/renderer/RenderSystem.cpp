@@ -1019,7 +1019,12 @@ void idRenderSystemLocal::CaptureRenderToImage( const char* imageName, bool clea
 	if( common->WriteDemo() )
 	{
 		common->WriteDemo()->WriteInt( DS_RENDER );
+#if defined( DOMINION ) // Portal sky, X-ray and remote rendering fixes
+		// Keep the discard request in the demo: auxiliary captures must clear on playback too.
+		common->WriteDemo()->WriteInt( clearColorAfterCopy ? DC_CAPTURE_RENDER_CLEAR : DC_CAPTURE_RENDER );
+#else
 		common->WriteDemo()->WriteInt( DC_CAPTURE_RENDER );
+#endif
 		common->WriteDemo()->WriteHashString( imageName );
 
 		if( r_showDemo.GetBool() )
@@ -1049,6 +1054,34 @@ void idRenderSystemLocal::CaptureRenderToImage( const char* imageName, bool clea
 	guiModel->Clear();
 }
 
+
+#if defined( DOMINION ) // OLD GUIs - Objective picture TGA cache
+/*
+================
+idRenderSystemLocal::WriteRenderImageToFile
+Do not wait for the game thread or read unfinished GPU work here. The backend
+copies the captured texture and writes the TGA after submitting the frame.
+================
+*/
+void idRenderSystemLocal::WriteRenderImageToFile( const char *imageName, const char *fileName, const char *basePath )
+{
+	if( !IsInitialized() )
+	{
+		return;
+	}
+	idImage *image = globalImages->GetImage( imageName );
+	if( image == NULL )
+	{
+		return;
+	}
+	writeRenderImageCommand_t *cmd = ( writeRenderImageCommand_t * )R_GetCommandBuffer( sizeof( *cmd ) );
+	cmd->commandId = RC_WRITE_RENDER_IMAGE;
+	cmd->image = image;
+	idStr::Copynz( cmd->fileName, fileName, sizeof( cmd->fileName ) );
+	// OLD GUIs - Save previews keep their write root until the command is submitted.
+	idStr::Copynz( cmd->basePath, basePath, sizeof( cmd->basePath ) );
+}
+#endif
 
 /*
 ==============

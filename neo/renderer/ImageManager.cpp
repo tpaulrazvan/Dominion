@@ -797,7 +797,11 @@ idImageManager::BeginLevelLoad
 Frees all images used by the previous level
 ====================
 */
+#if defined( DOMINION ) // Original map reload - retain source assets
+void idImageManager::BeginLevelLoad( bool reuseAssets )
+#else
 void idImageManager::BeginLevelLoad()
+#endif
 {
 	insideLevelLoad = true;
 
@@ -811,7 +815,12 @@ void idImageManager::BeginLevelLoad()
 			continue;
 		}
 
+#if defined( DOMINION ) // Original map reload - retain source assets
+		// Keep decoded/uploaded textures on this map, while tracking the new references.
+		if( !reuseAssets && !image->referencedOutsideLevelLoad && image->IsLoaded() )
+#else
 		if( !image->referencedOutsideLevelLoad && image->IsLoaded() )
+#endif
 		{
 			image->PurgeImage();
 			//idLib::Printf( "purging %s\n", image->GetName() );

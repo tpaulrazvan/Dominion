@@ -114,6 +114,11 @@ void idRenderWindow::PreRender()
 		gameEdit->ParseSpawnArgsToRenderEntity( &spawnArgs, &worldEntity );
 		if( worldEntity.hModel )
 		{
+#if defined( DOMINION ) // OLD GUIs - Menu model bounds
+			// MD5 Bounds(entity) returns the supplied entity bounds, initially zero here.
+			// BFG needs a real box to build its model projection and visibility tests.
+			worldEntity.bounds = worldEntity.hModel->Bounds( NULL );
+#endif
 			idVec3 v = modelRotate.ToVec3();
 			worldEntity.axis = v.ToMat3();
 			worldEntity.shaderParms[0] = 1;
@@ -157,6 +162,13 @@ void idRenderWindow::Render( int time )
 
 void idRenderWindow::Draw( int time, float x, float y )
 {
+#if defined( DOMINION ) // OLD GUIs - Menu model clipping
+	// GUI transitions can temporarily collapse or move a model window off the canvas.
+	if( drawRect.w <= 0.0f || drawRect.h <= 0.0f )
+	{
+		return;
+	}
+#endif
 	PreRender();
 	Render( time );
 
@@ -175,6 +187,24 @@ void idRenderWindow::Draw( int time, float x, float y )
 
 	refdef.time[0] = time;
 	refdef.time[1] = time;
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	if ( gui->IsFullscreenMenu() ) {
+		float sx, sy, ox, oy;
+		gui->GetMenuTransform( sx, sy, ox, oy );
+		const float px = (float)renderSystem->GetWidth() / Max( 1, renderSystem->GetVirtualWidth() );
+		const float py = (float)renderSystem->GetHeight() / Max( 1, renderSystem->GetVirtualHeight() );
+		refdef.guiX = idMath::Ftoi( ( ox + drawRect.x * sx ) * px );
+		refdef.guiY = idMath::Ftoi( ( oy + drawRect.y * sy ) * py );
+		refdef.guiWidth = Max( 1, idMath::Ftoi( drawRect.w * sx * px ) );
+		refdef.guiHeight = Max( 1, idMath::Ftoi( drawRect.h * sy * py ) );
+		if( refdef.guiX + refdef.guiWidth <= 0 || refdef.guiY + refdef.guiHeight <= 0 ||
+			refdef.guiX >= renderSystem->GetWidth() || refdef.guiY >= renderSystem->GetHeight() )
+		{
+			// Skip invisible previews before constructing a crop with nonpositive endpoints.
+			return;
+		}
+	}
+#endif
 	world->RenderScene( &refdef );
 }
 

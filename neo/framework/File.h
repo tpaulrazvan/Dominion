@@ -225,6 +225,10 @@ public:
 protected:
 	idStr					name;			// name of the file
 private:
+#if defined( DOMINION ) // OLD GUIs - Packed image cache validation
+	// A memory-backed PK4 file must retain its source timestamp for binary-cache checks.
+	ID_TIME_T				sourceTimestamp = 0;
+#endif
 	int						mode;			// open mode
 	size_t					maxSize;		// maximum size of file
 	size_t					fileSize;		// size of the file
@@ -357,6 +361,10 @@ public:
 	virtual int				Seek( long offset, fsOrigin_t origin );
 
 private:
+#if defined( DOMINION ) // OLD GUIs - Packed image cache validation
+	// Use the entry timestamp, rather than zero which bypasses source-cache validation.
+	ID_TIME_T				sourceTimestamp = 0;
+#endif
 	idStr					name;			// name of the file in the pak
 	idStr					fullPath;		// full file path including pak file name
 	// DG: use ZPOS64_T, it's the type minizip uses and should also work with zip64 files > 2GB

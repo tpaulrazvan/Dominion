@@ -2631,6 +2631,10 @@ idGameLocal::RunFrame
 void idGameLocal::RunFrame( idUserCmdMgr& cmdMgr, gameReturn_t& ret )
 {
 	SCOPED_PROFILE_EVENT( "RunFrame" );
+#if defined( DOMINION ) // Cutscene audio timing
+	// Measure this frame's simulated jump rather than using the maximum skip deadline.
+	const int cinematicSoundStartTime = fast.time;
+#endif
 
 	idEntity* 	ent;
 	int			num;
@@ -2890,6 +2894,11 @@ void idGameLocal::RunFrame( idUserCmdMgr& cmdMgr, gameReturn_t& ret )
 
 	if( skipCinematic )
 	{
+#if defined( DOMINION ) // Cutscene audio must finish with the skipped cinematic
+		// Like dhewm3's listener time-jump correction, advance audio after fast-forwarding:
+		// this also expires dialogue started during the skipped frames, while loops survive.
+		gameSoundWorld->Skip( fast.time - cinematicSoundStartTime );
+#endif
 		soundSystem->SetMute( false );
 		skipCinematic = false;
 
@@ -3189,7 +3198,11 @@ idGameLocal::Draw
 makes rendering and sound system calls
 ================
 */
+#if defined( DOMINION ) // OLD GUIs - Save previews isolate the player's temporal history
+bool idGameLocal::Draw( int clientNum, bool savePreview )
+#else
 bool idGameLocal::Draw( int clientNum )
+#endif
 {
 
 	if( clientNum == -1 )
@@ -3212,8 +3225,26 @@ bool idGameLocal::Draw( int clientNum )
 		return false;
 	}
 
+#if defined( DOMINION ) // OLD GUIs - Objective camera pictures
+	// Render requested map snapshots inside an ordinary draw frame, before the player's view.
+	if( !savePreview )
+	{
+		idObjective::RenderPendingPictures();
+	}
+	// A save thumbnail has its own crop and must not advance TAA/SSR/player history.
+	// Restore the live view's flags immediately after generating its render commands.
+	renderView_t *renderView = player->GetRenderView();
+	const int savedFlags = renderView->rdflags;
+	if( savePreview )
+	{
+		renderView->rdflags |= RDF_SAVEGAME;
+	}
+#endif
 	// render the scene
 	player->playerView.RenderPlayerView( player->hudManager );
+#if defined( DOMINION ) // OLD GUIs - Save previews isolate the player's temporal history
+	renderView->rdflags = savedFlags;
+#endif
 
 	return true;
 }
@@ -5064,9 +5095,14 @@ bool idGameLocal::SkipCinematic()
 	if( !skipCinematic )
 	{
 		skipCinematic = true;
+#if defined( DOMINION ) // Cutscene audio timing
+		// This is a safety deadline only; RunFrame advances sound by the completed skip.
+		cinematicMaxSkipTime = gameLocal.time + SEC2MS( g_cinematicMaxSkipTime.GetFloat() );
+#else
 		cinematicMaxSkipTime = gameLocal.time + SEC2MS( g_cinematicMaxSkipTime.GetFloat() );
 		// SRS - Skip the remainder of the currently playing cinematic sound
 		soundSystem->GetPlayingSoundWorld()->Skip( cinematicMaxSkipTime );
+#endif
 	}
 
 	return true;
@@ -5769,7 +5805,14 @@ idGameLocal::InhibitControls
 */
 bool idGameLocal::InhibitControls()
 {
+#if defined( DOMINION ) // OLD GUIs - Multiplayer scoreboard
+	// A classic scoreboard is drawn over live play. Only SWF's interactive
+	// scoreboard captures game input; holding Tab must not stop movement.
+	const bool scoreboardInput = common->IsMultiplayer() && mpGame.IsScoreboardActive() && !mpGame.UsesGuiScoreboard();
+	return ( Shell_IsActive() || IsPDAOpen() || IsPlayerChatting() || scoreboardInput );
+#else
 	return ( Shell_IsActive() || IsPDAOpen() || IsPlayerChatting() || ( common->IsMultiplayer() && mpGame.IsScoreboardActive() ) );
+#endif
 }
 
 /*
@@ -5872,6 +5915,11 @@ idGameLocal::Shell_ClosePause
 */
 void idGameLocal::Shell_ClosePause()
 {
+#if defined( DOMINION ) // OLD GUIs - Menu
+	if( shellHandler != NULL && shellHandler->UsesOriginalMenu() ) {
+		return;
+	}
+#endif
 	if( shellHandler != NULL )
 	{
 

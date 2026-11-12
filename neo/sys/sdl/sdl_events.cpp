@@ -459,7 +459,12 @@ sysEvent_t Sys_GetEvent()
 
 					case SDL_WINDOWEVENT_FOCUS_LOST:
 						// DG: pause the game when focus is lost, that also un-grabs the input
+#if defined( DOMINION ) // Background test execution
+						// Match the native Windows focus policy without retaining keyboard/mouse input.
+						cvarSystem->SetCVarBool( "com_pause", cvarSystem->GetCVarBool( "com_pauseOnFocusLoss" ) );
+#else
 						cvarSystem->SetCVarBool( "com_pause", true );
+#endif
 						cvarSystem->SetCVarBool( "com_activeApp", false );
 						// DG end
 						break;

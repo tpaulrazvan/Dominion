@@ -185,7 +185,15 @@ static void R_RenderGuiSurf( idUserInterface* gui, const drawSurf_t* drawSurf )
 
 	// call the gui, which will call the 2D drawing functions
 	tr.guiModel->Clear();
+#if defined( DOMINION ) // OLD GUIs - Original terminal animation clock
+	// Original entities normally use the fast clock. Use their clock for both input
+	// and drawing; a different clock can instantly finish a newly started animation.
+	const int guiTimeGroup = fileSystem->IsDoom2004() && drawSurf->space->entityDef != NULL ?
+		drawSurf->space->entityDef->parms.timeGroup : 0;
+	gui->Redraw( tr.viewDef->renderView.time[guiTimeGroup != 0 ? 1 : 0] );
+#else
 	gui->Redraw( tr.viewDef->renderView.time[0] );
+#endif
 	tr.guiModel->EmitToCurrentView( modelMatrix, drawSurf->space->weaponDepthHack );
 	tr.guiModel->Clear();
 

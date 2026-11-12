@@ -86,7 +86,11 @@ This class handles loading and rendering SWF files
 class idSWF
 {
 public:
-	idSWF( const char* filename, idSoundWorld* soundWorld, bool exportJSON = false, bool exportSWF = false );
+	idSWF( const char* filename, idSoundWorld* soundWorld, bool exportJSON = false, bool exportSWF = false
+#if defined( DOMINION ) // OLD GUIs - Shared support
+		, const char* gameDirectory = NULL
+#endif
+	);
 	~idSWF();
 
 	bool	IsLoaded()
@@ -217,6 +221,9 @@ public:
 
 private:
 	idStr			filename;
+#if defined( DOMINION ) // OLD GUIs - Shared support
+	idStr sourceGameDirectory;
+#endif
 	ID_TIME_T		timestamp;
 
 	float			frameWidth;

@@ -2308,6 +2308,35 @@ void idProgram::Startup( const char* defaultScript )
 		CompileFile( defaultScript );
 	}
 
+#if defined( DOMINION ) // Original expansion/mod main scripts
+	// Restore RoE/dhewm3's folder entry scripts: game base first, then the active mod.
+	// Keep this in Startup so initial loading and script reloads share the same baseline.
+	const char *const directoryCVars[] = { "fs_game_base", "fs_game" };
+	for( int i = 0; i < 2; ++i )
+	{
+		const idStr directory = cvarSystem->GetCVarString( directoryCVars[i] );
+		if( directory.IsEmpty() )
+		{
+			continue;
+		}
+		const idStr scriptFile = va( "script/%s_main.script", directory.c_str() );
+		// BFG or a mod may already include this entry from doom_main.script.
+		bool alreadyCompiled = false;
+		for( int fileIndex = 0; fileIndex < fileList.Num(); ++fileIndex )
+		{
+			if( idStr::IcmpPath( fileList[fileIndex], scriptFile ) == 0 )
+			{
+				alreadyCompiled = true;
+				break;
+			}
+		}
+		if( !alreadyCompiled && fileSystem->ReadFile( scriptFile.c_str(), NULL ) > 0 )
+		{
+			CompileFile( scriptFile.c_str() );
+		}
+	}
+#endif
+
 	FinishCompilation();
 }
 

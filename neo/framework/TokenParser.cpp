@@ -255,7 +255,12 @@ void idTokenParser::Error( VERIFY_FORMAT_STRING const char* str, ... )
 	idStr::vsnPrintf( text, sizeof( text ), str, ap );
 	va_end( ap );
 
+#if defined( DOMINION ) // OLD GUIs - Safe parser diagnostics
+	// GUI text can contain a literal percent sign. This message is already formatted.
+	idLib::common->Warning( "%s", text );
+#else
 	idLib::common->Warning( text );
+#endif
 }
 void idTokenParser::Warning( VERIFY_FORMAT_STRING const char* str, ... )
 {
@@ -266,7 +271,12 @@ void idTokenParser::Warning( VERIFY_FORMAT_STRING const char* str, ... )
 	idStr::vsnPrintf( text, sizeof( text ), str, ap );
 	va_end( ap );
 
+#if defined( DOMINION ) // OLD GUIs - Safe parser diagnostics
+	// Treat formatted source diagnostics as text, not as another format string.
+	idLib::common->Warning( "%s", text );
+#else
 	idLib::common->Warning( text );
+#endif
 }
 int idTokenParser::ParseInt()
 {
