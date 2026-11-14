@@ -26,8 +26,8 @@ If you have questions concerning this license or the applicable additional terms
 ===========================================================================
 */
 
-#ifndef __MATH_MATH_H__
-#define __MATH_MATH_H__
+#ifndef __IDLIB_MATH_H__
+#define __IDLIB_MATH_H__
 
 /*
 ===============================================================================
@@ -49,10 +49,10 @@ If you have questions concerning this license or the applicable additional terms
 	#undef DBL_EPSILON
 #endif
 
-#define DEG2RAD(a)				( (a) * idMath::M_DEG2RAD )
-#define RAD2DEG(a)				( (a) * idMath::M_RAD2DEG )
+#define DEG2RAD( a )			( ( a ) * idMath::M_DEG2RAD )
+#define RAD2DEG( a )			( ( a ) * idMath::M_RAD2DEG )
 
-#define SEC2MS(t)				( idMath::Ftoi( (t) * idMath::M_SEC2MS ) )
+#define SEC2MS(t)				( idMath::Ftoi( ( t ) * idMath::M_SEC2MS ) )
 #define MS2SEC(t)				( (t) * idMath::M_MS2SEC )
 
 #define	ANGLE2SHORT(x)			( idMath::Ftoi( (x) * 65536.0f / 360.0f ) & 65535 )
@@ -65,6 +65,41 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #define C_FLOAT_TO_ULONG(x) (unsigned long)(x)
+
+#if 0 // D3DX10math.h
+//===========================================================================
+//
+// General purpose utilities
+//
+//===========================================================================
+#define D3DX_PI    (3.14159265358979323846)
+#define D3DX_1BYPI ( 1.0 / D3DX_PI )
+
+#define D3DXToRadian( degree ) ((degree) * (D3DX_PI / 180.0))
+#define D3DXToDegree( radian ) ((radian) * (180.0 / D3DX_PI))
+
+//===========================================================================
+//
+// 16 bit floating point numbers
+//
+//===========================================================================
+
+#define D3DX_16F_DIG          3                // # of decimal digits of precision
+#define D3DX_16F_EPSILON      4.8875809e-4f    // smallest such that 1.0 + epsilon != 1.0
+#define D3DX_16F_MANT_DIG     11               // # of bits in mantissa
+#define D3DX_16F_MAX          6.550400e+004    // max value
+#define D3DX_16F_MAX_10_EXP   4                // max decimal exponent
+#define D3DX_16F_MAX_EXP      15               // max binary exponent
+#define D3DX_16F_MIN          6.1035156e-5f    // min positive value
+#define D3DX_16F_MIN_10_EXP   (-4)             // min decimal exponent
+#define D3DX_16F_MIN_EXP      (-14)            // min binary exponent
+#define D3DX_16F_RADIX        2                // exponent radix
+#define D3DX_16F_ROUNDS       1                // addition rounding: near
+#define D3DX_16F_SIGN_MASK    0x8000
+#define D3DX_16F_EXP_MASK     0x7C00
+#define D3DX_16F_FRAC_MASK    0x03FF
+
+#endif
 
 /*
 ================================================================================================
@@ -103,14 +138,14 @@ compile_time_assert( sizeof( unsigned int ) == 4 );
 // either 0 or 1, so this extra wrapper is needed to avoid the static
 // alaysis warning.
 
-ID_INLINE_EXTERN int INT32_SIGNBITSET( int i )
+ID_INLINE_EXTERN int INT32_SIGNBITSET( int i )		// vkDOOM3 removed EXTERN
 {
 	int	r = OLD_INT32_SIGNBITSET( i );
 	assert( r == 0 || r == 1 );
 	return r;
 }
 
-ID_INLINE_EXTERN int INT32_SIGNBITNOTSET( int i )
+ID_INLINE_EXTERN int INT32_SIGNBITNOTSET( int i )		// vkDOOM3 removed EXTERN
 {
 	int	r = OLD_INT32_SIGNBITNOTSET( i );
 	assert( r == 0 || r == 1 );
@@ -167,13 +202,13 @@ ID_INLINE_EXTERN int INT32_SIGNBITNOTSET( int i )
 
 ================================================================================================
 */
-
+// vkDOOM3 removed EXTERN for all those below
 /*
 ========================
 IEEE_FLT_IS_NAN
 ========================
 */
-ID_INLINE_EXTERN bool IEEE_FLT_IS_NAN( float x )
+ID_INLINE_EXTERN bool IEEE_FLT_IS_NAN( float x )		// vkDOOM3 removed EXTERN
 {
 	return x != x;
 }
@@ -183,7 +218,7 @@ ID_INLINE_EXTERN bool IEEE_FLT_IS_NAN( float x )
 IEEE_FLT_IS_INF
 ========================
 */
-ID_INLINE_EXTERN bool IEEE_FLT_IS_INF( float x )
+ID_INLINE_EXTERN bool IEEE_FLT_IS_INF( float x )	// vkDOOM3 removed EXTERN
 {
 	return x == x && x * 0 != x * 0;
 }
@@ -193,7 +228,7 @@ ID_INLINE_EXTERN bool IEEE_FLT_IS_INF( float x )
 IEEE_FLT_IS_INF_NAN
 ========================
 */
-ID_INLINE_EXTERN bool IEEE_FLT_IS_INF_NAN( float x )
+ID_INLINE_EXTERN bool IEEE_FLT_IS_INF_NAN( float x )	// vkDOOM3 removed EXTERN
 {
 	return x * 0 != x * 0;
 }
@@ -203,7 +238,7 @@ ID_INLINE_EXTERN bool IEEE_FLT_IS_INF_NAN( float x )
 IEEE_FLT_IS_IND
 ========================
 */
-ID_INLINE_EXTERN bool IEEE_FLT_IS_IND( float x )
+ID_INLINE_EXTERN bool IEEE_FLT_IS_IND( float x )	// vkDOOM3 removed EXTERN
 {
 	return	( reinterpret_cast<const unsigned int&>( x ) == 0xffc00000 );
 }
@@ -213,7 +248,7 @@ ID_INLINE_EXTERN bool IEEE_FLT_IS_IND( float x )
 IEEE_FLT_IS_DENORMAL
 ========================
 */
-ID_INLINE_EXTERN bool IEEE_FLT_IS_DENORMAL( float x )
+ID_INLINE_EXTERN bool IEEE_FLT_IS_DENORMAL( float x )	// vkDOOM3 removed EXTERN
 {
 	return ( ( reinterpret_cast<const unsigned int&>( x ) & 0x7f800000 ) == 0x00000000 &&
 			 ( reinterpret_cast<const unsigned int&>( x ) & 0x007fffff ) != 0x00000000 );
@@ -225,7 +260,7 @@ ID_INLINE_EXTERN bool IEEE_FLT_IS_DENORMAL( float x )
 IsNAN
 ========================
 */template<class type>
-ID_INLINE_EXTERN bool IsNAN( const type& v )
+ID_INLINE_EXTERN bool IsNAN( const type& v )	// vkDOOM3 removed EXTERN
 {
 	for( int i = 0; i < v.GetDimension(); i++ )
 	{
@@ -241,10 +276,16 @@ ID_INLINE_EXTERN bool IsNAN( const type& v )
 /*
 ========================
 IsValid
+
+//#modified-fva; BEGIN
+//ID_INLINE_EXTERN bool IsValid( const float & f ) {	// these parameter must be a reference for the function to be considered a specialization
+// Removed extern to eliminate warning C4499: 'extern': an explicit specialization cannot have a storage class (ignored)
+ID_INLINE bool IsValid(const float & f) {
+//#modified-fva; END
 ========================
 */
 template<class type>
-ID_INLINE_EXTERN bool IsValid( const type& v )
+ID_INLINE_EXTERN bool IsValid( const type& v )	// vkDOOM3 removed EXTERN
 {
 	for( int i = 0; i < v.GetDimension(); i++ )
 	{
@@ -262,11 +303,17 @@ ID_INLINE_EXTERN bool IsValid( const type& v )
 IsValid
 
 This should be a template ???
+
+//#modified-fva; BEGIN
+//ID_INLINE_EXTERN bool IsNAN( const float & f ) {	// these parameter must be a reference for the function to be considered a specialization
+// Removed extern to eliminate warning C4499: 'extern': an explicit specialization cannot have a storage class (ignored)
+ID_INLINE bool IsNAN(const float & f) {
+//#modified-fva; END
 ========================
 */
 template<>
 ID_INLINE
-bool IsValid( const float& f )  	// these parameter must be a reference for the function to be considered a specialization
+bool IsValid( const float& f )  	// these parameter must be a reference for the function to be considered a specialization		// vkDOOM3 removed EXTERN
 {
 	return !( IEEE_FLT_IS_NAN( f ) || IEEE_FLT_IS_INF( f ) || IEEE_FLT_IS_IND( f ) || IEEE_FLT_IS_DENORMAL( f ) );
 }
@@ -280,7 +327,7 @@ This should be a template ???
 */
 template<>
 ID_INLINE
-bool IsNAN( const float& f )  	// these parameter must be a reference for the function to be considered a specialization
+bool IsNAN( const float& f )  	// these parameter must be a reference for the function to be considered a specialization		// vkDOOM3 removed EXTERN
 {
 	if( IEEE_FLT_IS_NAN( f ) || IEEE_FLT_IS_INF( f ) || IEEE_FLT_IS_IND( f ) )
 	{
@@ -298,7 +345,7 @@ Returns true if any scalar is greater than the range or less than the negative r
 */
 template<class type>
 ID_INLINE
-bool IsInRange( const type& v, const float range )
+bool IsInRange( const type& v, const float range )		// vkDOOM3 removed EXTERN
 {
 	for( int i = 0; i < v.GetDimension(); i++ )
 	{
@@ -327,6 +374,26 @@ template<class T> ID_INLINE int	MinIndex( T x, T y )
 {
 	return ( x < y ) ? 0 : 1;
 }
+
+template<class T> T	Max( T x, T y )
+{
+	return ( x > y ) ? x : y;
+}
+template<class T> T	Min( T x, T y )
+{
+	return ( x < y ) ? x : y;
+}
+
+// OpenTech
+template<class T> ID_INLINE T	Max2(T x, T y)
+{
+	return (x > y) ? x : y;
+}
+template<class T> ID_INLINE T	Min2(T x, T y)
+{
+	return (x < y) ? x : y;
+}
+// <---
 
 template<class T> ID_INLINE T	Max3( T x, T y, T z )
 {
@@ -487,6 +554,8 @@ public:
 	static float				Pow( float x, float y );	// x raised to the power y with 32 bits precision
 	static float				Pow16( float x, float y );	// x raised to the power y with 16 bits precision
 
+	static float				Mod( float a, float b );	// SP-RBDOOM-3-BFG
+
 	static float				Exp( float f );				// e raised to the power f with 32 bits precision
 	static float				Exp16( float f );			// e raised to the power f with 16 bits precision
 
@@ -497,8 +566,8 @@ public:
 	static int					ILog2( float f );			// integral base-2 logarithm of the floating point value
 	static int					ILog2( int i );				// integral base-2 logarithm of the integer value
 
-	static int					BitsForFloat( float f );	// minumum number of bits required to represent ceil( f )
-	static int					BitsForInteger( int i );	// minumum number of bits required to represent i
+	static int					BitsForFloat( float f );	// minimum number of bits required to represent ceil( f )
+	static int					BitsForInteger( int i );	// minimum number of bits required to represent i
 	static int					MaskForFloatSign( float f );// returns 0x00000000 if x >= 0.0f and returns 0xFFFFFFFF if x <= -0.0f
 	static int					MaskForIntegerSign( int i );// returns 0x00000000 if x >= 0 and returns 0xFFFFFFFF if x < 0
 	static int					FloorPowerOfTwo( int x );	// round x down to the nearest power of 2
@@ -522,6 +591,10 @@ public:
 	static short				Ftoi16( float f );			// float to short conversion
 	static unsigned short		Ftoui16( float f );			// float to unsigned short conversion
 	static byte					Ftob( float f );			// float to byte conversion, the result is clamped to the range [0-255]
+
+//	ID_INLINE unsigned int idMath::Ftol(float f) {
+//		return (unsigned int)f;
+//	}
 
 	static signed char			ClampChar( int i );
 	static signed short			ClampShort( int i );
@@ -549,6 +622,10 @@ public:
 //
 //		return hash;
 //	}
+
+	// fhDOOM
+		template<typename T>
+	static T                    Diff(T a, T b);
 
 	static float				LerpToWithScale( const float cur, const float dest, const float scale );
 
@@ -583,6 +660,11 @@ public:
 	static const float			FLOAT_EPSILON;				// smallest positive number such that 1.0+FLOAT_EPSILON != 1.0
 	static const float                        DBL_EPSILON;  // smallest positive number such that 1.0+DBL_EPSILON != 1.0  (REVELATION)
 	static const float			FLT_SMALLEST_NON_DENORMAL;	// smallest non-denormal 32-bit floating point value
+	//#modified-fva; BEGIN
+	// cstDoom3BFG uses those in CVar declarations
+	// example idCVar cst_vidMonitor("cst_vidMonitor", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "monitor to use in fullscreen when cst_vidMode is 0", 1, idMath::CST_MAX_INT);
+	static const int			CST_MAX_INT;
+	//#modified-fva; END
 
 #if defined(USE_INTRINSICS_SSE)
 	static const __m128				SIMD_SP_zero;
@@ -880,6 +962,45 @@ ID_INLINE void idMath::SinCos( float a, float& s, float& c )
 	// DG end
 #endif
 }
+#if 0 
+/*
+========================
+idMath::SinCos
+// from another version of RBDOOM
+
+https://github.com/KungFuJesus/RBDOOM-3-BFG/commit/d544b4fff91a4c9c5fb92a5d937510fcaaaa4c77
+
+Leverage sincos function for platforms that have it
+GNU libm implementations (and most conforming POSIX ones) have had
+sincosf for decades.  Why not solve for these simultaneously?  The
+fsincos x87 implementation was previously leveraged here, which is
+typically slower than glibc's chebyshev based solution, anyway.
+========================
+*/
+ID_INLINE void idMath::SinCos(float a, float& s, float& c)
+{
+#if defined(_MSC_VER) && defined(_M_IX86)
+	_asm
+	{
+		fld		a
+		fsincos
+		mov		ecx, c
+		mov		edx, s
+		fstp	dword ptr[ecx]
+		fstp	dword ptr[edx]
+	}
+#else
+	// DG: non-MSVC version
+#ifdef _WIN32
+	s = sinf(a);
+	c = cosf(a);
+#else
+	sincosf(a, &s, &c);
+#endif
+	// DG end
+#endif
+}
+#endif
 
 /*
 ========================
@@ -1043,7 +1164,7 @@ ID_INLINE float idMath::ASin16( float a )
 			return -HALF_PI;
 		}
 		a = fabsf( a );
-		return ( ( ( -0.0187293f * a + 0.0742610f ) * a - 0.2121144f ) * a + 1.5707288f ) * idMath::Sqrt( 1.0f - a ) - HALF_PI; // wasm uses sqrtf
+		return ( ( ( -0.0187293f * a + 0.0742610f ) * a - 0.2121144f ) * a + 1.5707288f ) * idMath::Sqrt( 1.0f - a ) - HALF_PI; // wasm uses sqrtf	// fennixCrew removed idMath::
 	}
 	else
 	{
@@ -1051,7 +1172,7 @@ ID_INLINE float idMath::ASin16( float a )
 		{
 			return HALF_PI;
 		}
-		return HALF_PI - ( ( ( -0.0187293f * a + 0.0742610f ) * a - 0.2121144f ) * a + 1.5707288f ) * idMath::Sqrt( 1.0f - a ); // wasm uses sqrtf
+		return HALF_PI - ( ( ( -0.0187293f * a + 0.0742610f ) * a - 0.2121144f ) * a + 1.5707288f ) * idMath::Sqrt( 1.0f - a ); // wasm uses sqrtf	// fennixCrew removed idMath::
 	}
 }
 
@@ -1087,7 +1208,7 @@ ID_INLINE float idMath::ACos16( float a )
 			return PI;
 		}
 		a = fabsf( a );
-		return PI - ( ( ( -0.0187293f * a + 0.0742610f ) * a - 0.2121144f ) * a + 1.5707288f ) * idMath::Sqrt( 1.0f - a ); // wasm sqrtf
+		return PI - ( ( ( -0.0187293f * a + 0.0742610f ) * a - 0.2121144f ) * a + 1.5707288f ) * idMath::Sqrt( 1.0f - a ); // wasm sqrtf	// fennixCrew removed idMath::
 	}
 	else
 	{
@@ -1095,7 +1216,7 @@ ID_INLINE float idMath::ACos16( float a )
 		{
 			return 0.0f;
 		}
-		return ( ( ( -0.0187293f * a + 0.0742610f ) * a - 0.2121144f ) * a + 1.5707288f ) * idMath::Sqrt( 1.0f - a ); // wasm sqr
+		return ( ( ( -0.0187293f * a + 0.0742610f ) * a - 0.2121144f ) * a + 1.5707288f ) * idMath::Sqrt( 1.0f - a ); // wasm sqr	// fennixCrew removed idMath::
 	}
 }
 
@@ -1110,7 +1231,18 @@ ID_INLINE float idMath::ATan( float a )
 	// I think this is in OG BFG, but as of right now I havent diffed that, this line uncommented appears to be there and commented out in SnowFall
 	return atanf( a );
 }
-
+#if 0
+// Fully possessed version
+ID_INLINE float idMath::ATan(float y, float x)
+{
+#if defined( _DEBUG ) || defined( _lint )
+	if (!(fabs(y) > idMath::FLT_SMALLEST_NON_DENORMAL || fabs(x) > idMath::FLT_SMALLEST_NON_DENORMAL)) {
+		printf("Pseudo assert: fabs( y = %f) > idMath::FLT_SMALLEST_NON_DENORMAL || fabs( x = %f ) > idMath::FLT_SMALLEST_NON_DENORMAL\n", y, x);
+	}
+#endif
+	return atan2f(y, x);
+}
+#endif
 /*
 ========================
 idMath::ATan16
@@ -1208,6 +1340,19 @@ ID_INLINE float idMath::Pow16( float x, float y )
 {
 	return Exp16( y * Log16( x ) );
 }
+
+/*
+========================
+idMath::Mod
+
+SPRBD uses it in the new sky
+========================
+*/
+ID_INLINE float idMath::Mod(float a, float b)
+{
+	return a - b * Floor(a / b);
+}
+
 
 /*
 ========================
@@ -1782,6 +1927,16 @@ ID_INLINE unsigned long idMath::FtolFast( float f )
 	}
 
 // method from RevelatioN!
+	// added a version to clamp byte values (revelator)
+//	ID_INLINE byte idMath::ClampByte(byte min, byte max, int value) {
+//		if (value < min) {
+//			return min;
+//		}
+//		if (value > max) {
+//			return max;
+//		}
+//		return value;
+//	}
 	ID_INLINE byte idMath::ClampByte( byte min, byte max, int value )
 	{
 		if( value < min )
@@ -1890,18 +2045,31 @@ ID_INLINE unsigned long idMath::FtolFast( float f )
 //	return x.toBits() xor y.toBits() xor z.toBits()
 //}
 
+	template<typename T>
+	ID_INLINE T idMath::Diff(T a, T b)
+	{
+	//	return std::abs(a - b);
+		return false; 
+	}
 
 	template< typename T >
 	ID_INLINE
-	T Lerp( const T from, const T to, float f )
+	T Lerp( const T from, const T to, float f )		// vkDOOM3 removed EXTERN
 	{
 		return from + ( ( to - from ) * f );
 	}
 
+
+	//#modified-fva; BEGIN
+//ID_INLINE_EXTERN int Lerp( const int from, const int to, float f ) { 
+// Removed extern to eliminate warning C4499: 'extern': an explicit specialization cannot have a storage class (ignored)
+//	ID_INLINE int Lerp(const int from, const int to, float f) {
+		//#modified-fva; END
+		// 
 	//	This should be a template ? ? ?
 	template<>
 	ID_INLINE
-	int Lerp( const int from, const int to, float f )
+	int Lerp( const int from, const int to, float f )		// vkDOOM3 removed EXTERN
 	{
 		return idMath::Ftoi( ( float ) from + ( ( ( float ) to - ( float ) from ) * f ) );
 	}
@@ -1980,4 +2148,4 @@ ID_INLINE unsigned long idMath::FtolFast( float f )
 		*/
 	}
 
-#endif /* !__MATH_MATH_H__ */
+#endif /* !__IDLIB_MATH_H__ */

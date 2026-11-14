@@ -757,6 +757,24 @@ void idImage::ActuallyLoadImage( bool fromBackEnd, nvrhi::ICommandList* commandL
 	}
 
 	// RB: the following does not load the source images from disk because pic is NULL
+#if defined( DOMINION ) && !defined( DMAP ) // Map loading - Profile real image work, not retained textures
+	const bool measureLoad = globalImages->profileLevelLoad;
+	idImageManager::loadProfile_t &timings = globalImages->loadProfile;
+	uint64 timingMark = measureLoad ? Sys_Microseconds() : 0;
+	auto recordImageTime = [&]( uint64 &counter )
+	{
+		if( measureLoad )
+		{
+			const uint64 now = Sys_Microseconds();
+			counter += now - timingMark;
+			timingMark = now;
+		}
+	};
+	if( measureLoad && commandList == NULL )
+	{
+		++timings.metadataPasses;
+	}
+#endif
 	// but it tries to get the timestamp to see if we have a newer file than the one in the compressed .bimage
 
 #if defined( DOMINION ) // Original assets - source timestamps in production mode too
@@ -831,6 +849,9 @@ void idImage::ActuallyLoadImage( bool fromBackEnd, nvrhi::ICommandList* commandL
 #endif
 	// RB: try to load the .bimage and skip if sourceFileTime is newer
 	idBinaryImage im( generatedName );
+#if defined( DOMINION ) && !defined( DMAP ) // Map loading - Timestamp/format lookup cost
+	recordImageTime( timings.lookupUS );
+#endif
 	binaryFileTime = im.LoadFromGeneratedFile( sourceFileTime );
 
 	// BFHACK, do not want to tweak on buildgame so catch these images here
@@ -884,6 +905,13 @@ void idImage::ActuallyLoadImage( bool fromBackEnd, nvrhi::ICommandList* commandL
 		im.LoadFromDDS( GetName(), usage, sourceFileTime );
 #endif
 	const bimageFile_t& header = im.GetFileHeader();
+#if defined( DOMINION ) && !defined( DMAP ) // Map loading - Binary or DDS read cost
+	recordImageTime( timings.binaryUS );
+	if( measureLoad && ( binaryFileTime != FILE_NOT_FOUND_TIMESTAMP || loadedDDS ) )
+	{
+		++timings.cachedLoads;
+	}
+#endif
 
 	if(
 #if defined( DOMINION ) && !defined( DMAP ) // Original assets - DDS already supplied the upload chain
@@ -942,6 +970,9 @@ void idImage::ActuallyLoadImage( bool fromBackEnd, nvrhi::ICommandList* commandL
 			int size;
 			byte* pics[6];
 
+#if defined( DOMINION ) && !defined( DMAP ) // Map loading - Source cube read/decode cost
+			if( measureLoad ) { timingMark = Sys_Microseconds(); ++timings.sourceLoads; }
+#endif
 			if( !R_LoadCubeImages( GetName(), cubeFiles, pics, &size, &sourceFileTime, cubeMapSize ) || size == 0 )
 			{
 				idLib::Warning( "Couldn't load cube image: %s", GetName() );
@@ -950,6 +981,9 @@ void idImage::ActuallyLoadImage( bool fromBackEnd, nvrhi::ICommandList* commandL
 				return;
 			}
 
+#if defined( DOMINION ) && !defined( DMAP ) // Map loading - Source cube read/decode cost
+			recordImageTime( timings.sourceUS );
+#endif
 			repeat = TR_CLAMP;
 
 			opts.textureType = DTT_CUBIC;
@@ -979,6 +1013,9 @@ void idImage::ActuallyLoadImage( bool fromBackEnd, nvrhi::ICommandList* commandL
 			}
 
 			im.LoadCubeFromMemory( size, ( const byte** )pics, opts.numLevels, opts.format, opts.gammaMips );
+#if defined( DOMINION ) && !defined( DMAP ) // Map loading - Cube mip/format preparation
+			recordImageTime( timings.prepareUS );
+#endif
 
 			commonLocal.LoadPacifierBinarizeEnd();
 
@@ -998,7 +1035,13 @@ void idImage::ActuallyLoadImage( bool fromBackEnd, nvrhi::ICommandList* commandL
 			byte* pic;
 
 			// load the full specification, and perform any image program calculations
+#if defined( DOMINION ) && !defined( DMAP ) // Map loading - Source image read/decode/program cost
+			if( measureLoad ) { timingMark = Sys_Microseconds(); ++timings.sourceLoads; }
+#endif
 			R_LoadImageProgram( GetName(), &pic, &width, &height, &sourceFileTime, &usage );
+#if defined( DOMINION ) && !defined( DMAP ) // Map loading - Source image read/decode/program cost
+			recordImageTime( timings.sourceUS );
+#endif
 
 			if( pic == NULL )
 			{
@@ -1106,6 +1149,9 @@ void idImage::ActuallyLoadImage( bool fromBackEnd, nvrhi::ICommandList* commandL
 			commonLocal.LoadPacifierBinarizeEnd();
 
 			Mem_Free( pic );
+#if defined( DOMINION ) && !defined( DMAP ) // Map loading - 2D mip/format preparation
+			recordImageTime( timings.prepareUS );
+#endif
 		}
 
 		// RB: write the compressed .bimage which contains the optimized GPU format
@@ -1119,11 +1165,17 @@ void idImage::ActuallyLoadImage( bool fromBackEnd, nvrhi::ICommandList* commandL
 	}
 #endif
 
+#if defined( DOMINION ) && !defined( DMAP ) // Map loading - Allocation/fallback and staging recording
+	if( measureLoad ) { timingMark = Sys_Microseconds(); }
+#endif
 #if defined( DOMINION ) // blue textures fix
 	PrepareBinaryImageForUpload( im );
 #endif
 
 	AllocImage();
+#if defined( DOMINION ) && !defined( DMAP ) // Map loading - Allocation/fallback cost
+	recordImageTime( timings.createUS );
+#endif
 
 #if defined( USE_NVRHI ) && !defined( DMAP )
 	commandList->beginTrackingTextureState( texture, nvrhi::AllSubresources, nvrhi::ResourceStates::Common );
@@ -1134,9 +1186,16 @@ void idImage::ActuallyLoadImage( bool fromBackEnd, nvrhi::ICommandList* commandL
 		const byte* pic = im.GetImageData( i );
 
 		commandList->writeTexture( texture, img.destZ, img.level, pic, GetRowPitch( opts.format, img.width ) );
+#if defined( DOMINION ) // Map loading - Bytes staged for the mip chain
+		if( measureLoad ) { timings.uploadedBytes += img.dataSize; }
+#endif
 	}
 	commandList->setPermanentTextureState( texture, nvrhi::ResourceStates::ShaderResource );
 	commandList->commitBarriers();
+#if defined( DOMINION ) // Map loading - CPU upload recording, not GPU execution time
+	recordImageTime( timings.recordUS );
+	if( measureLoad ) { ++timings.uploads; }
+#endif
 #else
 	/*
 	for( int i = 0; i < im.NumImages(); i++ )

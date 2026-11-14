@@ -138,6 +138,17 @@ static void R_BlackImage( idImage* image, nvrhi::ICommandList* commandList )
 
 	// solid black texture
 	memset( data, 0, sizeof( data ) );
+#if defined( DOMINION ) // OLD GUIs - Original opaque black image for fades
+	// dhewm3 drops an all-zero alpha channel when selecting RGB storage, making
+	// _black opaque. Preserve that result for original materials on our RGBA/BC path.
+	if( fileSystem->IsDoom2004() )
+	{
+		for( int i = 0; i < DEFAULT_SIZE * DEFAULT_SIZE; ++i )
+		{
+			data[i / DEFAULT_SIZE][i % DEFAULT_SIZE][3] = 255;
+		}
+	}
+#endif
 	image->GenerateImage( ( byte* )data, DEFAULT_SIZE, DEFAULT_SIZE,
 						  TF_DEFAULT, TR_REPEAT, TD_DEFAULT, commandList );
 }
@@ -1056,6 +1067,11 @@ void idImageManager::CreateIntrinsicImages()
 	defaultImage = ImageFromFunction( "_default", R_DefaultImage );
 	whiteImage = ImageFromFunction( "_white", R_WhiteImage );
 	blackImage = ImageFromFunction( "_black", R_BlackImage );
+#if defined( DOMINION ) // OLD GUIs - Opaque save background snapshot
+	// Register this transient screen copy so capture code can identify its RGB-only
+	// purpose. CopyFramebufferFrom resizes it when a save first needs the full view.
+	saveBackgroundImage = ImageFromFunction( "_dominionSaveBackground", R_BlackImage );
+#endif
 	blackDiffuseImage = ImageFromFunction( "_blackDiffuse", R_BlackDiffuseImage );
 	cyanImage = ImageFromFunction( "_cyan", R_CyanImage );
 	redClayImage = ImageFromFunction( "_redClay", R_RedClayImage );

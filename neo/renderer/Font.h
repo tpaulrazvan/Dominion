@@ -71,11 +71,7 @@ private:
 		float maxHeight[3];
 	};
 	originalFontInfo_t* originalFont;
-#if defined( DOMINION ) // OLD GUIs - Shared support
-	bool LoadOriginalFont( const char* fontDirectory = NULL );
-#else
-	bool LoadOriginalFont();
-#endif
+	bool LoadOriginalFont( const char* fontDirectory );
 	int OriginalFontSize( float scale ) const;
 #endif
 

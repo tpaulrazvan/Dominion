@@ -6202,8 +6202,6 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 	// GUI model previews share the LDR canvas and must not alter gameplay histories.
 	const bool isMenuRenderDef = _viewDef->renderView.guiWidth > 0 && _viewDef->renderView.guiHeight > 0;
 	const bool useSceneEffects = is3D && !isMenuRenderDef;
-#else
-	const bool useSceneEffects = is3D;
 #endif
 
 	// ugly but still faster than building the string

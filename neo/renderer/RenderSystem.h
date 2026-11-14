@@ -306,6 +306,9 @@ public:
 	virtual uint32			GetColor() = 0;
 
 	virtual void			SetGLState( const uint64 glState ) = 0;
+#if defined( DOMINION ) // OLD GUIs - Fullscreen material parameter colors
+	virtual void			DrawFullscreenMaterial( const idMaterial *material, const idVec4 &color ) = 0;
+#endif
 
 	virtual void			DrawFilled( const idVec4& color, float x, float y, float w, float h ) = 0;
 	virtual void			DrawStretchPic( float x, float y, float w, float h, float s1, float t1, float s2, float t2, const idMaterial* material, float z = 0.0f ) = 0;

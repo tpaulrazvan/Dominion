@@ -276,6 +276,39 @@ void idRenderSystemLocal::SetGLState( const uint64 glState )
 	currentGLState = glState;
 }
 
+#if defined( DOMINION ) // OLD GUIs - Fullscreen material parameter colors
+/*
+================
+idRenderSystemLocal::DrawFullscreenMaterial
+Original wipes evaluate parm0..3 from the draw color, including expressions such
+as 1-parm3. Vertex-color multiplication with constant parameters cannot reproduce
+that. Flush around this draw so neither those parameters nor its state leak.
+================
+*/
+void idRenderSystemLocal::DrawFullscreenMaterial( const idMaterial *material, const idVec4 &color )
+{
+	if( !IsInitialized() )
+	{
+		return;
+	}
+	guiModel->EmitFullScreen();
+	guiModel->Clear();
+	const idVec4 savedShaderColor = guiModel->GetShaderColor();
+	const uint32 savedColor = currentColorNativeBytesOrder;
+	const uint64 savedState = currentGLState;
+	guiModel->SetShaderColor( color );
+	SetColor( colorWhite );
+	// The material owns its blending; previous HUD/SWF draw overrides do not.
+	currentGLState = 0;
+	DrawStretchPic( 0, 0, GetVirtualWidth(), GetVirtualHeight(), 0, 0, 1, 1, material );
+	guiModel->EmitFullScreen();
+	guiModel->Clear();
+	guiModel->SetShaderColor( savedShaderColor );
+	currentColorNativeBytesOrder = savedColor;
+	currentGLState = savedState;
+}
+#endif
+
 /*
 =============
 idRenderSystemLocal::DrawFilled

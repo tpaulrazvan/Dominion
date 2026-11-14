@@ -145,10 +145,8 @@ void idUserInterfaceManagerLocal::Preload( const char* mapName )
 }
 
 #if defined( DOMINION ) // OLD GUIs - Shared support
-#if defined( DOMINION ) // OLD GUIs - Shared support
 idCVar r_scaleMenusTo43( "r_scaleMenusTo43", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL,
 	"preserve the 4:3 aspect ratio of original fullscreen menus, loading screens and PDA" );
-#endif
 
 bool idUserInterfaceLocal::InitMenuFromFile( const char* qpath, const char* gameDirectory ) {
 	return InitFullscreenFromFile( qpath, gameDirectory, true );
@@ -238,10 +236,8 @@ idFont* idUserInterfaceLocal::RegisterMenuFont( const char* fontName ) const {
 		lang = "english";
 	}
 	idStr path = lang + ( name.IsEmpty() ? idStr( "" ) : "/" + name );
-	idFileLocal file( fileSystem->OpenFileRead( "fonts/" + path + "/fontImage_12.dat" ) );
-	if ( file == NULL ) {
-		path = "english" + ( name.IsEmpty() ? idStr( "" ) : "/" + name );
-	}
+	// Font registration already caches this name. Resolve missing language files
+	// when constructing that font, rather than reopening its archive for every window.
 	return renderSystem->RegisterFont( "oldgui/" + path );
 }
 
@@ -250,7 +246,6 @@ void idUserInterfaceLocal::GetMenuTransform( float& sx, float& sy, float& ox, fl
 	const float height = Max( 1, renderSystem->GetVirtualHeight() );
 	sx = width / 640.0f;
 	sy = height / 480.0f;
-#if defined( DOMINION ) // OLD GUIs - Shared support
 	if( scaleTo43 && r_scaleMenusTo43.GetBool() ) {
 		const float pixelWidth = Max( 1, renderSystem->GetWidth() );
 		const float pixelHeight = Max( 1, renderSystem->GetHeight() );
@@ -258,7 +253,6 @@ void idUserInterfaceLocal::GetMenuTransform( float& sx, float& sy, float& ox, fl
 		sx = scale * width / pixelWidth;
 		sy = scale * height / pixelHeight;
 	}
-#endif
 	ox = ( width - 640.0f * sx ) * 0.5f;
 	oy = ( height - 480.0f * sy ) * 0.5f;
 }
@@ -569,10 +563,16 @@ bool idUserInterfaceLocal::InitFromFile( const char* qpath, bool rebuild, bool c
 	}
 	state.Set( "text", "Test Text!" );
 
-	idTokenParser& bsrc = uiManagerLocal.GetBinaryParser();
-#if defined( DOMINION ) // Original assets - binary cache policy
-	if( !bsrc.IsLoaded() || !bsrc.StartParsing( source ) || !fileSystem->UseBinaryAssets( binaryLoadGuis.GetBool() ) )
+#if defined( DOMINION ) // OLD GUIs - Parse uncached source without a map-wide token dictionary
+	// Like the original source loader, discard syntax after constructing this desktop.
+	// The BFG map dictionary is useful for disk caches, but repeatedly searching it
+	// while loading original GUI source is costly and can retain stale source tokens.
+	const bool useBinaryGuis = fileSystem->UseBinaryAssets( binaryLoadGuis.GetBool() );
+	idTokenParser sourceParser;
+	idTokenParser &bsrc = useBinaryGuis ? uiManagerLocal.GetBinaryParser() : sourceParser;
+	if( !bsrc.IsLoaded() || !bsrc.StartParsing( source ) || !useBinaryGuis )
 #else
+	idTokenParser& bsrc = uiManagerLocal.GetBinaryParser();
 	if( !bsrc.IsLoaded() || !bsrc.StartParsing( source ) || !binaryLoadGuis.GetBool() )
 #endif
 	{

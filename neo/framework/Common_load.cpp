@@ -39,6 +39,9 @@ If you have questions concerning this license or the applicable additional terms
 #define LAUNCH_TITLE_DOOM2_EXECUTABLE		"doom2.exe"
 
 idCVar com_wipeSeconds( "com_wipeSeconds", "1", CVAR_SYSTEM, "" );
+#if defined( DOMINION ) // Map loading - Optional stage and image timing summary
+idCVar com_profileMapLoad( "com_profileMapLoad", "0", CVAR_SYSTEM | CVAR_INTEGER, "0 off, 1 map/image CPU timings, 2 also time an explicit device queue drain", 0, 2 );
+#endif
 #if defined( DOMINION ) // Original map reload - retain source assets
 idCVar com_reuseMapAssets( "com_reuseMapAssets", "1", CVAR_SYSTEM | CVAR_BOOL, "retain original Doom 3 media on same-map reloads; entity state and GPU geometry are rebuilt" );
 #endif
@@ -498,6 +501,19 @@ void idCommonLocal::ExecuteMapChange()
 	}
 
 	int start = Sys_Milliseconds();
+#if defined( DOMINION ) // Map loading - Optional stage and image timing summary
+	const bool profileLoad = com_profileMapLoad.GetBool();
+	uint64 profileMark = profileLoad ? Sys_Microseconds() : 0;
+	auto reportLoadPhase = [&]( const char *phase )
+	{
+		if( profileLoad )
+		{
+			const uint64 now = Sys_Microseconds();
+			common->Printf( "LOAD_PROFILE %s: %.3f ms\n", phase, ( now - profileMark ) * 0.001 );
+			profileMark = Sys_Microseconds();
+		}
+	};
+#endif
 
 	for( int i = 0; i < MAX_INPUT_DEVICES; i++ )
 	{
@@ -542,6 +558,10 @@ void idCommonLocal::ExecuteMapChange()
 	StartWipe( "wipeMaterial", true );
 	CompleteWipe();
 
+#if defined( DOMINION ) // Map loading - Optional stage and image timing summary
+	reportLoadPhase( "filesystem setup + fade out" );
+#endif
+
 	int sm = Sys_Milliseconds();
 	// shut down the existing game if it is running
 	UnloadMap();
@@ -568,6 +588,9 @@ void idCommonLocal::ExecuteMapChange()
 	common->Printf( "%6d msec to free assets\n", ms );
 
 	//Sys_DumpMemory( true );
+#if defined( DOMINION ) // Map loading - Optional stage and image timing summary
+	reportLoadPhase( "unload + asset preparation" );
+#endif
 
 	// load / program a gui to stay up on the screen while loading
 	// set the loading gui that we will wipe to
@@ -626,6 +649,9 @@ void idCommonLocal::ExecuteMapChange()
 	Sys_GrabMouseCursor( false );
 
 	// let the renderSystem load all the geometry
+#if defined( DOMINION ) // Map loading - Optional stage and image timing summary
+	reportLoadPhase( "loading GUI + minimum display + preloads" );
+#endif
 #if defined( DOMINION ) // OLD GUIs - Loading progress across all map stages
 	SetLegacyLoadProgress( 0.02f );
 #endif
@@ -637,6 +663,9 @@ void idCommonLocal::ExecuteMapChange()
 	// for the synchronous networking we needed to roll the angles over from
 	// level to level, but now we can just clear everything
 	usercmdGen->InitForNewMap();
+#if defined( DOMINION ) // Map loading - Optional stage and image timing summary
+	reportLoadPhase( "render world" );
+#endif
 
 	// load and spawn all other entities ( from a savegame possibly )
 #if defined( DOMINION ) // OLD GUIs - Loading progress across all map stages
@@ -664,6 +693,9 @@ void idCommonLocal::ExecuteMapChange()
 	}
 
 	game->Shell_CreateMenu( true );
+#if defined( DOMINION ) // Map loading - Optional stage and image timing summary
+	reportLoadPhase( "game entities or save restore + menu" );
+#endif
 
 	// Reset some values important to multiplayer
 	ResetNetworkingState();
@@ -706,13 +738,22 @@ void idCommonLocal::ExecuteMapChange()
 	SetLegacyLoadProgress( 0.45f, 0.40f );
 #endif
 	renderSystem->EndLevelLoad();
+#if defined( DOMINION ) // Map loading - Optional stage and image timing summary
+	reportLoadPhase( "session readiness + first tick + renderer assets" );
+#endif
 #if defined( DOMINION ) // OLD GUIs - Loading progress across all map stages
 	SetLegacyLoadProgress( 0.85f, 0.05f );
 #endif
 	soundSystem->EndLevelLoad();
+#if defined( DOMINION ) // Map loading - Optional stage and image timing summary
+	reportLoadPhase( "sound loading" );
+#endif
 	declManager->EndLevelLoad();
 	uiManager->EndLevelLoad( currentMapName );
 	fileSystem->EndLevelLoad();
+#if defined( DOMINION ) // Map loading - Optional stage and image timing summary
+	reportLoadPhase( "decl/GUI/filesystem finalization" );
+#endif
 #if defined( DOMINION ) // OLD GUIs - Loading progress across all map stages
 	SetLegacyLoadProgress( 0.90f );
 #endif
@@ -742,9 +783,15 @@ void idCommonLocal::ExecuteMapChange()
 	}
 
 	common->Printf( "----- Generating Interactions -----\n" );
+#if defined( DOMINION ) // Map loading - Optional stage and image timing summary
+	reportLoadPhase( "settling frames + autosave" );
+#endif
 
 	// let the renderSystem generate interactions now that everything is spawned
 	renderWorld->GenerateAllInteractions();
+#if defined( DOMINION ) // Map loading - Optional stage and image timing summary
+	reportLoadPhase( "interactions" );
+#endif
 #if defined( DOMINION ) // OLD GUIs - Loading progress across all map stages
 	SetLegacyLoadProgress( 0.99f );
 #endif
@@ -791,8 +838,6 @@ void idCommonLocal::ExecuteMapChange()
 		legacyLoadGUI->SetStateFloat( "map_loading", 1.0f );
 		legacyLoadGUI->StateChanged( Sys_Milliseconds() );
 		UpdateScreen( false );
-		uiManager->DeAlloc( legacyLoadGUI );
-		legacyLoadGUI = NULL;
 	}
 #endif
 	delete loadGUI;
@@ -802,10 +847,19 @@ void idCommonLocal::ExecuteMapChange()
 	// capture the current screen and start a wipe
 	StartWipe( "wipe2Material" );
 
+#if defined( DOMINION ) // OLD GUIs - Preserve the loading screen for its outgoing wipe
+	// Like dhewm3, capture while the loading desktop is still available to Draw().
+	uiManager->DeAlloc( legacyLoadGUI );
+	legacyLoadGUI = NULL;
+#endif
+
 	// we are valid for game draws now
 	insideExecuteMapChange = false;
 	mapSpawned = true;
 	Sys_ClearEvents();
+#if defined( DOMINION ) // Map loading - Optional stage and image timing summary
+	reportLoadPhase( "warnings + loading completion + outgoing capture" );
+#endif
 
 
 	int	msec = Sys_Milliseconds() - start;
@@ -825,14 +879,6 @@ Pumps the session and if multiplayer, displays dialogs during the loading proces
 */
 void idCommonLocal::UpdateLevelLoadPacifier()
 {
-#if defined( DOMINION ) // OLD GUIs - Loading screens
-	if( legacyLoadGUI != NULL && loadPacifierExpectedCount > 0 ) {
-		const float stageProgress = idMath::ClampFloat( 0.0f, 1.0f, float( loadPacifierCount ) / float( loadPacifierExpectedCount ) );
-		const float progress = legacyLoadProgressBase + legacyLoadProgressSpan * stageProgress;
-		legacyLoadGUI->SetStateFloat( "map_loading", Max( progress, legacyLoadGUI->State().GetFloat( "map_loading" ) ) );
-		legacyLoadGUI->StateChanged( Sys_Milliseconds() );
-	}
-#endif
 	autoRenderIconType_t icon = AUTORENDER_DEFAULTICON;
 	bool autoswapsRunning = renderSystem->AreAutomaticBackgroundSwapsRunning( &icon );
 	if( !insideExecuteMapChange && !autoswapsRunning )
@@ -881,6 +927,17 @@ void idCommonLocal::UpdateLevelLoadPacifier()
 		if( time - lastPacifierGuiTime >= 50 )
 		{
 			lastPacifierGuiTime = time;
+#if defined( DOMINION ) // OLD GUIs - Throttle loading GUI evaluation with its redraw
+			// Like dhewm3's pacifier, evaluate progress only for a screen update,
+			// rather than repeatedly evaluating the desktop between visible frames.
+			if( legacyLoadGUI != NULL && loadPacifierExpectedCount > 0 )
+			{
+				const float stageProgress = idMath::ClampFloat( 0.0f, 1.0f, float( loadPacifierCount ) / float( loadPacifierExpectedCount ) );
+				const float progress = legacyLoadProgressBase + legacyLoadProgressSpan * stageProgress;
+				legacyLoadGUI->SetStateFloat( "map_loading", Max( progress, legacyLoadGUI->State().GetFloat( "map_loading" ) ) );
+				legacyLoadGUI->StateChanged( time );
+			}
+#endif
 			UpdateScreen( false );
 		}
 	}
@@ -1242,6 +1299,9 @@ bool idCommonLocal::SaveGame( const char* saveName )
 			// Queue the same 320x240 game view as vanilla. Readback happens after GPU
 			// submission, and the loose TGA lives with the saves in fs_savepath.
 			const idStr preview = "savegames/" + gameDetails.slotName + ".tga";
+			// Our renderer uses a shared colour target for the cropped view. Preserve
+			// the visible frame so a menu-only redraw cannot present its small thumbnail.
+			renderSystem->CaptureRenderToImage( "_dominionSaveBackground" );
 			renderSystem->CropRenderSize( 320, 240 );
 			if( game->Draw( game->GetLocalClientNum(), true ) )
 			{
@@ -1250,6 +1310,9 @@ bool idCommonLocal::SaveGame( const char* saveName )
 				gameDetails.descriptors.Set( "legacyPreview", preview );
 			}
 			renderSystem->UnCrop();
+			// Restore before the next player/menu draw; the queued file copy already
+			// owns the thumbnail, and no additional player render/history update is needed.
+			renderSystem->DrawFullscreenMaterial( declManager->FindMaterial( "_dominionSaveBackground" ), colorWhite );
 		}
 		// Include the thumbnail descriptor in the integrity check written with this save.
 		gameDetails.descriptors.Delete( SAVEGAME_DETAIL_FIELD_CHECKSUM );

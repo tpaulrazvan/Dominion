@@ -238,6 +238,15 @@ void idCommonLocal::DrawWipeModel()
 	}
 
 	float fade = ( float )( currentTime - wipeStartTime ) / ( wipeStopTime - wipeStartTime );
+#if defined( DOMINION ) // OLD GUIs - Native wipe material parameters
+	// Original wipe2Material uses 1-parm3, not vertex alpha. Preserve its expression
+	// and custom wipe materials without changing ordinary GUI/SWF color batching.
+	if( fileSystem->IsDoom2004() )
+	{
+		renderSystem->DrawFullscreenMaterial( wipeMaterial, idVec4( 1, 1, 1, fade ) );
+		return;
+	}
+#endif
 	renderSystem->SetColor4( 1, 1, 1, fade );
 	renderSystem->DrawStretchPic( 0, 0, renderSystem->GetVirtualWidth(), renderSystem->GetVirtualHeight(), 0, 0, 1, 1, wipeMaterial );
 }

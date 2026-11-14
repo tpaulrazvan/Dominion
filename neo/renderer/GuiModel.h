@@ -51,6 +51,10 @@ public:
 	idGuiModel();
 
 	void		Clear();
+#if defined( DOMINION ) // OLD GUIs - Fullscreen material parameter colors
+	idVec4		GetShaderColor() const { return idVec4( shaderParms[0], shaderParms[1], shaderParms[2], shaderParms[3] ); }
+	void		SetShaderColor( const idVec4 &color ) { memcpy( shaderParms, color.ToFloatPtr(), sizeof( float ) * 4 ); }
+#endif
 
 #if defined( RENDERDEMOS )
 	void		WriteToDemo( idDemoFile* demo );

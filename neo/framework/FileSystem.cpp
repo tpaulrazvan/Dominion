@@ -137,6 +137,9 @@ struct searchpath_t
 // search flags when opening a file
 #define FSFLAG_SEARCH_DIRS		( 1 << 0 )
 #define FSFLAG_RETURN_FILE_MEM	( 1 << 1 )
+#if defined( DOMINION ) // File metadata - Do not decompress PK4 payloads for stat queries
+#define FSFLAG_METADATA_ONLY		( 1 << 2 )
+#endif
 
 class idFileSystemLocal : public idFileSystem
 {
@@ -355,7 +358,7 @@ private:
 
 	// RB: PK4 support
 #if defined( DOMINION ) // OLD GUIs - Shared directory lookup
-	idFile* 				GetZipFile( const char* fileName, bool memFile, const char* gamedir = NULL );
+	idFile* 				GetZipFile( const char* fileName, bool memFile, const char* gamedir = NULL, const bool metadataOnly = false );
 #else
 	idFile* 				GetZipFile( const char* fileName, bool memFile );
 #endif
@@ -2132,7 +2135,11 @@ int idFileSystemLocal::ReadFile( const char* relativePath, void** buffer, ID_TIM
 	}
 
 	// look for it in the filesystem or pack files
+#if defined( DOMINION ) // File metadata - Keep the normal search order without prefetching data
+	f = OpenFileReadFlags( relativePath, FSFLAG_SEARCH_DIRS | ( buffer == NULL ? FSFLAG_METADATA_ONLY : 0 ), buffer != NULL );
+#else
 	f = OpenFileRead( relativePath, ( buffer != NULL ) );
+#endif
 	if( f == NULL )
 	{
 		// RB: moved here
@@ -3695,7 +3702,7 @@ Returns NULL
 ========================
 */
 #if defined( DOMINION ) // OLD GUIs - Shared directory lookup
-idFile* idFileSystemLocal::GetZipFile( const char* fileName, bool memFile, const char* gamedir )
+idFile* idFileSystemLocal::GetZipFile( const char* fileName, bool memFile, const char* gamedir, const bool metadataOnly )
 #else
 idFile* idFileSystemLocal::GetZipFile( const char* fileName, bool memFile )
 #endif
@@ -3722,7 +3729,13 @@ idFile* idFileSystemLocal::GetZipFile( const char* fileName, bool memFile )
 		// RB: TODO I don't like that we always create a new idFile_Memory buffer instead of reusing
 		// the temporary resourceBufferPtr. This needs some profiling
 
+#if defined( DOMINION ) // File metadata - ZIP stream headers already provide length and timestamp
+		// Like dhewm3, a metadata request needs no uncompressed payload. Actual file
+		// reads retain the existing memory-prefetch policy, including small entries.
+		if( file != NULL && !metadataOnly && ( memFile || rc.length < 8 * 1024 * 1024 ) )
+#else
 		if( file != NULL && ( ( memFile /*|| rc.length <= resourceBufferAvailable*/ ) || rc.length < 8 * 1024 * 1024 ) )
+#endif
 		{
 			byte* buf = NULL;
 			//if( rc.length < resourceBufferAvailable )
@@ -3896,7 +3909,7 @@ idFile* idFileSystemLocal::OpenFileReadFlags( const char* relativePath, int sear
 	if( UsingZipFiles() && fs_resourceLoadPriority.GetInteger() == 1 )
 	{
 #if defined( DOMINION ) // OLD GUIs - Shared directory lookup
-		idFile* rf = GetZipFile( relativePath, ( searchFlags & FSFLAG_RETURN_FILE_MEM ) != 0, gamedir );
+		idFile* rf = GetZipFile( relativePath, ( searchFlags & FSFLAG_RETURN_FILE_MEM ) != 0, gamedir, ( searchFlags & FSFLAG_METADATA_ONLY ) != 0 );
 #else
 		idFile* rf = GetZipFile( relativePath, ( searchFlags & FSFLAG_RETURN_FILE_MEM ) != 0 );
 #endif
@@ -4053,7 +4066,7 @@ idFile* idFileSystemLocal::OpenFileReadFlags( const char* relativePath, int sear
 	if( UsingZipFiles() && fs_resourceLoadPriority.GetInteger() == 0 )
 	{
 #if defined( DOMINION ) // OLD GUIs - Shared directory lookup
-		idFile* rf = GetZipFile( relativePath, ( searchFlags & FSFLAG_RETURN_FILE_MEM ) != 0, gamedir );
+		idFile* rf = GetZipFile( relativePath, ( searchFlags & FSFLAG_RETURN_FILE_MEM ) != 0, gamedir, ( searchFlags & FSFLAG_METADATA_ONLY ) != 0 );
 #else
 		idFile* rf = GetZipFile( relativePath, ( searchFlags & FSFLAG_RETURN_FILE_MEM ) != 0 );
 #endif
@@ -4385,7 +4398,11 @@ idFileSystemLocal::FindFile
 */
 findFile_t idFileSystemLocal::FindFile( const char* path )
 {
+#if defined( DOMINION ) // File metadata - Existence checks must not prefetch compressed payloads
+	idFile* f = OpenFileReadFlags( path, FSFLAG_SEARCH_DIRS | FSFLAG_METADATA_ONLY );
+#else
 	idFile* f = OpenFileReadFlags( path, FSFLAG_SEARCH_DIRS );
+#endif
 	if( f == NULL )
 	{
 		return FIND_NO;

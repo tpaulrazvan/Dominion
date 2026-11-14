@@ -36,8 +36,8 @@ const float	idMath::PI				= 3.14159265358979323846f;
 const float	idMath::TWO_PI			= 2.0f * PI;
 const float	idMath::HALF_PI			= 0.5f * PI;
 const float	idMath::ONEFOURTH_PI	= 0.25f * PI;
-const float idMath::ONEOVER_PI		= 1.0f / idMath::PI;
-const float idMath::ONEOVER_TWOPI	= 1.0f / idMath::TWO_PI;
+const float idMath::ONEOVER_PI		= 1.0f / idMath::PI;		// remove idMath::	FennixCrew
+const float idMath::ONEOVER_TWOPI	= 1.0f / idMath::TWO_PI;	// remove idMath::	FennixCrew
 const float idMath::E				= 2.71828182845904523536f;
 const float idMath::SQRT_TWO		= 1.41421356237309504880f;
 const float idMath::SQRT_THREE		= 1.73205080756887729352f;
@@ -51,6 +51,9 @@ const float	idMath::INFINITUM		= 1e30f;
 const float idMath::FLOAT_EPSILON		= 1.192092896e-07f;
 const float idMath::DBL_EPSILON = 2.2204460492503131E-16; // REVELATION!
 const float idMath::FLT_SMALLEST_NON_DENORMAL	= * reinterpret_cast< const float* >( & SMALLEST_NON_DENORMAL );	// 1.1754944e-038f
+//#modified-fva; BEGIN
+const int idMath::CST_MAX_INT = (int)((~(unsigned int)0) >> 1);
+//#modified-fva; END
 
 #if defined(USE_INTRINSICS_SSE)
 const __m128 idMath::SIMD_SP_zero				= { 0.0f, 0.0f, 0.0f, 0.0f };

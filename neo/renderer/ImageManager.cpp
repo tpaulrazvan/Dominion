@@ -804,6 +804,11 @@ void idImageManager::BeginLevelLoad()
 #endif
 {
 	insideLevelLoad = true;
+#if defined( DOMINION ) && !defined( DMAP ) // Map loading - Optional CPU image timing counters
+	extern idCVar com_profileMapLoad;
+	profileLevelLoad = com_profileMapLoad.GetInteger() != 0;
+	loadProfile = loadProfile_t();
+#endif
 
 	for( int i = 0 ; i < images.Num() ; i++ )
 	{
@@ -917,6 +922,9 @@ idImageManager::LoadLevelImages
 #if !defined( DMAP )
 int idImageManager::LoadLevelImages( bool pacifier )
 {
+#if defined( DOMINION ) // Map loading - Measure submission separately from image preparation
+	const uint64 profileStart = profileLevelLoad ? Sys_Microseconds() : 0;
+#endif
 	if( !commandList )
 	{
 		nvrhi::CommandListParameters params = {};
@@ -964,9 +972,29 @@ int idImageManager::LoadLevelImages( bool pacifier )
 
 	globalImages->LoadDeferredImages( commandList );
 
+#if defined( DOMINION ) // Map loading - Measure submission separately from image preparation
+	const uint64 profileSubmit = profileLevelLoad ? Sys_Microseconds() : 0;
+#endif
 	commandList->close();
 
 	deviceManager->GetDevice()->executeCommandList( commandList );
+
+#if defined( DOMINION ) // Map loading - Optional queue-drain timing, not a GPU timestamp
+	if( profileLevelLoad )
+	{
+		const uint64 submitted = Sys_Microseconds();
+		common->Printf( "LOAD_IMAGES bulk CPU pass %.3f ms, close/submit %.3f ms\n",
+			( profileSubmit - profileStart ) * 0.001, ( submitted - profileSubmit ) * 0.001 );
+		extern idCVar com_profileMapLoad;
+		if( com_profileMapLoad.GetInteger() > 1 )
+		{
+			// Diagnostic mode only: this includes all earlier work on the device queue.
+			const uint64 waitStart = Sys_Microseconds();
+			deviceManager->GetDevice()->waitForIdle();
+			common->Printf( "LOAD_IMAGES queue drain %.3f ms\n", ( Sys_Microseconds() - waitStart ) * 0.001 );
+		}
+	}
+#endif
 
 	common->UpdateLevelLoadPacifier();
 
@@ -990,6 +1018,17 @@ void idImageManager::EndLevelLoad()
 
 	int	end = Sys_Milliseconds();
 	common->Printf( "%5i images loaded in %5.1f seconds\n", loadCount, ( end - start ) * 0.001 );
+#if defined( DOMINION ) // Map loading - Aggregate CPU work since BeginLevelLoad
+	if( profileLevelLoad )
+	{
+		common->Printf( "LOAD_IMAGES CPU: lookups %.3f, binary/DDS %.3f, source decode/program %.3f, mip/format preparation %.3f ms\n",
+			loadProfile.lookupUS * 0.001, loadProfile.binaryUS * 0.001, loadProfile.sourceUS * 0.001, loadProfile.prepareUS * 0.001 );
+		common->Printf( "LOAD_IMAGES CPU: resource creation %.3f, writeTexture/staging recording %.3f ms; source calls %d, cached/DDS %d, uploads %d, front-end passes %d, %.2f MiB\n",
+			loadProfile.createUS * 0.001, loadProfile.recordUS * 0.001, loadProfile.sourceLoads, loadProfile.cachedLoads,
+			loadProfile.uploads, loadProfile.metadataPasses, loadProfile.uploadedBytes / ( 1024.0 * 1024.0 ) );
+	}
+	profileLevelLoad = false;
+#endif
 	common->Printf( "----------------------------------------\n" );
 	//R_ListImages_f( idCmdArgs( "sorted sorted", false ) );
 }

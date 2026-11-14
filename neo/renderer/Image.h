@@ -570,6 +570,18 @@ public:
 		commandList = nullptr;
 	}
 
+#if defined( DOMINION ) // Map loading - Optional CPU image timing counters
+	// Reset per load; disabled counters do not read clocks or print per-image lines.
+	struct loadProfile_t
+	{
+		uint64 lookupUS = 0, binaryUS = 0, sourceUS = 0, prepareUS = 0;
+		uint64 createUS = 0, recordUS = 0, uploadedBytes = 0;
+		int sourceLoads = 0, cachedLoads = 0, uploads = 0, metadataPasses = 0;
+	};
+	loadProfile_t loadProfile;
+	bool profileLevelLoad = false;
+#endif
+
 	void				Init();
 	void				Shutdown();
 
@@ -631,6 +643,9 @@ public:
 	idImage* 			alphaNotchImage;			// 2x1 texture with just 1110 and 1111 with point sampling
 	idImage* 			whiteImage;					// full of 0xff
 	idImage* 			blackImage;					// full of 0x00
+#if defined( DOMINION ) // OLD GUIs - Opaque save background snapshot
+	idImage*			saveBackgroundImage = nullptr;
+#endif
 	idImage* 			blackDiffuseImage;			// full of 0x00
 	idImage* 			cyanImage;					// cyan
 	idImage* 			redClayImage;				// dark red

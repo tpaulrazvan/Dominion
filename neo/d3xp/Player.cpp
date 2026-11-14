@@ -5388,6 +5388,12 @@ known weapon names for both selection and pickup events without changing gamepla
 */
 int idPlayer::GuiWeaponSlot( const int weaponSlot ) const
 {
+	// Original player definitions and GUI scripts already agree on their slot numbers,
+	// including RoE's flashlight/grabber slots. Only BFG's reordered inventory needs translation.
+	if( fileSystem->IsDoom2004() )
+	{
+		return weaponSlot;
+	}
 	static const char *const baseWeapons[] =
 	{
 		"weapon_fists", "weapon_pistol", "weapon_shotgun", "weapon_machinegun",
@@ -14054,13 +14060,11 @@ void idPlayer::ToggleGuiPDA( void )
 		UpdatePDAInfo( false );
 		UpdateObjectiveInfo();
 		objectiveSystem->Activate( true, gameLocal.GetTimeGroupTime( timeGroup ) );
-#if defined( DOMINION ) // OLD GUIs - PDA
 		if( guiHud != NULL )
 		{
 			guiHud->HandleNamedEvent( "pdaPickupHide" );
 			guiHud->HandleNamedEvent( "videoPickupHide" );
 		}
-#endif
 		if( hud != NULL )
 		{
 			hud->ClearNewPDAInfo();

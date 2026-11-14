@@ -121,7 +121,16 @@ idFont::idFont( const char* n ) : name( n )
 	originalFont = NULL;
 	if ( name.Icmpn( "oldgui/", 7 ) == 0 ) {
 		alias = NULL;
-		if ( !LoadOriginalFont() ) {
+		// Resolve the original language fallback once per registered font, as dhewm3
+		// does through its font cache. GUI child windows must not repeat file probes.
+		idStr directory = name.Mid( 7, name.Length() );
+		idFileLocal file( fileSystem->OpenFileRead( "fonts/" + directory + "/fontImage_12.dat" ) );
+		if ( file == NULL ) {
+			const int separator = directory.Find( '/' );
+			directory = "english" + ( separator < 0 ? idStr( "" ) : directory.Mid( separator, directory.Length() ) );
+		}
+		directory = "fonts/" + directory;
+		if ( !LoadOriginalFont( directory ) ) {
 			common->Warning( "Could not load original menu font %s", n );
 			alias = renderSystem->RegisterFont( DEFAULT_FONT );
 		}
@@ -164,13 +173,8 @@ idFont::idFont( const char* n ) : name( n )
 }
 
 #if defined( DOMINION ) // OLD GUIs - Shared support
-#if defined( DOMINION ) // OLD GUIs - Shared support
 bool idFont::LoadOriginalFont( const char* fontDirectory ) {
-	const idStr directory = fontDirectory != NULL ? idStr( fontDirectory ) : "fonts/" + name.Mid( 7, name.Length() );
-#else
-bool idFont::LoadOriginalFont() {
-	const idStr directory = "fonts/" + name.Mid( 7, name.Length() );
-#endif
+	const idStr directory = fontDirectory;
 	originalFont = new( TAG_FONT ) originalFontInfo_t;
 	memset( originalFont, 0, sizeof( *originalFont ) );
 	const int sizes[3] = { 12, 24, 48 };

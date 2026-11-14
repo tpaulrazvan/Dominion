@@ -332,11 +332,12 @@ bool idImage::CopyFramebufferFrom( nvrhi::ITexture *source, int x, int y, int im
 	blitParms.sourceBox = idVec4( float( x ) / sourceDesc.width,
 		float( flipY ? y + imageHeight : y ) / sourceDesc.height,
 		float( imageWidth ) / sourceDesc.width, float( flipY ? -imageHeight : imageHeight ) / sourceDesc.height );
-#if defined( DOMINION ) // Fullscreen damage effects must not inherit glass opacity
-	if( this == globalImages->currentRenderImage )
+#if defined( DOMINION ) // Fullscreen damage effects and OLD GUIs - Opaque save background snapshot
+	if( this == globalImages->currentRenderImage || this == globalImages->saveBackgroundImage )
 	{
-		// PlayerView blends a colour snapshot, not the scene's material alpha masks.
-		// Preserve opaque alpha while copying RGB; otherwise glass masks limit double vision.
+		// PlayerView and save restoration blend a complete colour snapshot. Scene alpha
+		// contains material masks, not screen opacity: copying it leaves holes in the
+		// restored frame (or limits double vision to glass). Keep alpha opaque, copy RGB.
 		backEnd.GL_GetCommandList()->clearTextureFloat( texture, nvrhi::AllSubresources, nvrhi::Color( 0.f, 0.f, 0.f, 1.f ) );
 		blitParms.blendState.setColorWriteMask( nvrhi::ColorMask::Red | nvrhi::ColorMask::Green | nvrhi::ColorMask::Blue );
 	}
